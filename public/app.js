@@ -103,7 +103,9 @@ function sizeCards() {
 const sv = (t, one, many) => (teamName(t) === 'Opponents' ? many : one);
 function scoreText() { const s = S.score || 0; return s > 0 ? `${teamName(0)} ${sv(0, 'leads', 'lead')} by ${s}` : s < 0 ? `${teamName(1)} ${sv(1, 'leads', 'lead')} by ${-s}` : 'Level'; }
 function renderHeader() {
-  $('handNo').textContent = S.handNo ? `Hand ${S.handNo} · ${S.n} players` : `Table ${S.code} · ${S.n} players`;
+  const watching = S.phase !== 'lobby' && S.lobbyNames && S.lobbyNames.length ? `<span class="watchn"> · 👀 ${S.lobbyNames.length}<span class="wl"> watching</span></span>` : '';
+  $('handNo').innerHTML = esc(S.handNo ? `Hand ${S.handNo} · ${S.n} players` : `Table ${S.code} · ${S.n} players`) + watching;
+  $('handNo').title = watching ? 'Watching: ' + S.lobbyNames.join(', ') : '';
   document.querySelector('.sbox.ta .sname').textContent = teamName(0);
   document.querySelector('.sbox.tb .sname').textContent = teamName(1);
   const score = S.score || 0, s = Math.max(-TARGET, Math.min(TARGET, score)), pos = 50 - s / TARGET * 50;
@@ -362,7 +364,7 @@ function lobbyScreen() {
     const mine = i === 0 && me0();
     const team = S.spectator ? (i % 2 === 0 ? 'Orange team' : 'Blue team') : (i % 2 === 0 ? 'Your team' : 'Opponents');
     let act = '';
-    if (mine) act = 'You';
+    if (mine) act = 'You · tap an empty seat to move';
     else if (p.bot) act = 'Empty · tap to sit';
     else act = p.connected ? 'Taken' : 'Away';
     return `<button class="seatbtn ${tcls(i)} ${mine ? 'mine' : ''}" data-sit="${p.real}" ${!p.bot && !mine ? 'disabled' : ''}>
@@ -467,6 +469,7 @@ function onFx(f) {
   if (!S) return;
   switch (f.type) {
     case 'deal': sfx('deal'); break;
+    case 'watch': toast(f.text); sfx('pop'); break;
     case 'bid': sfx('bid', f.v); break;
     case 'support': sfx('support'); break;
     case 'pass': sfx('pass'); break;
@@ -624,6 +627,11 @@ function send(ev, data) {
     const cb = r => { if (r && r.error) flash(r.error); res(r); };
     if (data === undefined) sock.emit(ev, cb); else sock.emit(ev, data, cb);
   });
+}
+function toast(msg) {
+  let t = $('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 3500);
 }
 function flash(msg) { const c = $('conn'); c.innerHTML = esc(msg); c.hidden = false; clearTimeout(flash.t); flash.t = setTimeout(() => { if (sock.connected) c.hidden = true; }, 2600); }
 let waking = null;

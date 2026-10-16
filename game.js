@@ -68,12 +68,22 @@ class Table {
 
   // ---------- membership ----------
   addClient(socket, pid, name) {
+    const wasHere = [...this.clients.values()].some(x => x.pid === pid);
     this.clients.set(socket.id, { socket, pid });
-    const p = this.players.get(pid);
+    let p = this.players.get(pid);
     if (p) { p.connected = true; p.name = name || p.name; if (p.seat != null) { this.seats[p.seat].name = p.name; } }
-    else this.players.set(pid, { name, seat: null, connected: true });
+    else { p = { name, seat: null, connected: true }; this.players.set(pid, p); }
     socket.join(this.code);
-    this.touch(); this.broadcast();
+    this.touch();
+    if (p.seat == null && this.phase === 'lobby') {
+      // Joining before the game starts: take the first empty seat (they can still move)
+      const free = this.seats.findIndex(s => s.bot);
+      if (free >= 0) { this.sit(pid, free); return; }
+    }
+    if (p.seat == null && this.phase !== 'lobby' && !wasHere) {
+      this.fx('watch', { text: `${p.name} joined as audience`, except: pid });
+    }
+    this.broadcast();
   }
   removeClient(socketId) {
     const c = this.clients.get(socketId); if (!c) return;
@@ -108,7 +118,9 @@ class Table {
       this.freeSeat(p.seat);
     }
     if (s.pid && s.pid !== pid) { const other = this.players.get(s.pid); if (other) other.seat = null; }
+    const tookFrom = this.phase !== 'lobby' && s.bot ? s.name : null;
     s.pid = pid; s.bot = false; s.name = p.name; p.seat = seat;
+    if (tookFrom) this.fx('watch', { text: `${p.name} took over ${tookFrom}'s seat`, except: pid });
     this.touch(); this.broadcast();
     return null;
   }
@@ -209,9 +221,10 @@ class Table {
   }
   fx(type, data = {}) {
     for (const { socket, pid } of this.clients.values()) {
+      if (data.except && data.except === pid) continue;
       const p = this.players.get(pid); const me = p && p.seat != null ? p.seat : -1; const base = me < 0 ? 0 : me;
       const rot = s => (s == null || s < 0 ? s : (s - base + this.n) % this.n);
-      const d = { ...data };
+      const d = { ...data }; delete d.except;
       for (const k of ['seat', 'lead', 'credit', 'showSeat']) if (k in d) d[k] = rot(d[k]);
       if ('team' in d) d.team = (d.team - base % 2 + 2) % 2;
       if (d.text) d.text = this.fmt(d.text, me);
