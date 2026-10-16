@@ -13,6 +13,12 @@ app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] })
 app.get('/health', (_req, res) => res.json({ ok: true, tables: tables.size }));
 
 const tables = new Map();
+
+// Voice chat connection helpers. STUN works for most home wifi; a TURN server (set on Render as
+// TURN_URL, TURN_USER, TURN_PASS) relays audio for mobile networks that block direct connections.
+const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
+if (process.env.TURN_URL) ICE.push({ urls: process.env.TURN_URL.split(',').map(s => s.trim()), username: process.env.TURN_USER || '', credential: process.env.TURN_PASS || '' });
+const MAX_VOICE = 8;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function newCode() {
   let c;
@@ -30,6 +36,7 @@ io.on('connection', socket => {
 
   const reply = (cb, err, data) => { if (typeof cb === 'function') cb(err ? { error: err } : { ok: true, ...data }); };
   const leave = () => { if (table) { table.removeClient(socket.id); socket.leave(table.code); table = null; } };
+  // removeClient also drops this socket from voice chat and tells the others
 
   socket.on('create', (opts, cb) => {
     const n = [4, 6, 8].includes(opts && opts.n) ? opts.n : 4;
@@ -76,6 +83,35 @@ io.on('connection', socket => {
     const p = table.players.get(pid); if (p && p.seat != null) table.fx('react', { seat: p.seat, emo });
     reply(cb);
   });
+  // ---- voice chat: the server only passes connection messages between players' phones ----
+  const voiceLeave = () => {
+    if (table && table.voice.delete(socket.id)) { io.to(table.code).emit('voice:left', socket.id); table.broadcast(); }
+  };
+  socket.on('voice:join', cb => {
+    if (!table) return reply(cb, 'Not at a table');
+    if (!table.voice.has(socket.id) && table.voice.size >= MAX_VOICE) return reply(cb, 'Voice chat is full (8 people).');
+    const peers = [...table.voice.keys()].filter(id => id !== socket.id);
+    table.voice.set(socket.id, { pid, muted: false });
+    table.broadcast();
+    reply(cb, null, { peers, ice: ICE, me: socket.id });
+  });
+  socket.on('voice:leave', cb => { voiceLeave(); reply(cb); });
+  socket.on('voice:mute', (m, cb) => {
+    if (table && table.voice.has(socket.id)) { table.voice.get(socket.id).muted = !!m; table.broadcast(); }
+    reply(cb);
+  });
+  socket.on('voice:talk', on => {
+    if (!table || !table.voice.has(socket.id)) return;
+    const now = Date.now(); if (socket.data.lastTalk && now - socket.data.lastTalk < 150) return; socket.data.lastTalk = now;
+    socket.to(table.code).emit('voice:talk', { sid: socket.id, on: !!on });
+  });
+  socket.on('voice:signal', msg => {
+    if (!table || !msg || typeof msg.to !== 'string') return;
+    if (!table.voice.has(socket.id) || !table.voice.has(msg.to)) return;
+    const s = JSON.stringify(msg.data || null); if (s.length > 20000) return;
+    io.to(msg.to).emit('voice:signal', { from: socket.id, data: msg.data });
+  });
+
   socket.on('disconnect', leave);
 });
 

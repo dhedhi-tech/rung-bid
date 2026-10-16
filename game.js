@@ -58,6 +58,7 @@ class Table {
     const names = shuffle(BOT_NAMES.slice());
     this.seats = Array.from({ length: n }, (_, i) => ({ pid: null, name: names[i], bot: true }));
     this.clients = new Map(); // socket.id -> {socket, pid}
+    this.voice = new Map();   // socket.id -> {pid, muted} for people in voice chat
     this.players = new Map(); // pid -> {name, seat, connected}
     this.pending = null;
     this.lastActive = Date.now();
@@ -77,6 +78,7 @@ class Table {
   removeClient(socketId) {
     const c = this.clients.get(socketId); if (!c) return;
     this.clients.delete(socketId);
+    if (this.voice.delete(socketId)) this.io.to(this.code).emit('voice:left', socketId);
     const stillHere = [...this.clients.values()].some(x => x.pid === c.pid);
     const p = this.players.get(c.pid);
     if (p && !stillHere) {
@@ -165,7 +167,9 @@ class Table {
       seats: Array.from({ length: n }, (_, i) => {
         const s = this.seats[(i + base) % n];
         const pl = s.pid && this.players.get(s.pid);
-        return { name: s.name, bot: s.bot, human: !s.bot, connected: !!(pl && pl.connected), host: s.pid === this.hostId, real: (i + base) % n };
+        const vc = s.pid && !s.bot ? [...this.voice.entries()].find(([, x]) => x.pid === s.pid) : null;
+        return { name: s.name, bot: s.bot, human: !s.bot, connected: !!(pl && pl.connected), host: s.pid === this.hostId, real: (i + base) % n,
+          voice: vc ? { sid: vc[0], muted: vc[1].muted } : null };
       }),
       lobbyNames: [...this.players.values()].filter(x => x.connected && x.seat == null).map(x => x.name),
     };
@@ -395,15 +399,17 @@ class Table {
       const seat = (start + k) % G.n;
       G.main = `Waiting for {n${seat}} to bid`;
       const cur = G.bid ? G.bid.value : 5, maxV = r === 1 ? 7 : 13;
-      const options = []; if (!(G.bid && G.bid.seat === seat)) for (let v = Math.max(6, cur + 1); v <= maxV; v++) options.push(v);
+      // The current holder may raise their own bid too (for example to change trump)
+      const options = []; for (let v = Math.max(6, cur + 1); v <= maxV; v++) options.push(v);
       const v = await this.ask(seat, 'bid', { kind: 'bid', round: r, options }, () => this.botBid(seat, r),
         val => val === 0 || val === null || options.includes(val));
       const val = v || null;
       G.hist.push({ r, seat, v: val });
       if (val) {
         const support = G.supportSeat === seat && !this.isHuman(seat);
+        const own = !!(G.bid && G.bid.seat === seat);
         G.bid = { value: val, seat }; G.acts[seat] = val;
-        this.log(support ? `{n${seat}} raises to ${val} to back partner's ${SNAME[G.trump]}` : `{v${seat}:bid:bids} ${val}`);
+        this.log(support ? `{n${seat}} raises to ${val} to back partner's ${SNAME[G.trump]}` : own ? `{v${seat}:raise:raises} own bid to ${val}` : `{v${seat}:bid:bids} ${val}`);
         this.fx(support ? 'support' : 'bid', { seat, v: val });
       } else {
         G.acts[seat] = 'Pass'; this.log(`{v${seat}:pass:passes}`); this.fx('pass', { seat });

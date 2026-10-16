@@ -142,10 +142,12 @@ function renderSeats() {
     }
     const cnt = S.counts ? S.counts[i] : 0;
     const backs = (i === 0 && me0()) || S.phase === 'lobby' ? '' : `<span class="backs"><span class="mini-back"></span>${cnt}</span>`;
-    const tag = p.bot ? '<span class="tag-bot">BOT</span>' : (!p.connected ? '<span class="tag-bot">AWAY</span>' : '');
+    const tag = (p.bot ? '<span class="tag-bot">BOT</span>' : (!p.connected ? '<span class="tag-bot">AWAY</span>' : ''))
+      + (p.voice ? `<span class="vmic" title="${p.voice.muted ? 'Mic off' : 'In voice chat'}">${p.voice.muted ? '🔇' : '🎙'}</span>` : '');
     const active = S.active === i && S.phase === 'game';
     const tmr = active && deadlineAt ? `<span class="tmr" data-tmr><i></i></span>` : '';
-    html += `<div class="seat ${t} ${active ? 'active' : ''} ${!p.bot && !p.connected ? 'offline' : ''}" data-seat="${i}" style="left:${pos.x}%;top:${pos.y}%"><div class="s-name"><span class="dot"></span>${esc(i === 0 && me0() ? 'You' : p.name)}${tag}${backs ? ' ' : ''}${backs}</div><span class="s-role">${teamTag(i)}</span><div class="s-row">${chips}</div>${tmr}</div>`;
+    const talking = p.voice && !p.voice.muted && (talkers.has(p.voice.sid) || (i === 0 && me0() && V.talking));
+    html += `<div class="seat ${t} ${active ? 'active' : ''} ${talking ? 'speaking' : ''} ${!p.bot && !p.connected ? 'offline' : ''}" data-seat="${i}" style="left:${pos.x}%;top:${pos.y}%"><div class="s-name"><span class="dot"></span>${esc(i === 0 && me0() ? 'You' : p.name)}${tag}${backs ? ' ' : ''}${backs}</div><span class="s-role">${teamTag(i)}</span><div class="s-row">${chips}</div>${tmr}</div>`;
   }
   $('seats').innerHTML = html;
   tickTimers();
@@ -495,11 +497,121 @@ $('hand').addEventListener('click', e => {
   S.ask = null; renderHand();
   send('act', { kind: 'play', value: id });
 });
-$('reacts').innerHTML = ['👏', '😂', '😮', '🔥', '😢', '🙏'].map(e => `<button data-r="${e}" aria-label="React ${e}">${e}</button>`).join('');
-$('reacts').onclick = e => { const b = e.target.closest('button[data-r]'); if (b) send('react', b.dataset.r); };
+const sock = io({ auth: { pid, name: myName || 'Player' }, autoConnect: false });
+$('reacts').innerHTML = '<span class="voicectl" id="voiceCtl"></span>' + ['👏', '😂', '😮', '🔥', '😢', '🙏'].map(e => `<button data-r="${e}" aria-label="React ${e}">${e}</button>`).join('');
+$('reacts').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.r) send('react', b.dataset.r);
+  else if (b.id === 'vJoin') voiceJoin();
+  else if (b.id === 'vMute') voiceMute(!V.muted);
+  else if (b.id === 'vLeave') voiceLeave(true);
+};
+
+/* ---------- voice chat (phone to phone audio; the server only passes connection messages) ---------- */
+const V = { on: false, want: false, muted: false, stream: null, peers: new Map(), ice: [], me: null, talking: false, joining: false };
+const talkers = new Set();
+function renderVoice() {
+  const el = $('voiceCtl'); if (!el) return;
+  if (!V.on) el.innerHTML = `<button class="vbtn" id="vJoin" ${V.joining ? 'disabled' : ''}>${V.joining ? 'Connecting…' : '🎙 Voice'}</button>`;
+  else el.innerHTML = `<button class="vbtn ${V.muted ? 'off' : 'live'}" id="vMute" aria-label="${V.muted ? 'Turn mic on' : 'Turn mic off'}">${V.muted ? '🔇 Mic off' : '🎙 Mic on'}</button><button class="vbtn" id="vLeave" aria-label="Leave voice chat">✕</button>`;
+}
+async function voiceJoin() {
+  if (V.on || V.joining) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.RTCPeerConnection) { flash('Voice chat needs a newer browser.'); return; }
+  V.joining = true; renderVoice();
+  try { V.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false }); }
+  catch (e) { V.joining = false; renderVoice(); flash('Microphone is blocked. Allow the mic for this site in your browser settings, then try again.'); return; }
+  const r = await send('voice:join');
+  V.joining = false;
+  if (!r || !r.ok) { stopStream(); renderVoice(); return; }
+  V.on = true; V.want = true; V.muted = false; V.ice = r.ice; V.me = r.me;
+  startLevel();
+  r.peers.forEach(id => makePeer(id));
+  renderVoice();
+}
+function stopStream() { if (V.stream) V.stream.getTracks().forEach(t => t.stop()); V.stream = null; }
+function closePeer(id) {
+  const P = V.peers.get(id); if (!P) return;
+  try { P.pc.close(); } catch (e) {}
+  if (P.audio) { P.audio.srcObject = null; P.audio.remove(); }
+  V.peers.delete(id); talkers.delete(id);
+}
+function voiceLeave(byUser) {
+  if (byUser) V.want = false;
+  if (V.on && sock.connected) send('voice:leave');
+  [...V.peers.keys()].forEach(closePeer);
+  stopStream(); stopLevel();
+  V.on = false; V.muted = false; V.talking = false;
+  renderVoice(); if (S) renderSeats();
+}
+function voiceMute(m) {
+  V.muted = m;
+  if (V.stream) V.stream.getAudioTracks().forEach(t => { t.enabled = !m; });
+  send('voice:mute', m); renderVoice();
+}
+function makePeer(id) {
+  if (V.peers.has(id)) return V.peers.get(id);
+  const pc = new RTCPeerConnection({ iceServers: V.ice });
+  const P = { pc, audio: null, polite: V.me > id, makingOffer: false, ignoreOffer: false };
+  V.peers.set(id, P);
+  V.stream.getTracks().forEach(t => pc.addTrack(t, V.stream));
+  pc.onicecandidate = e => { if (e.candidate) sock.emit('voice:signal', { to: id, data: { c: e.candidate } }); };
+  pc.ontrack = e => {
+    if (!P.audio) { P.audio = document.createElement('audio'); P.audio.autoplay = true; P.audio.setAttribute('playsinline', ''); P.audio.hidden = true; document.body.appendChild(P.audio); }
+    P.audio.srcObject = e.streams[0]; P.audio.play().catch(() => {});
+  };
+  pc.onnegotiationneeded = async () => {
+    try { P.makingOffer = true; await pc.setLocalDescription(); sock.emit('voice:signal', { to: id, data: { d: pc.localDescription } }); }
+    catch (e) {} finally { P.makingOffer = false; }
+  };
+  pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed' && pc.restartIce) pc.restartIce(); };
+  return P;
+}
+sock.on('voice:signal', async ({ from, data }) => {
+  if (!V.on || !data) return;
+  const P = makePeer(from), pc = P.pc;
+  try {
+    if (data.d) {
+      const collision = data.d.type === 'offer' && (P.makingOffer || pc.signalingState !== 'stable');
+      P.ignoreOffer = !P.polite && collision;
+      if (P.ignoreOffer) return;
+      await pc.setRemoteDescription(data.d);
+      if (data.d.type === 'offer') { await pc.setLocalDescription(); sock.emit('voice:signal', { to: from, data: { d: pc.localDescription } }); }
+    } else if (data.c) {
+      try { await pc.addIceCandidate(data.c); } catch (e) { if (!P.ignoreOffer) console.warn(e); }
+    }
+  } catch (e) { console.warn('voice', e); }
+});
+sock.on('voice:left', id => { closePeer(id); });
+sock.on('voice:talk', ({ sid, on }) => { if (on) talkers.add(sid); else talkers.delete(sid); markTalkers(); });
+function markTalkers() {
+  if (!S || !S.seats) return;
+  document.querySelectorAll('#seats .seat').forEach(el => {
+    const i = +el.dataset.seat, p = S.seats[i];
+    const t = p && p.voice && !p.voice.muted && (talkers.has(p.voice.sid) || (i === 0 && me0() && V.talking));
+    el.classList.toggle('speaking', !!t);
+  });
+}
+// Detect when I'm speaking (from my own mic only) and tell the table
+let VAC = null, vTimer = null;
+function startLevel() {
+  try {
+    VAC = VAC || new (window.AudioContext || window.webkitAudioContext)(); if (VAC.state === 'suspended') VAC.resume();
+    const an = VAC.createAnalyser(); an.fftSize = 512; VAC.createMediaStreamSource(V.stream).connect(an);
+    const buf = new Uint8Array(an.fftSize); let quietFor = 0;
+    vTimer = setInterval(() => {
+      an.getByteTimeDomainData(buf); let sum = 0; for (const v of buf) { const x = (v - 128) / 128; sum += x * x; }
+      const loud = !V.muted && Math.sqrt(sum / buf.length) > 0.04;
+      quietFor = loud ? 0 : quietFor + 1;
+      const talking = loud || (V.talking && quietFor < 4);
+      if (talking !== V.talking) { V.talking = talking; if (sock.connected) sock.emit('voice:talk', talking); markTalkers(); }
+    }, 120);
+  } catch (e) {}
+}
+function stopLevel() { clearInterval(vTimer); vTimer = null; if (V.talking && sock.connected) sock.emit('voice:talk', false); }
+renderVoice();
 
 /* ---------- connection ---------- */
-const sock = io({ auth: { pid, name: myName || 'Player' }, autoConnect: false });
 function setName(v) { myName = v.slice(0, 14); store.set('rb-name', myName); sock.auth.name = myName; if (sock.connected) sock.emit('rename', myName); }
 function send(ev, data) {
   return new Promise(res => {
@@ -526,10 +638,11 @@ async function createTable(practice) {
 }
 async function joinTable() {
   const r = await send('join', tableCode);
-  if (r && r.ok) { history.replaceState(null, '', '/?t=' + r.code); }
+  if (r && r.ok) { history.replaceState(null, '', '/?t=' + r.code); if (V.want && !V.on) setTimeout(voiceJoin, 600); }
   else { tableCode = null; history.replaceState(null, '', '/'); S = null; homeScreen(r && r.error); }
 }
 function leaveTable() {
+  voiceLeave(true);
   send('leaveTable'); tableCode = null; S = null; history.replaceState(null, '', '/');
   $('trick').innerHTML = ''; hidePanel(); homeScreen();
   boot();
@@ -538,7 +651,7 @@ sock.on('connect', () => {
   clearTimeout(waking); $('conn').hidden = true;
   if (tableCode && myName) joinTable();
 });
-sock.on('disconnect', () => connecting());
+sock.on('disconnect', () => { connecting(); if (V.on) { const w = V.want; voiceLeave(false); V.want = w; } });
 sock.on('connect_error', () => connecting());
 sock.on('state', st => {
   if (awaitingCreate && !tableCode) tableCode = st.code;
