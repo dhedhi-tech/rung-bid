@@ -305,6 +305,8 @@ function homeScreen(err) {
   openModal('home', `<div class="eyebrow">Team bidding card game</div>
     <h1 class="display">Rung<em>·</em>Bid</h1>
     <p>Play with friends on any phone. Create a table, share the link on WhatsApp, and bots fill any empty seats.</p>
+    ${store.get('rb-tut-seen') ? '' : '<div class="tut-banner"><b>New to Rung Bid?</b><span>Learn the rules in 2 minutes with a hands-on tutorial.</span></div>'}
+    <button class="secondary tut-open" id="tutBtn">${store.get('rb-tut-seen') ? 'How to play' : 'Start the tutorial'}</button>
     <div class="field"><span>Your name</span><input type="text" id="nameIn" maxlength="14" autocomplete="nickname" placeholder="e.g. Atif" value="${esc(myName)}"></div>
     <div class="field"><span>Players</span><div class="seg" id="segN">
       <button data-n="4">4<small>1 deck</small></button><button data-n="6">6<small>78 cards</small></button><button data-n="8">8<small>2 decks</small></button></div></div>
@@ -316,6 +318,7 @@ function homeScreen(err) {
     <div class="field" style="margin-top:16px"><span>Got a table code?</span><div class="row2"><input type="text" id="codeIn" maxlength="5" placeholder="ABCDE" autocapitalize="characters"><button class="secondary" id="joinBtn">Join</button></div></div>
     <div class="err" id="homeErr">${err ? esc(err) : ''}</div>
     <button class="linkbtn" id="rulesLink">Read the rules</button>`);
+  $('tutBtn').onclick = () => { const v = $('nameIn').value.trim(); if (v) setName(v); openTutorial('home'); };
   const sync = () => {
     document.querySelectorAll('#segN button').forEach(b => b.classList.toggle('on', +b.dataset.n === homeN));
     document.querySelectorAll('#segJ button').forEach(b => b.classList.toggle('on', (b.dataset.j === '1') === homeJ));
@@ -342,7 +345,9 @@ function nameScreen() {
     <p>Rung Bid is a team bidding card game. Type your name, then pick a seat.</p>
     <div class="field"><span>Your name</span><input type="text" id="nameIn" maxlength="14" autocomplete="nickname" placeholder="e.g. Atif" value="${esc(myName)}"></div>
     <button class="primary" id="goBtn">Join table</button>
-    <div class="err" id="homeErr"></div>`);
+    <div class="err" id="homeErr"></div>
+    <button class="linkbtn" id="tutLink">New to Rung Bid? Take the 2 minute tutorial</button>`);
+  $('tutLink').onclick = () => openTutorial('invite');
   const go = () => { const v = $('nameIn').value.trim(); if (!v) { $('homeErr').textContent = 'Type your name first.'; return; } setName(v); closeModal(); joinTable(); };
   $('goBtn').onclick = go;
   $('nameIn').onkeydown = e => { if (e.key === 'Enter') go(); };
@@ -666,6 +671,12 @@ $('soundBtn').onclick = () => { muted = !muted; store.set('rb-muted', muted ? '1
 syncSound();
 $('rulesBtn').onclick = () => { $('rules').hidden = false; };
 $('rulesClose').onclick = () => { $('rules').hidden = true; };
+$('rulesTut').onclick = () => { $('rules').hidden = true; openTutorial(S ? 'game' : 'home'); };
+window.tutorialPractice = () => {
+  const inp = $('nameIn'), v = (inp && inp.value.trim()) || myName;
+  if (v) { setName(v); createTable(true); }
+  else if (inp) { $('homeErr').textContent = 'Type your name, then tap Practice with bots.'; inp.focus(); }
+};
 $('leaveBtn').onclick = () => {
   if (!S) { homeScreen(); return; }
   const b = $('leaveBtn');
