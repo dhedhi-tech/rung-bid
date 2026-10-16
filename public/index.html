@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0c1618">
+<meta name="description" content="Rung Bid: the team bidding card game for 4, 6 or 8 players. Create a table and share the link.">
+<meta property="og:title" content="Rung Bid">
+<meta property="og:description" content="Join my table. Team bidding card game for 4, 6 or 8 players.">
+<title>Rung Bid</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='10' y='4' width='44' height='56' rx='7' fill='%23fbf7ef'/%3E%3Ctext x='32' y='44' font-size='30' text-anchor='middle' fill='%23c3302b'%3E%E2%99%A5%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=DM+Serif+Display&display=swap">
+<style>:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);box-sizing:border-box}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<style>
+/* Layout: one-screen card room. Score tilt bar on top, oval table with seats round the rim, status strip, your fanned hand at the bottom. */
+:root{
+  --bg:#0c1618; --panel:#14242a; --panel-2:#1b3037; --line:#2b444b; --fg:#eef3f0; --muted:#94aba8;
+  --felt:#0f4a44; --felt-dark:#08302d; --rim:#4f2c1b; --rim-light:#8b5636;
+  --paper:#fbf7ef; --paper-edge:#ddd3c1; --suit-red:#c3302b; --suit-black:#191b22;
+  --team-a:#f4a93a; --team-b:#6cc4d8; --good:#82d48e; --bad:#ef6c5c;
+  --joker:#7b2fbf; --joker-tint:#e9dbf7;
+  --back-a:#8a2329; --back-b:#24204b; --back-dot:#e8c27b;
+  --font-display:"Archivo", system-ui, sans-serif;
+  --font-body:"Archivo", system-ui, sans-serif;
+  --font-card:"DM Serif Display", Georgia, "Times New Roman", serif;
+  --cw:64px; --tw:52px;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);overflow:hidden;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
+
+.app{height:100%;box-sizing:border-box;max-width:1120px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto;gap:8px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px}
+
+/* Header */
+.top{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;grid-template-areas:"brand tilt contract tools";align-items:center;gap:16px}
+.brand{grid-area:brand;display:flex;flex-direction:column;line-height:1.05}
+.logo{font-family:var(--font-display);font-weight:850;font-stretch:125%;font-size:20px;letter-spacing:-.01em}
+.logo em{font-style:normal;color:var(--team-a)}
+.handno{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.tilt{grid-area:tilt;min-width:0}
+.tilt-labels{display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;gap:8px}
+.sbox{display:flex;align-items:baseline;gap:7px}
+.sname{font-weight:700}
+.snum{font-family:var(--font-display);font-weight:900;font-stretch:115%;font-size:26px;line-height:.9;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--muted);opacity:.55;transition:color .3s,opacity .3s,transform .3s}
+.sbox.lead .snum{opacity:1}
+.sbox.ta.lead .snum{color:var(--team-a)} .sbox.tb.lead .snum{color:var(--team-b)}
+.snum.bump{transform:scale(1.3)}
+.ghost.muted{opacity:.6;text-decoration:line-through}
+.tilt-labels .ta{color:var(--team-a)} .tilt-labels .tb{color:var(--team-b)}
+#tiltText{color:var(--fg);font-weight:650;text-transform:none;letter-spacing:0;font-size:12.5px;font-variant-numeric:tabular-nums}
+.tilt-track{position:relative;height:10px;border-radius:5px;background:var(--panel-2);overflow:visible}
+.tilt-mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--line)}
+.tilt-fill{position:absolute;top:0;bottom:0;border-radius:5px;transition:left .6s ease,width .6s ease,background .3s}
+.tilt-knob{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;background:var(--fg);transform:translate(-50%,-50%);box-shadow:0 0 0 3px var(--bg);transition:left .6s ease}
+.tilt-ends{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
+.contract{grid-area:contract;text-align:right;font-variant-numeric:tabular-nums;min-width:132px}
+.contract .c1{font-weight:750;font-size:15px;display:flex;gap:6px;justify-content:flex-end;align-items:baseline}
+.contract .c2{font-size:12px;color:var(--muted);margin-top:2px}
+.tsuit{font-family:var(--font-card);font-size:20px;line-height:1}
+.tpill{display:inline-flex;align-items:center;gap:4px;background:var(--paper);color:var(--suit-black);border-radius:7px;padding:2px 8px 2px 6px;font-size:13px;font-weight:800}
+.tpill.red{color:var(--suit-red)}
+.tpill .tsuit{font-size:19px}
+.announce{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:6;background:var(--paper);color:var(--suit-black);border-radius:18px;padding:16px 34px 18px;
+  display:flex;flex-direction:column;align-items:center;box-shadow:0 0 0 4px var(--team-a),0 24px 60px rgba(0,0,0,.6);animation:annIn .35s cubic-bezier(.2,.9,.3,1.3) both;pointer-events:none}
+.announce.red{color:var(--suit-red)}
+.an-eye{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#6b6f78}
+.an-sym{font-family:var(--font-card);font-size:clamp(64px,14vmin,104px);line-height:1.05}
+.an-name{font-weight:900;font-stretch:120%;font-size:clamp(22px,4.5vmin,30px);text-transform:uppercase;letter-spacing:.04em}
+.an-sub{font-size:12.5px;color:#5d626b;margin-top:4px;font-weight:600}
+@keyframes annIn{from{opacity:0;transform:translate(-50%,-50%) scale(.7)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+.tools{grid-area:tools;display:flex;gap:6px}
+.ghost{background:transparent;border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:13px;font-weight:600}
+.ghost:hover{background:var(--panel-2)}
+
+/* Table */
+.table{position:relative;min-height:0}
+.felt{position:absolute;inset:7% 5%;border-radius:50%;
+  background:radial-gradient(ellipse at 50% 40%, var(--felt) 0%, var(--felt-dark) 100%);
+  box-shadow:0 0 0 10px var(--rim),0 0 0 12px var(--rim-light),0 18px 40px rgba(0,0,0,.55), inset 0 0 60px rgba(0,0,0,.45)}
+.watermark{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:var(--font-card);font-size:clamp(70px,16vmin,150px);color:var(--fg);opacity:.07;pointer-events:none;transition:opacity .3s}
+.watermark.red{color:#ff8a80;opacity:.1}
+#seats,#trick{position:absolute;inset:0}
+#trick{pointer-events:none;z-index:3}
+
+.seat{position:absolute;transform:translate(-50%,-50%);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 9px;min-width:74px;text-align:center;
+  box-shadow:0 6px 16px rgba(0,0,0,.35);transition:box-shadow .2s,border-color .2s;z-index:2}
+.seat .s-name{font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap}
+.seat .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.seat.ta .dot{background:var(--team-a)} .seat.tb .dot{background:var(--team-b)}
+.seat.ta{background:color-mix(in srgb,var(--team-a) 22%,var(--panel));border:2px solid var(--team-a)}
+.seat.tb{background:color-mix(in srgb,var(--team-b) 20%,var(--panel));border:2px solid var(--team-b)}
+.s-role{display:block;font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;margin-top:1px}
+.seat.ta .s-role{color:var(--team-a)} .seat.tb .s-role{color:var(--team-b)}
+.pn{font-weight:800}
+.pn.ta{color:var(--team-a)} .pn.tb{color:var(--team-b)}
+.pn small{font-weight:600;font-size:.85em;opacity:.85}
+.hb .pn small{display:none}
+.an-sub .pn{color:inherit;text-decoration:underline;text-decoration-thickness:3px;text-underline-offset:3px}
+.an-sub .pn.ta{text-decoration-color:var(--team-a)} .an-sub .pn.tb{text-decoration-color:var(--team-b)}
+.seat .s-row{display:flex;gap:4px;justify-content:center;align-items:center;margin-top:4px;min-height:18px;flex-wrap:wrap}
+.chip{font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:2px 6px;border-radius:5px;background:var(--panel-2);color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.chip.dealer{background:transparent;border:1px solid var(--line)}
+.chip.bid{background:var(--fg);color:var(--bg)}
+.chip.pass{opacity:.7}
+.chip.holder.ta{background:var(--team-a);color:#241504} .chip.holder.tb{background:var(--team-b);color:#04161b}
+.chip.tricks{color:var(--fg)}
+.backs{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.mini-back{width:9px;height:13px;border-radius:2px;background:radial-gradient(circle,var(--back-dot) 0 22%,transparent 24%) 0 0/5px 5px,var(--back-a);border:1px solid rgba(255,255,255,.25)}
+.seat.active{border-color:var(--fg);box-shadow:0 0 0 3px rgba(238,243,240,.18),0 6px 16px rgba(0,0,0,.35)}
+.seat.active::after{content:"";position:absolute;inset:-6px;border-radius:14px;border:2px solid var(--fg);opacity:.5;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.15;transform:scale(1)}50%{opacity:.6;transform:scale(1.04)}}
+
+/* Cards */
+.card{position:absolute;width:var(--cw);height:calc(var(--cw)*1.4);background:var(--paper);border-radius:calc(var(--cw)*.1);color:var(--suit-black);font-family:var(--font-card);
+  box-shadow:inset 0 0 0 1px var(--paper-edge),0 4px 10px rgba(0,0,0,.35);user-select:none;-webkit-user-select:none}
+.card.red{color:var(--suit-red)}
+.c-idx{position:absolute;left:7%;top:4%;display:flex;flex-direction:column;align-items:center;line-height:.95;font-size:calc(var(--cw)*.3)}
+.c-idx small{font-size:calc(var(--cw)*.3)}
+.c-pip{position:absolute;right:8%;bottom:4%;font-size:calc(var(--cw)*.62);line-height:1}
+
+.tcard{--cw:var(--tw);transform:translate(-50%,-50%);transition:left .32s cubic-bezier(.2,.8,.3,1),top .32s cubic-bezier(.2,.8,.3,1),opacity .35s,transform .35s,box-shadow .2s}
+.tcard.win{box-shadow:inset 0 0 0 1px var(--paper-edge),0 0 0 3px var(--team-a),0 8px 22px rgba(0,0,0,.5)}
+.tcard.win.tb{box-shadow:inset 0 0 0 1px var(--paper-edge),0 0 0 3px var(--team-b),0 8px 22px rgba(0,0,0,.5)}
+.tcard.gone{opacity:0;transform:translate(-50%,-50%) scale(.55)}
+
+/* Trump cut effect */
+.cut-fx{position:absolute;width:0;height:0;z-index:30;pointer-events:none}
+.cut-ring{position:absolute;left:-60px;top:-60px;width:120px;height:120px;border-radius:50%;border:4px solid var(--team-a);opacity:0;animation:cutRing .7s ease-out .25s both}
+.cut-fx.tb .cut-ring{border-color:var(--team-b)}
+.cut-slash{position:absolute;left:-75px;top:-4px;width:150px;height:8px;border-radius:4px;background:linear-gradient(90deg,transparent,var(--paper) 30%,var(--team-a) 50%,var(--paper) 70%,transparent);
+  transform:rotate(-35deg) scaleX(0);animation:cutSlash .45s cubic-bezier(.2,.9,.3,1) .22s both;box-shadow:0 0 18px var(--team-a)}
+.cut-fx.tb .cut-slash{background:linear-gradient(90deg,transparent,var(--paper) 30%,var(--team-b) 50%,var(--paper) 70%,transparent);box-shadow:0 0 18px var(--team-b)}
+.cut-label{position:absolute;left:0;top:-62px;transform:translateX(-50%);white-space:nowrap;background:var(--paper);color:var(--suit-black);border-radius:8px;padding:3px 10px;
+  font-weight:900;font-stretch:120%;font-size:16px;letter-spacing:.06em;box-shadow:0 0 0 3px var(--team-a),0 10px 24px rgba(0,0,0,.5);animation:cutLabel 1.3s ease both .2s}
+.cut-fx.tb .cut-label{box-shadow:0 0 0 3px var(--team-b),0 10px 24px rgba(0,0,0,.5)}
+.cut-label b{font-family:var(--font-card);font-size:20px;font-weight:400}
+.cut-label.red b{color:var(--suit-red)}
+@keyframes cutSlash{0%{transform:rotate(-35deg) scaleX(0);opacity:1}70%{transform:rotate(-35deg) scaleX(1);opacity:1}100%{transform:rotate(-35deg) scaleX(1.1);opacity:0}}
+@keyframes cutRing{0%{opacity:.9;transform:scale(.3)}100%{opacity:0;transform:scale(1.4)}}
+@keyframes cutLabel{0%{opacity:0;transform:translateX(-50%) scale(.5)}15%{opacity:1;transform:translateX(-50%) scale(1.15)}25%{transform:translateX(-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-10px)}}
+.felt.jolt{animation:jolt .35s ease .22s}
+@keyframes jolt{25%{transform:translateX(-5px)}50%{transform:translateX(4px)}75%{transform:translateX(-2px)}}
+
+/* Tricks board */
+.tboard{display:flex;gap:6px;align-self:center}
+.tb-team{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:4px 9px}
+.tb-team .dot{width:8px;height:8px;border-radius:50%}
+.tb-team.ta .dot{background:var(--team-a)} .tb-team.tb .dot{background:var(--team-b)}
+.tb-lbl{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.tb-num{font-weight:900;font-size:17px;font-variant-numeric:tabular-nums}
+.tb-num small{font-size:12px;font-weight:600;color:var(--muted)}
+.pips{display:flex;gap:2px}
+.pip{width:6px;height:12px;border-radius:2px;background:var(--panel-2);border:1px solid var(--line)}
+.tb-team.ta .pip.on{background:var(--team-a);border-color:var(--team-a)}
+.tb-team.tb .pip.on{background:var(--team-b);border-color:var(--team-b)}
+.tb-team.bump{animation:tbBump .4s}
+@keyframes tbBump{40%{transform:scale(1.08)}}
+@media (max-width:720px){.pips{display:none}.tb-lbl{font-size:10px}}
+
+/* Joker */
+.card.joker{color:var(--joker);background:radial-gradient(circle at 50% 50%,var(--paper) 40%,var(--joker-tint) 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-family:var(--font-display)}
+.j-word{font-weight:900;font-stretch:125%;font-size:calc(var(--cw)*.2);letter-spacing:.06em}
+.j-star{font-size:calc(var(--cw)*.42);line-height:1;font-weight:800}
+.jfx .cut-ring{border-color:var(--joker)!important}
+.jlabel{background:var(--joker)!important;color:#fff!important;box-shadow:0 0 0 3px var(--paper),0 10px 24px rgba(0,0,0,.5)!important}
+.announce.jann{color:var(--joker);box-shadow:0 0 0 4px var(--joker),0 24px 60px rgba(0,0,0,.6)}
+.felt.spin{animation:fspin .6s ease .2s}
+@keyframes fspin{30%{filter:hue-rotate(60deg) brightness(1.15)}100%{filter:none}}
+
+/* Landscape phones: ask to rotate */
+.rotate{display:none}
+@media (orientation:landscape) and (max-height:500px) and (pointer:coarse){
+  .rotate{display:grid;place-items:center;position:fixed;inset:0;z-index:50;background:var(--bg);text-align:center}
+  .rot-card{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--muted);font-size:14px}
+  .rot-card b{color:var(--fg);font-size:18px}
+  .rot-icon{font-size:56px;line-height:1;color:var(--team-a);animation:rot 1.6s ease-in-out infinite}
+  @keyframes rot{0%,30%{transform:rotate(90deg)}60%,100%{transform:rotate(0)}}
+}
+
+/* Status strip */
+.status{display:flex;align-items:baseline;gap:12px;min-height:22px;padding-inline:2px;flex-wrap:wrap}
+#stMain{font-weight:750;font-size:14px}
+#stLog{font-size:13px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+
+/* Hand */
+.hand{position:relative;height:calc(var(--cw)*1.4 + 18px)}
+.hand .card{bottom:0;transition:transform .15s,opacity .2s,filter .2s;cursor:default}
+.hand .card.legal{cursor:pointer}
+.hand.playing .card:not(.legal){filter:brightness(.55) saturate(.6)}
+@media (hover:hover){.hand .card.legal:hover{transform:translateY(-12px)}}
+.hand .card.sel{transform:translateY(-16px);box-shadow:inset 0 0 0 1px var(--paper-edge),0 0 0 3px var(--team-a),0 8px 18px rgba(0,0,0,.45)}
+.hand .card.in{animation:dealIn .38s cubic-bezier(.2,.8,.3,1) both}
+@keyframes dealIn{from{opacity:0;transform:translateY(-40px) rotate(-6deg)}to{opacity:1;transform:none}}
+.hand .card.shake{animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+
+/* Action panel */
+.panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;
+  width:min(360px,calc(100% - 24px));box-sizing:border-box;box-shadow:0 20px 50px rgba(0,0,0,.55)}
+.panel-title{font-weight:800;font-stretch:112%;font-size:16px}
+.panel-sub{font-size:12.5px;color:var(--muted);margin:4px 0 12px}
+.hist{display:grid;gap:8px;margin:-4px 0 12px;max-height:170px;overflow:auto;font-size:12px}
+.hist-row{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.hist-r{width:100%;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.hb{background:var(--panel-2);border-radius:5px;padding:2px 7px;white-space:nowrap}
+.hb b{font-weight:850}
+.hb.pass{color:var(--muted)}
+.hb.trump{background:var(--paper);color:var(--suit-black);font-weight:750}
+.hb.trump.red{color:var(--suit-red)}
+.panel-sub b{color:var(--fg)}
+.bid-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.chip-btn{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:10px 0;font-weight:800;font-size:17px;font-variant-numeric:tabular-nums}
+.chip-btn:hover{background:var(--fg);color:var(--bg)}
+.pass-btn{width:100%;margin-top:8px;background:transparent;border:1px dashed var(--line);border-radius:9px;padding:9px;font-weight:650;color:var(--muted)}
+.pass-btn:hover{color:var(--fg);border-color:var(--fg)}
+.suit-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.suit-btn{background:var(--paper);color:var(--suit-black);border:0;border-radius:10px;padding:8px 2px;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:11px;font-weight:650}
+.suit-btn.red{color:var(--suit-red)}
+.suit-btn .big{font-family:var(--font-card);font-size:30px;line-height:1.05}
+.suit-btn .cnt{color:#6b6f78;font-weight:500;font-size:10.5px}
+.suit-btn.current{box-shadow:0 0 0 3px var(--team-a)}
+.suit-btn:hover{transform:translateY(-2px)}
+
+/* Modals */
+.modal{position:fixed;inset:0;z-index:20;background:rgba(5,10,12,.72);display:grid;place-items:center;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-bottom,0px))}
+#rules{z-index:30}
+.sheet{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;width:min(460px,100%);box-sizing:border-box;max-height:100%;overflow:auto;box-shadow:0 30px 70px rgba(0,0,0,.6)}
+.eyebrow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.display{font-family:var(--font-display);font-weight:900;font-stretch:125%;font-size:40px;line-height:1;margin:6px 0 10px;letter-spacing:-.02em}
+.display em{font-style:normal;color:var(--team-a)}
+.sheet h2{font-weight:850;font-stretch:115%;font-size:22px;margin:6px 0 8px;text-wrap:balance}
+.sheet p{font-size:14px;line-height:1.5;color:var(--muted);margin:0 0 14px;max-width:62ch}
+.field{margin:14px 0}
+.field>span{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:6px}
+.seg button{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 6px;font-weight:800;font-size:18px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.seg button small{font-size:10.5px;font-weight:500;color:var(--muted)}
+.seg button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.seg button.on small{color:#4b5a5a}
+.seg.text button{font-size:14px}
+.primary{width:100%;background:var(--team-a);color:#241504;border:0;border-radius:11px;padding:13px;font-weight:850;font-size:15px;margin-top:6px}
+.primary:hover{filter:brightness(1.07)}
+.linkbtn{display:block;margin:12px auto 0;background:none;border:0;color:var(--muted);text-decoration:underline;font-size:13px}
+.res-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}
+.res-grid div{background:var(--panel-2);border-radius:10px;padding:10px}
+.res-grid span{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.res-grid b{font-size:14px;font-variant-numeric:tabular-nums}
+.good{color:var(--good)} .bad{color:var(--bad)}
+.rules-list{margin:0;padding-left:18px;font-size:13.5px;line-height:1.55;color:var(--fg)}
+.rules-list li{margin-bottom:6px}
+.rules-list b{color:var(--team-a)}
+.score-table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 14px}
+.score-table td{padding:7px 4px;border-bottom:1px solid var(--line)}
+.score-table td:last-child{text-align:right;font-weight:750;white-space:nowrap}
+
+.chip .short{display:none}
+@media (max-width:720px){
+  .chip .long{display:none} .chip .short{display:inline}
+  .tools{gap:4px} .ghost{padding:6px 8px;font-size:12px}
+  .contract{overflow:hidden} .contract .c2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tpill{font-size:12px}
+  .hand{overflow:hidden}
+  .seat{max-width:120px}
+  .seat .s-row{gap:3px}
+  .s-role{font-size:8.5px}
+  .sname{white-space:nowrap}
+  .top{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"brand tools" "tilt contract";gap:8px 12px}
+  .contract{min-width:0}
+  #tiltText{display:none}
+  .snum{font-size:22px}
+  .sname{font-size:10px}
+  .seat{min-width:0;padding:4px 6px;border-radius:8px}
+  .seat .s-name{font-size:11.5px}
+  .chip{font-size:9.5px;padding:1px 4px}
+  .display{font-size:32px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<style>
+/* ---------- Online additions ---------- */
+.conn{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 8px);transform:translateX(-50%);z-index:60;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:650;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.conn .spin{display:inline-block;width:10px;height:10px;border:2px solid var(--muted);border-top-color:var(--team-a);border-radius:50%;margin-right:7px;vertical-align:-1px;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.field input[type=text]{width:100%;box-sizing:border-box;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;font:inherit;font-size:16px;color:var(--fg)}
+.field input[type=text]:focus{outline:2px solid var(--team-a);outline-offset:1px}
+.row2{display:grid;grid-template-columns:1fr auto;gap:8px}
+.secondary{background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:12px 14px;font-weight:800;font-size:15px;color:var(--fg)}
+.secondary:hover{border-color:var(--fg)}
+.btn-col{display:grid;gap:8px;margin-top:6px}
+.err{color:var(--bad);font-size:13px;min-height:18px;margin-top:6px}
+.codebig{font-family:var(--font-display);font-weight:900;font-stretch:125%;font-size:34px;letter-spacing:.12em;color:var(--team-a);line-height:1}
+.share{display:grid;gap:8px;background:var(--panel-2);border-radius:12px;padding:12px;margin:10px 0 14px}
+.share .link{font-size:12.5px;color:var(--muted);word-break:break-all;user-select:all}
+.share .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.share a.secondary{text-align:center;text-decoration:none;display:block}
+.seatgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 14px}
+.seatbtn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border-radius:11px;padding:10px 11px;border:2px solid var(--line);background:var(--panel-2);min-width:0}
+.seatbtn.ta{border-color:var(--team-a);background:color-mix(in srgb,var(--team-a) 16%,var(--panel-2))}
+.seatbtn.tb{border-color:var(--team-b);background:color-mix(in srgb,var(--team-b) 14%,var(--panel-2))}
+.seatbtn .sn{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.seatbtn .st{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.seatbtn.ta .st{color:var(--team-a)} .seatbtn.tb .st{color:var(--team-b)}
+.seatbtn .act{font-size:12px;font-weight:700;margin-top:3px;color:var(--fg)}
+.seatbtn.mine{box-shadow:0 0 0 3px var(--fg)}
+.seatbtn:disabled{cursor:default;opacity:.85}
+.hint{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+.tag-bot{font-size:9px;font-weight:800;letter-spacing:.08em;background:var(--panel-2);color:var(--muted);border-radius:4px;padding:1px 4px;margin-left:4px}
+.seat.offline{opacity:.6}
+.tmr{position:absolute;left:8px;right:8px;bottom:-5px;height:4px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden}
+.tmr i{display:block;height:100%;background:var(--fg);transform-origin:left;transition:transform .25s linear}
+.tmr.low i{background:var(--bad)}
+.ptimer{height:4px;border-radius:2px;background:var(--panel-2);margin:-4px 0 12px;overflow:hidden}
+.ptimer i{display:block;height:100%;background:var(--team-a);transform-origin:left;transition:transform .25s linear}
+.ptimer.low i{background:var(--bad)}
+.reacts{display:flex;gap:6px;justify-content:center}
+.reacts button{background:var(--panel);border:1px solid var(--line);border-radius:999px;width:38px;height:34px;font-size:18px;line-height:1}
+.react-pop{position:absolute;z-index:8;font-size:34px;transform:translate(-50%,-50%);pointer-events:none;animation:rpop 1.8s ease-out both}
+@keyframes rpop{0%{opacity:0;transform:translate(-50%,-30%) scale(.4)}15%{opacity:1;transform:translate(-50%,-80%) scale(1.15)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-160%) scale(1)}}
+.watchbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;font-size:13px;color:var(--muted);padding:6px 0}
+.watchbar button{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-weight:700;font-size:12.5px}
+.leave-confirm{border-color:var(--bad)!important;color:var(--bad)}
+.countdown{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><span class="logo">Rung<em>·</em>Bid</span><span class="handno" id="handNo">Online</span></div>
+    <div class="tilt" aria-label="Running score">
+      <div class="tilt-labels">
+        <div class="sbox ta"><span class="sname">Your team</span><span class="snum" id="scoreA">0</span></div>
+        <span id="tiltText">Level</span>
+        <div class="sbox tb"><span class="snum" id="scoreB">0</span><span class="sname">Opponents</span></div>
+      </div>
+      <div class="tilt-track"><div class="tilt-mid"></div><div class="tilt-fill" id="tiltFill"></div><div class="tilt-knob" id="tiltKnob"></div></div>
+      <div class="tilt-ends"><span>52</span><span>0</span><span>52</span></div>
+    </div>
+    <div class="contract" id="contract"></div>
+    <div class="tools"><button class="ghost" id="soundBtn" aria-label="Sound on or off">Sound</button><button class="ghost" id="rulesBtn">Rules</button><button class="ghost" id="leaveBtn">Leave</button></div>
+  </header>
+
+  <main class="table" id="table">
+    <div class="felt"></div>
+    <div class="watermark" id="watermark"></div>
+    <div id="trick"></div>
+    <div id="seats"></div>
+    <div class="announce" id="announce" hidden></div>
+    <div class="panel" id="panel" hidden><div class="panel-title" id="panelTitle"></div><div id="panelBody"></div></div>
+  </main>
+
+  <div class="status"><div class="tboard" id="tboard" hidden></div><span id="stMain"></span><span id="stLog"></span></div>
+  <div class="hand" id="hand"></div>
+  <div class="reacts" id="reacts" hidden></div>
+</div>
+
+<div class="rotate" id="rotate"><div class="rot-card"><div class="rot-icon">▯</div><b>Turn your phone upright</b><span>Rung Bid plays best in portrait.</span></div></div>
+<div class="modal" id="modal" hidden><div class="sheet" id="sheet"></div></div>
+<div class="modal" id="rules" hidden><div class="sheet">
+  <div class="eyebrow">How it plays</div>
+  <h2>Rung Bid rules</h2>
+  <ul class="rules-list">
+    <li><b>Teams</b> sit alternately. Every second seat is your partner.</li>
+    <li><b>Decks.</b> 4 players: one deck. 6 players: two decks without 2s, 3s, 4s and both 5♦ (78 cards). 8 players: two decks.</li>
+    <li><b>Three deals.</b> 5 cards, then 4, then 4. Everyone ends with 13, so every hand has 13 tricks.</li>
+    <li><b>Bidding</b> after each deal starts left of the dealer. Bid 6 to 13 or pass. Each bid must beat the highest so far. In round 1 the highest possible bid is 7. A bid of 6 must still take 7 tricks, but scores 6 points. A player who passed can bid again next round.</li>
+    <li>If everyone passes in round 1, the first player dealt is forced to bid 6.</li>
+    <li><b>Trump.</b> After round 1 the highest bidder calls trump. In rounds 2 and 3 trump is called again only if someone raises the bid. No raise means trump stays.</li>
+    <li><b>Play.</b> The final highest bidder leads. Follow the led suit if you can. If you can't, play any card, trump or not.</li>
+    <li>Highest trump wins the trick, otherwise highest card of the led suit. With two decks, if two identical cards fall, the one played last wins.</li>
+    <li>The hand stops as soon as the result is decided.</li>
+  </ul>
+  <div class="eyebrow" style="margin-top:12px">Joker mode</div>
+  <ul class="rules-list">
+    <li>One joker per deck. To keep 13 cards each: 4 players drop the 2♣, 6 players drop one 5 of each suit, 8 players drop both 2♣.</li>
+    <li>You can play a joker only when you can't follow suit. You can never lead with one.</li>
+    <li>A joker <b>reverses</b> the trick: it goes to the other team from whoever would have won, trump cuts included. The joker player leads next.</li>
+    <li>Two jokers in one trick cancel out.</li>
+    <li>If you must lead and hold only jokers, you're stuck. The other team takes one trick per joker you hold.</li>
+  </ul>
+  <table class="score-table">
+    <tr><td>Bidding team makes the bid (bid 6 needs 7 tricks)</td><td>bid</td></tr>
+    <tr><td>Makes it before opponents win a trick</td><td>2× bid</td></tr>
+    <tr><td>Bidding team fails</td><td>2× to opponents</td></tr>
+    <tr><td>Opponents break it before bidding team wins a trick</td><td>4× to opponents</td></tr>
+  </table>
+  <p>One running score. Points cancel the other team's lead. First team to lead by 52 wins. After each hand, the final bidder decides the next dealer. If they are on the team behind, they deal. If they are on the team ahead, they bid first.</p>
+  <button class="primary" id="rulesClose">Got it</button>
+</div></div>
+
+<div class="conn" id="conn" hidden></div>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
