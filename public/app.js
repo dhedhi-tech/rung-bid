@@ -15,6 +15,11 @@ const store = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
 };
+// A link opened from the "open in browser" help carries the player id, so the seat comes along
+const urlPid = (new URLSearchParams(location.search).get('p') || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
+if (urlPid) { store.set('rb-pid', urlPid); }
+const urlName = (new URLSearchParams(location.search).get('n') || '').slice(0, 14);
+if (urlName && !store.get('rb-name')) store.set('rb-name', urlName);
 let pid = store.get('rb-pid');
 if (!pid) { pid = 'p' + Math.random().toString(36).slice(2) + Date.now().toString(36); store.set('rb-pid', pid); }
 let myName = store.get('rb-name') || '';
@@ -518,6 +523,33 @@ $('hand').addEventListener('click', e => {
   send('act', { kind: 'play', value: id });
 });
 const sock = io({ auth: { pid, name: myName || 'Player' }, autoConnect: false });
+
+/* In-app browsers (WhatsApp, Facebook, Instagram) often block the microphone and speech typing */
+const UA = navigator.userAgent || '';
+const isAndroid = /Android/i.test(UA), isIOS = /iPhone|iPad|iPod/i.test(UA);
+const inApp = /WhatsApp|FBAN|FBAV|FB_IAB|Instagram|Line\//i.test(UA) || (isAndroid && /; wv\)/.test(UA)) || (isIOS && !/Safari\//.test(UA));
+function openInBrowserHelp(feature) {
+  let d = $('inapp');
+  if (!d) { d = document.createElement('div'); d.className = 'modal tut-modal'; d.id = 'inapp'; document.body.appendChild(d); }
+  const q = '?t=' + encodeURIComponent(tableCode || '') + '&p=' + encodeURIComponent(pid) + (myName ? '&n=' + encodeURIComponent(myName) : '');
+  const url = location.origin + '/' + (tableCode ? q : '');
+  const chrome = 'intent://' + location.host + '/' + (tableCode ? q : '') + '#Intent;scheme=https;package=com.android.chrome;end';
+  d.innerHTML = `<div class="sheet"><div class="eyebrow">${feature} needs a full browser</div>
+    <h2>Open the game in ${isIOS ? 'Safari' : 'Chrome'}</h2>
+    <p>You opened the link inside ${/WhatsApp/i.test(UA) || !/FBAN|FBAV|Instagram/i.test(UA) ? "WhatsApp's" : "the app's"} built-in browser. It blocks the microphone, so voice chat and speech typing don't work here.</p>
+    ${isAndroid ? `<a class="primary" style="display:block;box-sizing:border-box;text-align:center;text-decoration:none;margin-bottom:10px" href="${chrome}">Open in Chrome</a>
+      <p class="hint">If that doesn't work: tap the <b>⋮</b> menu at the top right, then <b>Open in Chrome</b>.</p>`
+      : `<p class="hint">Tap the <b>Safari</b> or <b>share</b> icon at the bottom or top of the screen, then <b>Open in Safari</b>. Or copy the link below and paste it into Safari.</p>`}
+    <div class="share"><span class="link" id="inappLink">${esc(url)}</span><div class="btns" style="grid-template-columns:1fr"><button class="secondary" id="inappCopy">Copy link</button></div></div>
+    <p class="hint">Your seat is kept. This link puts you straight back in your seat. Don't share it with others.</p>
+    <button class="linkbtn" id="inappClose">Not now</button></div>`;
+  d.hidden = false;
+  $('inappClose').onclick = () => { d.hidden = true; };
+  $('inappCopy').onclick = () => {
+    const ok = () => { $('inappCopy').textContent = 'Copied'; };
+    try { navigator.clipboard.writeText(url).then(ok, () => { const r = document.createRange(); r.selectNodeContents($('inappLink')); getSelection().removeAllRanges(); getSelection().addRange(r); }); } catch (e) {}
+  };
+}
 $('reacts').innerHTML = '<span class="voicectl" id="voiceCtl"></span><button class="vbtn chatbtn" id="chatBtn" aria-label="Open chat">💬<span class="lbl"> Chat</span><span class="cbadge" id="chatBadge" hidden></span></button>' + ['👏', '😂', '😮', '🔥', '😢', '🙏'].map(e => `<button data-r="${e}" aria-label="React ${e}">${e}</button>`).join('');
 $('reacts').onclick = e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -538,6 +570,7 @@ function renderVoice() {
 }
 async function voiceJoin() {
   if (V.on || V.joining) return;
+  if (inApp) { openInBrowserHelp('Voice chat'); return; }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.RTCPeerConnection) { flash('Voice chat needs a newer browser.'); return; }
   V.joining = true; renderVoice();
   try { V.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false }); }
@@ -671,6 +704,7 @@ if (SR) {
   $('sttLang').onclick = () => { sttLang = sttLang === 'en-US' ? 'ur-PK' : 'en-US'; store.set('rb-stt', sttLang); if (recOn) rec.stop(); syncStt(); };
   $('sttMic').onclick = () => {
     if (recOn) { rec.stop(); return; }
+    if (inApp) { openInBrowserHelp('Speech typing'); return; }
     if (V.on && !V.muted) { flash('Turn your voice chat mic off first (tap 🎙 Mic on), then use 🎤.'); return; }
     let got = false;
     rec = new SR(); rec.lang = sttLang; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
@@ -694,7 +728,13 @@ if (SR) {
       if (why) flash(why); else if (e.error !== 'aborted') flash('Speech typing stopped (' + e.error + '). Try again.');
       got = true; // error already explained
     };
-    rec.onend = () => { recOn = false; syncStt(); if (!got) flash("Didn't catch that. Tap 🎤 and speak again."); };
+    let started = false;
+    rec.onstart = rec.onaudiostart = () => { started = true; };
+    rec.onend = () => { recOn = false; syncStt(); if (!got && started) flash("Didn't catch that. Tap 🎤 and speak again."); };
+    // Some browsers accept start() and then silently do nothing: explain after 4 seconds
+    setTimeout(() => {
+      if (recOn && !started) { try { rec.abort(); } catch (e) {} recOn = false; syncStt(); openInBrowserHelp('Speech typing'); }
+    }, 4000);
     try { rec.start(); recOn = true; syncStt(); }
     catch (e) { recOn = false; syncStt(); flash("Speech typing couldn't start in this browser. Try Chrome (Android) or Safari (iPhone)."); }
   };
