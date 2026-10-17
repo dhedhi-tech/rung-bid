@@ -76,6 +76,7 @@ class Table {
     else { p = { name, seat: null, connected: true }; this.players.set(pid, p); }
     socket.join(this.code);
     this.touch();
+    this.checkResume();
     if (p.seat == null && this.phase === 'lobby') {
       // Joining before the game starts: take the first empty seat (they can still move)
       const free = this.seats.findIndex(s => s.bot);
@@ -121,6 +122,7 @@ class Table {
     if (s.pid && s.pid !== pid) { const other = this.players.get(s.pid); if (other) other.seat = null; }
     const tookFrom = this.phase !== 'lobby' && s.bot ? s.name : null;
     s.pid = pid; s.bot = false; s.name = p.name; p.seat = seat;
+    this.checkResume();
     if (tookFrom) this.fx('watch', { text: `${p.name} took over ${tookFrom}'s seat`, except: pid });
     this.touch(); this.broadcast();
     return null;
@@ -253,7 +255,25 @@ class Table {
   }
 
   // ---------- asking a seat for a move ----------
-  ask(seat, kind, askView, fallback, valid) {
+  // ---------- pause when no real players are left ----------
+  hasSeatedHuman() { return this.seats.some((_, i) => this.isHuman(i)); }
+  untilHumans() {
+    if (this.hasSeatedHuman() || !this.G) return Promise.resolve();
+    const G = this.G;
+    if (!this.paused) { this.paused = true; this.mainBefore = G.main; G.main = 'Game paused. It continues when a player comes back'; G.deadline = 0; this.broadcast(); }
+    return new Promise((res, rej) => { this.resumeFn = res; this.abortWait = () => rej(new Abort()); });
+  }
+  checkResume() {
+    if (this.paused && this.resumeFn && this.hasSeatedHuman()) {
+      this.paused = false; if (this.G) this.G.main = this.mainBefore || '';
+      const r = this.resumeFn; this.resumeFn = null; this.abortWait = null; r();
+    }
+  }
+  async ask(seat, kind, askView, fallback, valid) {
+    await this.untilHumans();
+    return this.askNow(seat, kind, askView, fallback, valid);
+  }
+  askNow(seat, kind, askView, fallback, valid) {
     const G = this.G;
     G.active = seat;
     if (!this.isHuman(seat)) {
@@ -301,12 +321,13 @@ class Table {
     this.run();
   }
   async run() {
-    try { while (this.alive) { const over = await this.playHand(); if (over) break; } }
+    try { while (this.alive) { await this.untilHumans(); const over = await this.playHand(); if (over) break; } }
     catch (e) { if (!(e instanceof Abort)) console.error('table', this.code, e); }
     this.running = false;
   }
   destroy() {
     this.alive = false;
+    if (this.abortWait) this.abortWait();
     if (this.pending) this.pending.abort();
     if (this.waitNext) this.waitNext();
   }

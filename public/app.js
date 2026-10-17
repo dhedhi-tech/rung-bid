@@ -661,16 +661,37 @@ if (SR) {
   $('sttLang').onclick = () => { sttLang = sttLang === 'en-US' ? 'ur-PK' : 'en-US'; store.set('rb-stt', sttLang); if (recOn) rec.stop(); syncStt(); };
   $('sttMic').onclick = () => {
     if (recOn) { rec.stop(); return; }
+    if (V.on && !V.muted) { flash('Turn your voice chat mic off first (tap 🎙 Mic on), then use 🎤.'); return; }
+    let got = false;
     rec = new SR(); rec.lang = sttLang; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
     const before = $('chatIn').value.trim();
     rec.onresult = e => {
-      let text = ''; for (let k = 0; k < e.results.length; k++) text += e.results[k][0].transcript;
+      let text = '';
+      for (let k = e.resultIndex; k < e.results.length; k++) text = e.results[k][0].transcript; // latest phrase only (avoids repeats on Android)
+      if (!text.trim()) return;
+      got = true;
       $('chatIn').value = ((before ? before + ' ' : '') + text.trim()).slice(0, 200);
     };
-    rec.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') flash('Microphone is blocked. Allow the mic for this site, then try again.'); else if (e.error === 'no-speech') flash('Didn\'t catch that. Tap 🎤 and speak again.'); };
-    rec.onend = () => { recOn = false; syncStt(); };
-    try { rec.start(); recOn = true; syncStt(); } catch (e) { recOn = false; syncStt(); }
+    rec.onerror = e => {
+      const why = {
+        'not-allowed': 'Microphone is blocked for speech typing. Allow the mic for this site in your browser settings.',
+        'service-not-allowed': "Speech typing doesn't work in this browser. Open the game link in Chrome (Android) or Safari (iPhone).",
+        'audio-capture': 'No microphone found, or another app is using it. Close other apps using the mic and try again.',
+        'network': 'Speech typing needs internet. Check your connection and try again.',
+        'language-not-supported': 'This phone does not support speech typing in that language. Tap the language button to switch.',
+        'no-speech': "Didn't hear anything. Tap 🎤 and speak right away.",
+      }[e.error];
+      if (why) flash(why); else if (e.error !== 'aborted') flash('Speech typing stopped (' + e.error + '). Try again.');
+      got = true; // error already explained
+    };
+    rec.onend = () => { recOn = false; syncStt(); if (!got) flash("Didn't catch that. Tap 🎤 and speak again."); };
+    try { rec.start(); recOn = true; syncStt(); }
+    catch (e) { recOn = false; syncStt(); flash("Speech typing couldn't start in this browser. Try Chrome (Android) or Safari (iPhone)."); }
   };
+} else {
+  // Browser has no speech typing (for example Firefox or some in-app browsers): show the button with an explanation
+  $('stt').hidden = false; $('sttLang').hidden = true;
+  $('sttMic').onclick = () => flash("This browser can't do speech typing. Open the game link in Chrome (Android) or Safari (iPhone).");
 }
 function openChat() { chatOpen = true; chatUnread = 0; $('chat').hidden = false; renderChat(); if (!coarse) $('chatIn').focus(); }
 function closeChat() { chatOpen = false; if (recOn && rec) rec.stop(); if ($('chat')) $('chat').hidden = true; }
@@ -716,7 +737,7 @@ function toast(msg) {
   t.textContent = msg; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
   clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 3500);
 }
-function flash(msg) { const c = $('conn'); c.innerHTML = esc(msg); c.hidden = false; clearTimeout(flash.t); flash.t = setTimeout(() => { if (sock.connected) c.hidden = true; }, 2600); }
+function flash(msg) { const c = $('conn'); c.innerHTML = esc(msg); c.hidden = false; clearTimeout(flash.t); flash.t = setTimeout(() => { if (sock.connected) c.hidden = true; }, 2600 + msg.length * 35); }
 let waking = null;
 function connecting() {
   const c = $('conn'); c.hidden = false;
