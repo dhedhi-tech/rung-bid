@@ -2,9 +2,10 @@
 // Needs SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_KEY on the server.
 // For local testing only, DEV_LOGIN=1 enables a fake sign-in and keeps profiles in memory.
 
-const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
-const ANON = process.env.SUPABASE_ANON_KEY || '';
-const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+// Keep only https://xxxx.supabase.co even if a longer address (like .../rest/v1/) was pasted
+const SB_URL = (() => { const raw = (process.env.SUPABASE_URL || '').trim(); if (!raw) return ''; try { return new URL(raw.includes('://') ? raw : 'https://' + raw).origin; } catch (e) { return raw.replace(/\/+$/, ''); } })();
+const ANON = (process.env.SUPABASE_ANON_KEY || '').trim();
+const SERVICE = (process.env.SUPABASE_SERVICE_KEY || '').trim();
 const DEV = process.env.DEV_LOGIN === '1';
 const enabled = !!(SB_URL && ANON && SERVICE);
 
