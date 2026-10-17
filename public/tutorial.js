@@ -2,7 +2,7 @@
 (function () {
   const C = (r, s) => ({ id: 'x' + r + s + Math.random(), r, s });
   const card = (c, extra = '') => (c.s === 'J'
-    ? `<div class="card joker ${extra}">${JOKER_ART}</div>`
+    ? `<div class="card joker ${extra}">${jokerArt()}</div>`
     : `<div class="card ${RED(c.s) ? 'red' : ''} ${extra}" data-k="${c.r}${c.s}"><span class="c-idx">${RL(c.r)}<small>${SYM[c.s]}</small></span><span class="c-pip">${SYM[c.s]}</span></div>`);
   const row = (cards, cls = '') => `<div class="tut-cards ${cls}">${cards.map(c => card(c)).join('')}</div>`;
 
