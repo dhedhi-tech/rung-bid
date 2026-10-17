@@ -162,7 +162,8 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
 @media (max-width:720px){.pips{display:none}.tb-lbl{font-size:10px}}
 
 /* Joker */
-.card.joker{color:var(--joker);background:radial-gradient(circle at 50% 50%,var(--paper) 40%,var(--joker-tint) 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-family:var(--font-display)}
+.card.joker{background:radial-gradient(circle at 50% 55%,var(--paper) 45%,var(--joker-tint) 100%);overflow:hidden}
+.card.joker .j-art{position:absolute;inset:0;width:100%;height:100%;display:block}
 .j-word{font-weight:900;font-stretch:125%;font-size:calc(var(--cw)*.2);letter-spacing:.06em}
 .j-star{font-size:calc(var(--cw)*.42);line-height:1;font-weight:800}
 .jfx .cut-ring{border-color:var(--joker)!important}
