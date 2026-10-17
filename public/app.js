@@ -431,9 +431,11 @@ function render() {
   if (!S.ask || S.ask.kind !== 'play') selected = null;
 
   renderTricks(); renderHeader(); renderSeats(); renderHand(); renderStatus(); renderTrickCards();
-  const t = myTurnText(); if (t) $('stMain').textContent = t;
+  const t = myTurnText() || (S.ask && S.ask.kind === 'bid' ? 'Your bid' : S.ask && S.ask.kind === 'trump' ? 'Call trump' : null);
+  if (t) $('stMain').textContent = t;
   renderAsk();
-  $('reacts').hidden = !(me0() && S.phase !== 'lobby');
+  $('reacts').hidden = S.phase === 'lobby';
+  $('reacts').classList.toggle('watching', !me0());
 
   if (S.phase === 'lobby') lobbyScreen();
   else if (S.phase === 'over' && S.result) { if (modalKind !== 'over' || shownHost !== S.isHost) { resultScreen(); shownHost = S.isHost; } }
@@ -506,10 +508,11 @@ $('hand').addEventListener('click', e => {
   send('act', { kind: 'play', value: id });
 });
 const sock = io({ auth: { pid, name: myName || 'Player' }, autoConnect: false });
-$('reacts').innerHTML = '<span class="voicectl" id="voiceCtl"></span>' + ['👏', '😂', '😮', '🔥', '😢', '🙏'].map(e => `<button data-r="${e}" aria-label="React ${e}">${e}</button>`).join('');
+$('reacts').innerHTML = '<span class="voicectl" id="voiceCtl"></span><button class="vbtn chatbtn" id="chatBtn" aria-label="Open chat">💬<span class="lbl"> Chat</span><span class="cbadge" id="chatBadge" hidden></span></button>' + ['👏', '😂', '😮', '🔥', '😢', '🙏'].map(e => `<button data-r="${e}" aria-label="React ${e}">${e}</button>`).join('');
 $('reacts').onclick = e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.r) send('react', b.dataset.r);
+  else if (b.id === 'chatBtn') openChat();
   else if (b.id === 'vJoin') voiceJoin();
   else if (b.id === 'vMute') voiceMute(!V.muted);
   else if (b.id === 'vLeave') voiceLeave(true);
@@ -627,6 +630,51 @@ function startLevel() {
 }
 function stopLevel() { clearInterval(vTimer); vTimer = null; if (V.talking && sock.connected) sock.emit('voice:talk', false); }
 renderVoice();
+/* ---------- text chat ---------- */
+let chatMsgs = [], chatUnread = 0, chatOpen = false;
+(function buildChat() {
+  const d = document.createElement('div'); d.className = 'chatpanel'; d.id = 'chat'; d.hidden = true;
+  d.innerHTML = `<div class="chat-head"><b>Table chat</b><button class="tut-x" id="chatClose" aria-label="Close chat">✕</button></div>
+    <div class="chat-list" id="chatList"></div>
+    <form class="chat-form" id="chatForm" autocomplete="off"><input type="text" id="chatIn" maxlength="200" placeholder="Type a message" aria-label="Message"><button class="primary" type="submit">Send</button></form>`;
+  document.body.appendChild(d);
+  $('chatClose').onclick = closeChat;
+  $('chatForm').onsubmit = e => {
+    e.preventDefault();
+    const v = $('chatIn').value.trim(); if (!v) return;
+    $('chatIn').value = '';
+    send('chat', v);
+  };
+})();
+function openChat() { chatOpen = true; chatUnread = 0; $('chat').hidden = false; renderChat(); if (!coarse) $('chatIn').focus(); }
+function closeChat() { chatOpen = false; if ($('chat')) $('chat').hidden = true; }
+function renderChat() {
+  const b = $('chatBadge'); if (b) { b.hidden = !chatUnread; b.textContent = chatUnread > 9 ? '9+' : chatUnread; }
+  if (!chatOpen) return;
+  const list = $('chatList');
+  list.innerHTML = chatMsgs.length ? chatMsgs.map(m => {
+    const cls = m.seat == null ? 'aud' : tcls(m.seat);
+    const who = m.seat == null && !m.mine ? `${esc(m.name)} <small>(audience)</small>` : esc(m.name);
+    return `<div class="cmsg ${m.mine ? 'mine' : ''}"><span class="pn ${cls}">${who}</span> ${esc(m.text)}</div>`;
+  }).join('') : '<p class="hint">No messages yet. Say hi to the table.</p>';
+  list.scrollTop = list.scrollHeight;
+}
+async function loadChat() {
+  const r = await send('chatHistory');
+  if (r && r.ok) { chatMsgs = r.list; renderChat(); }
+}
+function chatBubble(m) {
+  if (m.seat == null || !S || S.phase === 'lobby') return;
+  const pos = seatPos(m.seat), d = document.createElement('div');
+  d.className = 'chat-bubble ' + tcls(m.seat); d.textContent = m.text.length > 60 ? m.text.slice(0, 57) + '…' : m.text;
+  d.style.left = pos.x + '%'; d.style.top = pos.y + '%';
+  $('table').appendChild(d); setTimeout(() => d.remove(), 3600);
+}
+sock.on('chat', m => {
+  chatMsgs.push(m); if (chatMsgs.length > 50) chatMsgs.shift();
+  if (!chatOpen && !m.mine) { chatUnread++; sfx('pop'); }
+  renderChat(); chatBubble(m);
+});
 
 /* ---------- connection ---------- */
 function setName(v) { myName = v.slice(0, 14); store.set('rb-name', myName); sock.auth.name = myName; if (sock.connected) sock.emit('rename', myName); }
@@ -660,11 +708,11 @@ async function createTable(practice) {
 }
 async function joinTable() {
   const r = await send('join', tableCode);
-  if (r && r.ok) { history.replaceState(null, '', '/?t=' + r.code); if (V.want && !V.on) setTimeout(voiceJoin, 600); }
+  if (r && r.ok) { history.replaceState(null, '', '/?t=' + r.code); if (V.want && !V.on) setTimeout(voiceJoin, 600); loadChat(); }
   else { tableCode = null; history.replaceState(null, '', '/'); S = null; homeScreen(r && r.error); }
 }
 function leaveTable() {
-  voiceLeave(true);
+  voiceLeave(true); chatMsgs = []; chatUnread = 0; closeChat(); renderChat();
   send('leaveTable'); tableCode = null; S = null; history.replaceState(null, '', '/');
   $('trick').innerHTML = ''; hidePanel(); homeScreen();
   boot();

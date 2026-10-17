@@ -330,6 +330,27 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
 .toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translate(-50%,-20px);opacity:0;z-index:55;pointer-events:none;
   background:var(--paper);color:var(--suit-black);font-weight:750;font-size:14px;border-radius:999px;padding:9px 16px;box-shadow:0 0 0 3px var(--team-b),0 12px 30px rgba(0,0,0,.5);transition:opacity .25s,transform .25s;max-width:calc(100vw - 32px);text-align:center}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+/* ---------- Chat ---------- */
+.reacts.watching .voicectl,.reacts.watching button[data-r]{display:none}
+.chatbtn{position:relative}
+.cbadge{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;border-radius:9px;background:var(--bad);color:#fff;font-size:11px;font-weight:800;line-height:18px;padding:0 4px;box-sizing:border-box}
+.chatpanel{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 10px);z-index:45;width:min(440px,calc(100vw - 24px));
+  background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.6);display:flex;flex-direction:column;max-height:min(60vh,480px)}
+.chat-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px 6px 14px;font-size:14px}
+.chat-list{flex:1;overflow-y:auto;padding:4px 14px 8px;display:flex;flex-direction:column;gap:6px;min-height:120px}
+.cmsg{font-size:14px;line-height:1.4;word-wrap:break-word;overflow-wrap:anywhere}
+.cmsg .pn{font-weight:800;margin-right:2px}
+.cmsg .pn.aud{color:var(--muted)}
+.cmsg .pn small{font-weight:600;font-size:.8em}
+.chat-form{display:grid;grid-template-columns:1fr auto;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.chat-form input{min-width:0;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:16px;color:var(--fg)}
+.chat-form input:focus{outline:2px solid var(--team-a);outline-offset:1px}
+.chat-form .primary{width:auto;margin:0;padding:10px 16px}
+.chat-bubble{position:absolute;z-index:4;transform:translate(-50%,-140%);max-width:180px;background:var(--paper);color:var(--suit-black);font-size:12.5px;font-weight:650;line-height:1.3;
+  padding:6px 10px;border-radius:12px;box-shadow:0 0 0 2px var(--team-a),0 8px 20px rgba(0,0,0,.45);pointer-events:none;animation:cbub 3.6s ease both;word-wrap:break-word}
+.chat-bubble.tb{box-shadow:0 0 0 2px var(--team-b),0 8px 20px rgba(0,0,0,.45)}
+@keyframes cbub{0%{opacity:0;transform:translate(-50%,-110%) scale(.8)}8%{opacity:1;transform:translate(-50%,-140%) scale(1)}85%{opacity:1}100%{opacity:0}}
+@media (max-width:420px){.reacts{gap:4px}.reacts .chatbtn{padding:0 9px}.chatbtn .lbl{display:none}.reacts .vbtn{padding:0 8px}}
 /* ---------- Tutorial ---------- */
 .tut-banner{display:grid;gap:2px;background:color-mix(in srgb,var(--team-a) 18%,var(--panel-2));border:1px solid var(--team-a);border-radius:12px;padding:10px 12px;margin:0 0 8px;font-size:13.5px}
 .tut-banner b{color:var(--team-a);font-size:14.5px}

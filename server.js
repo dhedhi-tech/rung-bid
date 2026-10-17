@@ -98,6 +98,13 @@ io.on('connection', socket => {
   socket.on('next', cb => { if (table) table.dealNow(pid); reply(cb); });
   socket.on('again', cb => { if (!table) return reply(cb, 'Not at a table'); reply(cb, table.playAgain(pid)); });
   socket.on('leaveTable', cb => { if (table) table.stand(pid); leave(); reply(cb); });
+  socket.on('chat', (text, cb) => {
+    if (!table) return reply(cb, 'Not at a table');
+    const now = Date.now(); if (socket.data.lastChat && now - socket.data.lastChat < 700) return reply(cb, 'Slow down a little');
+    socket.data.lastChat = now;
+    reply(cb, table.chat(pid, text));
+  });
+  socket.on('chatHistory', cb => { reply(cb, null, { list: table ? table.chatHistory(pid) : [] }); });
   socket.on('react', (emo, cb) => {
     const allowed = ['👏', '😂', '😮', '🔥', '😢', '🙏'];
     if (!table || !allowed.includes(emo)) return reply(cb);

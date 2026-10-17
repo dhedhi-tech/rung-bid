@@ -59,6 +59,7 @@ class Table {
     this.seats = Array.from({ length: n }, (_, i) => ({ pid: null, name: names[i], bot: true }));
     this.clients = new Map(); // socket.id -> {socket, pid}
     this.voice = new Map();   // socket.id -> {pid, muted} for people in voice chat
+    this.chatLog = [];        // last 50 text messages
     this.players = new Map(); // pid -> {name, seat, connected}
     this.pending = null;
     this.lastActive = Date.now();
@@ -129,6 +130,24 @@ class Table {
     if (p) p.seat = null;
     s.pid = null; s.bot = true; s.name = this.botName(seat);
   }
+  // ---------- text chat ----------
+  chatEntry(m, viewerPid) {
+    const vp = viewerPid && this.players.get(viewerPid); const me = vp && vp.seat != null ? vp.seat : -1; const base = me < 0 ? 0 : me;
+    return { id: m.id, name: m.pid === viewerPid ? 'You' : m.name, mine: m.pid === viewerPid, text: m.text, ts: m.ts,
+      seat: m.seat == null ? null : (m.seat - base + this.n) % this.n };
+  }
+  chat(pid, text) {
+    const p = this.players.get(pid); if (!p) return 'Not at this table';
+    const clean = String(text || '').replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+    if (!clean) return null;
+    const m = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), pid, name: p.name, seat: p.seat, text: clean, ts: Date.now() };
+    this.chatLog.push(m); if (this.chatLog.length > 50) this.chatLog.shift();
+    this.touch();
+    for (const { socket, pid: vpid } of this.clients.values()) socket.emit('chat', this.chatEntry(m, vpid));
+    return null;
+  }
+  chatHistory(pid) { return this.chatLog.map(m => this.chatEntry(m, pid)); }
+
   stand(pid) {
     const p = this.players.get(pid); if (!p || p.seat == null) return;
     const seat = p.seat; this.freeSeat(seat);
