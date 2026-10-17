@@ -390,7 +390,7 @@ function joinSheet() {
 
 /* ---------- accounts: sign in, profile, levels, coins ---------- */
 let AUTH = { auth: false }, PROFILE = null, sbClient = null, sbToken = null;
-const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js';
+const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js';
 function loadScript(src) { return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); }); }
 async function initAuth() {
   try { AUTH = await (await fetch('/config')).json(); } catch (e) { AUTH = { auth: false }; }

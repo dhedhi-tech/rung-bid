@@ -28,7 +28,8 @@ const tokenCache = new Map(); // token -> {user, at}
 async function sb(path, opts = {}) {
   const r = await fetch(SB_URL + path, {
     ...opts,
-    headers: { apikey: SERVICE, Authorization: 'Bearer ' + SERVICE, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    // New-style secret keys (sb_secret_...) go only in the apikey header; legacy service_role keys also go in Authorization
+    headers: { apikey: SERVICE, ...(SERVICE.startsWith('sb_') ? {} : { Authorization: 'Bearer ' + SERVICE }), 'Content-Type': 'application/json', ...(opts.headers || {}) },
   });
   if (!r.ok) throw new Error('Supabase ' + r.status + ' ' + (await r.text()).slice(0, 200));
   const t = await r.text(); return t ? JSON.parse(t) : null;
