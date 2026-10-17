@@ -636,7 +636,7 @@ let chatMsgs = [], chatUnread = 0, chatOpen = false;
   const d = document.createElement('div'); d.className = 'chatpanel'; d.id = 'chat'; d.hidden = true;
   d.innerHTML = `<div class="chat-head"><b>Table chat</b><button class="tut-x" id="chatClose" aria-label="Close chat">✕</button></div>
     <div class="chat-list" id="chatList"></div>
-    <form class="chat-form" id="chatForm" autocomplete="off"><input type="text" id="chatIn" maxlength="200" placeholder="Type a message" aria-label="Message"><button class="primary" type="submit">Send</button></form>`;
+    <form class="chat-form" id="chatForm" autocomplete="off"><span class="stt" id="stt" hidden><button type="button" class="stt-mic" id="sttMic" aria-label="Speak your message">🎤</button><button type="button" class="stt-lang" id="sttLang" aria-label="Speech language"></button></span><input type="text" id="chatIn" maxlength="200" placeholder="Type a message" aria-label="Message"><button class="primary" type="submit">Send</button></form>`;
   document.body.appendChild(d);
   $('chatClose').onclick = closeChat;
   $('chatForm').onsubmit = e => {
@@ -646,8 +646,34 @@ let chatMsgs = [], chatUnread = 0, chatOpen = false;
     send('chat', v);
   };
 })();
+/* Speech to text: speak and the words fill the message box (Chrome, Safari, Edge) */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, recOn = false, sttLang = store.get('rb-stt') || 'en-US';
+function syncStt() {
+  if (!SR) return;
+  $('stt').hidden = false;
+  $('sttLang').textContent = sttLang === 'ur-PK' ? 'اردو' : 'EN';
+  $('sttMic').classList.toggle('on', recOn);
+  $('chatIn').placeholder = recOn ? 'Listening…' : 'Type a message';
+}
+if (SR) {
+  syncStt();
+  $('sttLang').onclick = () => { sttLang = sttLang === 'en-US' ? 'ur-PK' : 'en-US'; store.set('rb-stt', sttLang); if (recOn) rec.stop(); syncStt(); };
+  $('sttMic').onclick = () => {
+    if (recOn) { rec.stop(); return; }
+    rec = new SR(); rec.lang = sttLang; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+    const before = $('chatIn').value.trim();
+    rec.onresult = e => {
+      let text = ''; for (let k = 0; k < e.results.length; k++) text += e.results[k][0].transcript;
+      $('chatIn').value = ((before ? before + ' ' : '') + text.trim()).slice(0, 200);
+    };
+    rec.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') flash('Microphone is blocked. Allow the mic for this site, then try again.'); else if (e.error === 'no-speech') flash('Didn\'t catch that. Tap 🎤 and speak again.'); };
+    rec.onend = () => { recOn = false; syncStt(); };
+    try { rec.start(); recOn = true; syncStt(); } catch (e) { recOn = false; syncStt(); }
+  };
+}
 function openChat() { chatOpen = true; chatUnread = 0; $('chat').hidden = false; renderChat(); if (!coarse) $('chatIn').focus(); }
-function closeChat() { chatOpen = false; if ($('chat')) $('chat').hidden = true; }
+function closeChat() { chatOpen = false; if (recOn && rec) rec.stop(); if ($('chat')) $('chat').hidden = true; }
 function renderChat() {
   const b = $('chatBadge'); if (b) { b.hidden = !chatUnread; b.textContent = chatUnread > 9 ? '9+' : chatUnread; }
   if (!chatOpen) return;

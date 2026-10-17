@@ -342,7 +342,12 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
 .cmsg .pn{font-weight:800;margin-right:2px}
 .cmsg .pn.aud{color:var(--muted)}
 .cmsg .pn small{font-weight:600;font-size:.8em}
-.chat-form{display:grid;grid-template-columns:1fr auto;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.chat-form{display:grid;grid-template-columns:auto 1fr auto;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.chat-form .stt[hidden]+input{grid-column:1 / 3}
+.stt{display:flex;gap:4px}
+.stt-mic{width:42px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);font-size:18px}
+.stt-mic.on{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 22%,var(--panel-2));animation:pulse 1.2s ease-in-out infinite}
+.stt-lang{min-width:42px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);font-size:12px;font-weight:800;padding:0 6px}
 .chat-form input{min-width:0;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:16px;color:var(--fg)}
 .chat-form input:focus{outline:2px solid var(--team-a);outline-offset:1px}
 .chat-form .primary{width:auto;margin:0;padding:10px 16px}

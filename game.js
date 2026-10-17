@@ -292,7 +292,7 @@ class Table {
   }
   newGame() {
     this.G = {
-      n: this.n, joker: this.joker, avg: calibrate(this.n, this.joker), players: Array.from({ length: this.n }, () => ({ hand: [], tricks: 0 })),
+      n: this.n, joker: this.joker, avg: calibrate(this.n, this.joker), fullDeck: buildDeck(this.n, this.joker), played: [], players: Array.from({ length: this.n }, () => ({ hand: [], tricks: 0 })),
       dealer: Math.floor(Math.random() * this.n), score: 0, won: [0, 0], handNo: 1,
       bid: null, trump: null, acts: {}, trick: [], leadSuit: null, tricksWon: [0, 0], phase: 'deal', active: -1, log: [], round: 0,
       hist: [], roundTrump: {}, main: '', deadline: 0, over: null, result: null,
@@ -363,6 +363,14 @@ class Table {
     for (const s of SUITS) { const p = power(h, s); if (p > bp) { bp = p; best = s; } }
     return best;
   }
+  // A card is "boss" when no card that could beat it is still out: no unseen card of the same suit
+  // with equal or higher rank (with two decks the identical card played later wins).
+  isBoss(seat, c) {
+    if (isJ(c)) return false;
+    const G = this.G, gone = new Set(G.played.map(x => x.id));
+    for (const x of G.players[seat].hand) gone.add(x.id);
+    return !G.fullDeck.some(d => d.s === c.s && d.r >= c.r && d.id !== c.id && !gone.has(d.id));
+  }
   botPlay(seat) {
     const G = this.G, hand = G.players[seat].hand, legal = this.legalCards(hand), T = G.trump, team = seat % 2;
     const nonJ = legal.filter(c => !isJ(c)), jok = legal.find(isJ);
@@ -379,8 +387,9 @@ class Table {
     const cur = this.currentWinner();
     const leader = G.trick[0].seat, partnerLed = leader % 2 === team && leader !== seat;
     if (cur.seat % 2 === team) {
-      if (partnerLed && after > 0 && cur.card.r < 14 && cur.card.s === G.leadSuit) {
-        const over = legal.filter(c => c.s === G.leadSuit && this.beats(c, cur.card)).sort((a, b) => b.r - a.r);
+      if (partnerLed && after > 0 && cur.card.s === G.leadSuit && !this.isBoss(seat, cur.card)) {
+        // Partner's card can still be beaten: take over only with a card nobody can beat
+        const over = legal.filter(c => c.s === G.leadSuit && this.beats(c, cur.card) && this.isBoss(seat, c)).sort((a, b) => a.r - b.r);
         if (over.length) return over[0];
       }
       return lowest(legal);
@@ -388,7 +397,15 @@ class Table {
     const winners = legal.filter(c => !isJ(c) && this.beats(c, cur.card));
     if (!winners.length) return lowest(legal);
     const fw = winners.filter(c => c.s !== T).sort((a, b) => a.r - b.r);
-    if (fw.length) return after === 0 ? fw[0] : fw[fw.length - 1];
+    if (fw.length) {
+      if (after === 0) return fw[0];
+      // Players still to come: only commit a high card if nothing left out can beat it
+      const safe = fw.filter(c => this.isBoss(seat, c));
+      if (safe.length) return safe[0];
+      const tw = winners.filter(c => c.s === T).sort((a, b) => a.r - b.r);
+      if (tw.length && G.leadSuit !== T) return tw[0];
+      return lowest(legal);
+    }
     return winners.sort((a, b) => a.r - b.r)[0];
   }
   botLead(seat, hand) {
@@ -410,10 +427,13 @@ class Table {
       const single = SUITS.find(s => s !== T && of(s).length === 1 && of(s)[0].r < 14 && !oppCuts(s));
       if (single) return of(single)[0];
     }
-    if (bidTeam && trumps.length >= 4 && trumps[0].r >= 13) return trumps[0];
-    const ace = pool.find(c => c.r === 14); if (ace) return ace;
+    if (bidTeam && trumps.length >= 4 && this.isBoss(seat, trumps[0])) return trumps[0];
+    // Lead a card nobody can beat in its suit (with two decks an Ace is only safe once the other Ace is gone)
+    const boss = pool.filter(c => this.isBoss(seat, c)).sort((a, b) => b.r - a.r)[0]; if (boss) return boss;
     if (!pool.length) return trumps.length ? trumps[trumps.length - 1] : hand[0];
-    const groups = {}; for (const c of pool) (groups[c.s] = groups[c.s] || []).push(c);
+    // Don't lead an unprotected Ace or King that a higher or duplicate card can still take
+    const modest = pool.filter(c => c.r < 13 || this.isBoss(seat, c));
+    const groups = {}; for (const c of (modest.length ? modest : pool)) (groups[c.s] = groups[c.s] || []).push(c);
     const suits = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length);
     return low(groups[suits[0]]);
   }
@@ -471,7 +491,7 @@ class Table {
   playCard(seat, card) {
     const G = this.G, h = G.players[seat].hand; h.splice(h.findIndex(c => c.id === card.id), 1);
     if (!G.trick.length) G.leadSuit = card.s;
-    G.trick.push({ seat, card });
+    G.trick.push({ seat, card }); G.played.push(card);
     if (G.trick.length > 1 && card.s !== G.leadSuit) G.voids[seat].add(G.leadSuit);
     if (isJ(card)) {
       const cancel = this.jokerCount() === 2;
@@ -554,7 +574,7 @@ class Table {
   async playHand() {
     const G = this.G;
     Object.assign(G, {
-      voids: Array.from({ length: G.n }, () => new Set()), returnTo: Array(G.n).fill(null), hist: [], roundTrump: {}, supportSeat: -1,
+      voids: Array.from({ length: G.n }, () => new Set()), returnTo: Array(G.n).fill(null), hist: [], roundTrump: {}, supportSeat: -1, played: [],
       bid: null, trump: null, acts: {}, trick: [], leadSuit: null, tricksWon: [0, 0], round: 0, phase: 'deal', active: -1, log: [], result: null,
     });
     G.players.forEach(p => { p.hand = []; p.tricks = 0; });
