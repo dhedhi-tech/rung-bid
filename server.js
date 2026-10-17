@@ -4,6 +4,8 @@ const http = require('http');
 const express = require('express');
 const { Server } = require('socket.io');
 const { Table } = require('./game');
+const A = require('./accounts');
+const pidAuth = new Map(); // player id -> { profile } for signed-in players
 
 const app = express();
 const server = http.createServer(app);
@@ -20,6 +22,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
   extensions: ['html'], index: false,
   setHeaders: (res, file) => { if (/\.(js|css)$/.test(file)) res.set('Cache-Control', 'no-cache'); },
 }));
+app.get('/config', (_req, res) => { res.set('Cache-Control', 'no-cache'); res.json(A.config()); });
 app.get('/health', (_req, res) => res.json({ ok: true, tables: tables.size }));
 
 const tables = new Map();
@@ -61,6 +64,20 @@ function newCode() {
 const cleanName = s => String(s || '').replace(/[<>{}&"'`]/g, '').trim().slice(0, 14) || 'Player';
 const cleanPid = s => String(s || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
 
+// XP, coins and level badges for signed-in players
+function wireProgress(t) {
+  t.levelOf = p => { const a = pidAuth.get(p); return a ? A.levelOf(a.profile.xp) : null; };
+  t.onHandEnd = info => {
+    for (const s of info.seats) {
+      if (!s.pid) continue;
+      const a = pidAuth.get(s.pid); if (!a) continue;
+      const g = A.handGains(info, s.seat);
+      const gain = A.award(a.profile, g.xp, g.coins, g.stats);
+      for (const { socket, pid: cp } of t.clients.values()) if (cp === s.pid) socket.emit('profile', { profile: A.view(a.profile), gain });
+    }
+  };
+}
+
 io.on('connection', socket => {
   let pid = cleanPid(socket.handshake.auth && socket.handshake.auth.pid);
   let name = cleanName(socket.handshake.auth && socket.handshake.auth.name);
@@ -76,6 +93,7 @@ io.on('connection', socket => {
     if (tables.size > 500) return reply(cb, 'Server is busy. Try again in a minute.');
     const code = newCode();
     const t = new Table(code, { n, joker: !!(opts && opts.joker), hostId: pid, limit: opts && Number(opts.limit) }, io);
+    wireProgress(t);
     tables.set(code, t);
     leave(); table = t; t.addClient(socket, pid, name);
     t.sit(pid, 0);
@@ -109,6 +127,32 @@ io.on('connection', socket => {
   socket.on('next', cb => { if (table) table.dealNow(pid); reply(cb); });
   socket.on('again', cb => { if (!table) return reply(cb, 'Not at a table'); reply(cb, table.playAgain(pid)); });
   socket.on('leaveTable', cb => { if (table) table.stand(pid); leave(); reply(cb); });
+  // ---- accounts ----
+  const signedIn = async (user, cb) => {
+    const profile = await A.load(user);
+    pidAuth.set(pid, { profile });
+    const daily = A.claimDaily(profile);
+    if (table) table.broadcast();
+    reply(cb, null, { profile: A.view(profile), daily });
+  };
+  socket.on('auth', async (token, cb) => {
+    try { const user = await A.verify(String(token || '')); if (!user) return reply(cb, 'Sign-in expired. Please sign in again.'); await signedIn(user, cb); }
+    catch (e) { console.error('auth', e.message); reply(cb, 'Could not load your profile. Try again in a minute.'); }
+  });
+  socket.on('devLogin', async (nm, cb) => {
+    if (!A.DEV || A.enabled) return reply(cb, 'Not available');
+    await signedIn({ id: 'dev-' + pid, name: cleanName(nm), avatar: '' }, cb);
+  });
+  socket.on('signout', cb => { pidAuth.delete(pid); if (table) table.broadcast(); reply(cb); });
+  socket.on('buy', (item, cb) => {
+    const a = pidAuth.get(pid); if (!a) return reply(cb, 'Sign in to collect coins');
+    const err = A.buy(a.profile, String(item)); reply(cb, err, { profile: A.view(a.profile) });
+  });
+  socket.on('equip', (item, cb) => {
+    const a = pidAuth.get(pid); if (!a) return reply(cb, 'Sign in first');
+    const err = A.equip(a.profile, String(item)); reply(cb, err, { profile: A.view(a.profile) });
+  });
+
   socket.on('chat', (text, cb) => {
     if (!table) return reply(cb, 'Not at a table');
     const now = Date.now(); if (socket.data.lastChat && now - socket.data.lastChat < 700) return reply(cb, 'Slow down a little');

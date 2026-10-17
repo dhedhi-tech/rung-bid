@@ -203,7 +203,7 @@ class Table {
         const pl = s.pid && this.players.get(s.pid);
         const vc = s.pid && !s.bot ? [...this.voice.entries()].find(([, x]) => x.pid === s.pid) : null;
         return { name: s.name, bot: s.bot, human: !s.bot, connected: !!(pl && pl.connected), host: s.pid === this.hostId, real: (i + base) % n,
-          voice: vc ? { sid: vc[0], muted: vc[1].muted } : null };
+          voice: vc ? { sid: vc[0], muted: vc[1].muted } : null, lvl: !s.bot && s.pid && this.levelOf ? this.levelOf(s.pid) : null };
       }),
       lobbyNames: [...this.players.values()].filter(x => x.connected && x.seat == null).map(x => x.name),
     };
@@ -235,7 +235,7 @@ class Table {
     return {
       title: this.fmt(R.title, me), winner: rotTeam(R.winner), pts: R.pts, contract: R.contract, bidder: this.fmt(`{n${R.bidSeat}}`, me),
       tricks: [R.tricks[base % 2], R.tricks[1 - base % 2]], next: R.next != null ? this.fmt(`{n${R.next}}`, me) : null,
-      over: R.over, byLimit: !!R.byLimit, deciderNext: !!R.deciderNext, endsAt: R.endsAt ? Math.max(0, R.endsAt - Date.now()) : 0, handNo: R.handNo,
+      kind: R.kind, over: R.over, byLimit: !!R.byLimit, deciderNext: !!R.deciderNext, endsAt: R.endsAt ? Math.max(0, R.endsAt - Date.now()) : 0, handNo: R.handNo,
     };
   }
   broadcast() {
@@ -249,6 +249,7 @@ class Table {
       const d = { ...data }; delete d.except;
       for (const k of ['seat', 'lead', 'credit', 'showSeat']) if (k in d) d[k] = rot(d[k]);
       if ('team' in d) d.team = (d.team - base % 2 + 2) % 2;
+      if (d.gameWinner != null) d.gameWinner = (d.gameWinner - base % 2 + 2) % 2;
       if (d.text) d.text = this.fmt(d.text, me);
       if (d.sub) d.sub = this.fmt(d.sub, me);
       socket.emit('fx', { type, ...d });
@@ -573,20 +574,26 @@ class Table {
   }
   async endHand() {
     const G = this.G, bt = G.bid.seat % 2, ot = 1 - bt, v = G.bid.value, tw = G.tricksWon, req = this.need();
-    let winner, pts, title;
-    if (tw[bt] >= req) { winner = bt; if (tw[ot] === 0) { pts = 2 * v; title = `Clean sweep. {t${bt}} score double`; } else { pts = v; title = `{t${bt}} made the bid`; } }
-    else { winner = ot; if (tw[bt] === 0) { pts = 4 * v; title = `Whitewash. {t${ot}} score 4×`; } else { pts = 2 * v; title = `Bid broken. {t${ot}} score double`; } }
+    let winner, pts, title, kind;
+    if (tw[bt] >= req) { winner = bt; if (tw[ot] === 0) { pts = 2 * v; kind = 'sweep'; title = `Clean sweep. {t${bt}} score double`; } else { pts = v; kind = 'made'; title = `{t${bt}} made the bid`; } }
+    else { winner = ot; if (tw[bt] === 0) { pts = 4 * v; kind = 'whitewash'; title = `Whitewash. {t${ot}} score 4×`; } else { pts = 2 * v; kind = 'broken'; title = `Bid broken. {t${ot}} score double`; } }
     G.score += winner === 0 ? pts : -pts; G.won[winner] += pts;
     // Game ends at a 52 point lead, or when the hand limit is reached and one team is ahead (level score: play a decider hand)
     const limitHit = this.limit && G.handNo >= this.limit;
     const over = Math.abs(G.score) >= TARGET || (limitHit && G.score !== 0);
     if (!over) this.nextDealer();
     G.phase = 'done'; G.main = title;
-    G.result = { title, winner, pts, contract: `${v} ${SYM[G.trump]}`, bidSeat: G.bid.seat, tricks: tw.slice(), next: over ? null : G.dealer, over,
+    G.result = { title, winner, pts, kind, contract: `${v} ${SYM[G.trump]}`, bidSeat: G.bid.seat, tricks: tw.slice(), next: over ? null : G.dealer, over,
       byLimit: over && Math.abs(G.score) < TARGET, deciderNext: !over && limitHit, endsAt: over ? 0 : Date.now() + HAND_END_MS, handNo: G.handNo };
     if (over) G.over = { winner: G.score > 0 ? 0 : 1 };
-    this.broadcast(); this.fx('handEnd', { team: winner });
-    if (over) { this.phase = 'over'; this.broadcast(); return true; }
+    if (over) this.phase = 'over';
+    // Progress hook (XP and coins for signed-in players)
+    if (this.onHandEnd) {
+      const seats = this.seats.map((st, i) => ({ seat: i, pid: !st.bot && st.pid ? st.pid : null, team: i % 2 }));
+      try { this.onHandEnd({ seats, winner, kind, bidSeat: G.bid.seat, over, gameWinner: over ? (G.score > 0 ? 0 : 1) : null, n: this.n }); } catch (e) { console.error('progress', e); }
+    }
+    this.broadcast(); this.fx('handEnd', { team: winner, kind, over, gameWinner: over ? (G.score > 0 ? 0 : 1) : null });
+    if (over) return true;
     await new Promise(res => { const t = setTimeout(res, HAND_END_MS); this.waitNext = () => { clearTimeout(t); res(); }; });
     this.waitNext = null;
     if (!this.alive) throw new Abort();

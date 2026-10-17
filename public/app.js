@@ -59,9 +59,11 @@ const SFX = {
   win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * .11, .35, { type: 'triangle', vol: .16 })); },
   lose() { [392, 349, 311, 262].forEach((f, i) => tone(f, i * .14, .35, { type: 'triangle', vol: .12 })); },
   pop() { tone(660, 0, .08, { vol: .08 }); },
+  fanfare() { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, i * .12, i === 6 ? .7 : .22, { type: 'triangle', vol: .16 })); [262, 392, 523].forEach(f => tone(f, .84, .9, { type: 'sine', vol: .07 })); },
 };
 function sfx(name, ...a) { try { SFX[name](...a); } catch (e) {} }
 
+const sockReady = []; // socket listeners registered once the connection object exists
 /* ---------- state ---------- */
 let S = null;              // latest view from the server
 let deadlineAt = 0, deadlineTotal = 1;
@@ -152,6 +154,7 @@ function renderSeats() {
     const cnt = S.counts ? S.counts[i] : 0;
     const backs = (i === 0 && me0()) || S.phase === 'lobby' ? '' : `<span class="backs"><span class="mini-back"></span>${cnt}</span>`;
     const tag = (p.bot ? '<span class="tag-bot">BOT</span>' : (!p.connected ? '<span class="tag-bot">AWAY</span>' : ''))
+      + (p.lvl ? `<span class="lvl-badge" title="Level ${p.lvl}">${p.lvl}</span>` : '')
       + (p.voice ? `<span class="vmic" title="${p.voice.muted ? 'Mic off' : 'In voice chat'}">${p.voice.muted ? '🔇' : '🎙'}</span>` : '');
     const active = S.active === i && S.phase === 'game';
     const tmr = active && deadlineAt ? `<span class="tmr" data-tmr><i></i></span>` : '';
@@ -310,26 +313,54 @@ let resultAt = 0;
 function openModal(kind, html) { modalKind = kind; $('sheet').innerHTML = html; $('modal').hidden = false; }
 function closeModal() { modalKind = null; $('modal').hidden = true; }
 
-function homeScreen(err) {
-  openModal('home', `<div class="eyebrow">Team bidding card game</div>
-    <h1 class="display">Rung<em>·</em>Bid</h1>
-    <p>Play with friends on any phone. Create a table, share the link on WhatsApp, and bots fill any empty seats.</p>
-    ${store.get('rb-tut-seen') ? '' : '<div class="tut-banner"><b>New to Rung Bid?</b><span>Learn the rules in 2 minutes with a hands-on tutorial.</span></div>'}
-    <button class="secondary tut-open" id="tutBtn">${store.get('rb-tut-seen') ? 'How to play' : 'Start the tutorial'}</button>
-    <div class="field"><span>Your name</span><input type="text" id="nameIn" maxlength="14" autocomplete="nickname" placeholder="e.g. Atif" value="${esc(myName)}"></div>
+/* ---------- welcome screen ---------- */
+function homeScreen(err) { welcomeScreen(err); }
+function welcomeScreen(err) {
+  closeModal();
+  let w = $('welcome');
+  if (!w) { w = document.createElement('div'); w.id = 'welcome'; w.className = 'welcome'; document.body.appendChild(w); }
+  const fan = [{ r: 14, s: 'S' }, { r: 13, s: 'H' }, { r: 12, s: 'C' }, { r: 11, s: 'D' }, { r: 10, s: 'S' }]
+    .map((c, i) => `<div class="wfan-card" style="--i:${i - 2}">${cardHTML({ ...c, id: 'w' + i })}</div>`).join('');
+  const firstTime = !store.get('rb-tut-seen');
+  w.innerHTML = `<div class="wtop"><div id="wChip"></div></div>
+    <div class="whero">
+      <div class="wfan">${fan}</div>
+      <h1 class="wlogo">Rung<em>·</em>Bid</h1>
+      <p class="wtag">The team bidding card game for 4, 6 or 8 players</p>
+    </div>
+    <div class="wmenu">
+      ${firstTime ? '<div class="tut-banner"><b>New to Rung Bid?</b><span>Learn the rules in 2 minutes with a hands-on tutorial.</span></div>' : ''}
+      <button class="primary" id="wPlay">Play with friends</button>
+      <button class="secondary" id="wPractice">Practice with bots</button>
+      <div class="wrow"><button class="secondary" id="wJoin">Join with a code</button><button class="secondary" id="wTut">${firstTime ? 'Tutorial' : 'How to play'}</button></div>
+      <div class="err" id="wErr">${err ? esc(err) : ''}</div>
+    </div>`;
+  w.hidden = false;
+  $('wPlay').onclick = () => createSheet(false);
+  $('wPractice').onclick = () => createSheet(true);
+  $('wJoin').onclick = joinSheet;
+  $('wTut').onclick = () => openTutorial('home');
+  renderChip();
+}
+function hideWelcome() { const w = $('welcome'); if (w) w.hidden = true; }
+function nameField() { return `<div class="field"><span>Your name</span><input type="text" id="nameIn" maxlength="14" autocomplete="nickname" placeholder="e.g. Atif" value="${esc(myName)}"></div>`; }
+function takeName() {
+  const v = $('nameIn').value.trim();
+  if (!v) { $('homeErr').textContent = 'Type your name first so friends know who you are.'; $('nameIn').focus(); return false; }
+  setName(v); return true;
+}
+function createSheet(practice) {
+  openModal('create', `<div class="eyebrow">${practice ? 'Practice with bots' : 'New table'}</div>
+    <h2>${practice ? 'Set up a practice game' : 'Create a table'}</h2>
+    ${nameField()}
     <div class="field"><span>Players</span><div class="seg" id="segN">
       <button data-n="4">4<small>1 deck</small></button><button data-n="6">6<small>78 cards</small></button><button data-n="8">8<small>2 decks</small></button></div></div>
     <div class="field"><span>Mode</span><div class="seg text" id="segJ"><button data-j="0">Classic</button><button data-j="1">Joker mode</button></div></div>
     <div class="field"><span>Game length</span><div class="seg" id="segL">
       <button data-l="6">Quick<small>6 hands</small></button><button data-l="10">Normal<small>10 hands</small></button><button data-l="0">Full<small>no limit</small></button></div></div>
-    <div class="btn-col">
-      <button class="primary" id="createBtn">Create table</button>
-      <button class="secondary" id="practiceBtn">Practice with bots</button>
-    </div>
-    <div class="field" style="margin-top:16px"><span>Got a table code?</span><div class="row2"><input type="text" id="codeIn" maxlength="5" placeholder="ABCDE" autocapitalize="characters"><button class="secondary" id="joinBtn">Join</button></div></div>
-    <div class="err" id="homeErr">${err ? esc(err) : ''}</div>
-    <button class="linkbtn" id="rulesLink">Read the rules</button>`);
-  $('tutBtn').onclick = () => { const v = $('nameIn').value.trim(); if (v) setName(v); openTutorial('home'); };
+    <button class="primary" id="goCreate">${practice ? 'Start practice' : 'Create table'}</button>
+    <div class="err" id="homeErr"></div>
+    <button class="linkbtn" id="backHome">Back</button>`);
   const sync = () => {
     document.querySelectorAll('#segN button').forEach(b => b.classList.toggle('on', +b.dataset.n === homeN));
     document.querySelectorAll('#segJ button').forEach(b => b.classList.toggle('on', (b.dataset.j === '1') === homeJ));
@@ -339,19 +370,133 @@ function homeScreen(err) {
   $('segN').onclick = e => { const b = e.target.closest('button'); if (b) { homeN = +b.dataset.n; sync(); } };
   $('segJ').onclick = e => { const b = e.target.closest('button'); if (b) { homeJ = b.dataset.j === '1'; sync(); } };
   $('segL').onclick = e => { const b = e.target.closest('button'); if (b) { homeL = +b.dataset.l; sync(); } };
-  const takeName = () => {
-    const v = $('nameIn').value.trim();
-    if (!v) { $('homeErr').textContent = 'Type your name first so friends know who you are.'; $('nameIn').focus(); return false; }
-    setName(v); return true;
-  };
-  $('createBtn').onclick = () => { if (takeName()) createTable(false); };
-  $('practiceBtn').onclick = () => { if (takeName()) createTable(true); };
-  $('joinBtn').onclick = () => {
-    const c = $('codeIn').value.trim().toUpperCase(); if (!c) return;
-    if (takeName()) { tableCode = c; joinTable(); }
-  };
-  $('rulesLink').onclick = () => { $('rules').hidden = false; };
+  $('goCreate').onclick = () => { if (takeName()) { ac(); createTable(practice); } };
+  $('backHome').onclick = closeModal;
 }
+function joinSheet() {
+  openModal('join', `<div class="eyebrow">Join a table</div><h2>Got a table code?</h2>
+    ${nameField()}
+    <div class="field"><span>Table code</span><input type="text" id="codeIn" maxlength="5" placeholder="ABCDE" autocapitalize="characters"></div>
+    <button class="primary" id="goJoin">Join table</button>
+    <div class="err" id="homeErr"></div>
+    <button class="linkbtn" id="backHome">Back</button>`);
+  $('goJoin').onclick = () => {
+    const c = $('codeIn').value.trim().toUpperCase();
+    if (!c) { $('homeErr').textContent = 'Type the 5 letter table code.'; return; }
+    if (takeName()) { tableCode = c; closeModal(); joinTable(); }
+  };
+  $('backHome').onclick = closeModal;
+}
+
+/* ---------- accounts: sign in, profile, levels, coins ---------- */
+let AUTH = { auth: false }, PROFILE = null, sbClient = null, sbToken = null;
+const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js';
+function loadScript(src) { return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); }); }
+async function initAuth() {
+  try { AUTH = await (await fetch('/config')).json(); } catch (e) { AUTH = { auth: false }; }
+  renderChip();
+  if (AUTH.supabaseUrl) {
+    try {
+      await loadScript(SUPABASE_JS);
+      sbClient = window.supabase.createClient(AUTH.supabaseUrl, AUTH.anonKey, { auth: { persistSession: true, detectSessionInUrl: true, flowType: 'pkce' } });
+      sbClient.auth.onAuthStateChange((_ev, sess) => setToken(sess ? sess.access_token : null));
+      const { data } = await sbClient.auth.getSession();
+      setToken(data.session ? data.session.access_token : null);
+    } catch (e) { console.warn('auth', e); }
+  } else if (AUTH.dev && store.get('rb-dev')) authNow();
+}
+function setToken(t) {
+  if (t === sbToken) return;
+  sbToken = t;
+  if (t) authNow(); else { PROFILE = null; applyFelt(); renderChip(); }
+}
+async function authNow() {
+  if (!sock.connected) return;
+  let r = null;
+  if (sbToken) r = await send('auth', sbToken);
+  else if (AUTH.dev && store.get('rb-dev')) r = await send('devLogin', store.get('rb-dev'));
+  if (r && r.ok) gotProfile(r.profile, r.daily);
+}
+function gotProfile(p, daily) {
+  PROFILE = p;
+  if (!myName && p.name) setName(p.name.split(' ')[0]);
+  applyFelt(); renderChip();
+  if (modalKind === 'profile') profileSheet();
+  if (daily) setTimeout(() => gainToast(`Daily reward · +${daily} coins`), 600);
+}
+function signIn() {
+  if (AUTH.dev && !sbClient) {
+    openModal('devlogin', `<div class="eyebrow">Test sign-in</div><h2>Sign in (test mode)</h2>${nameField()}<button class="primary" id="goDev">Sign in</button><div class="err" id="homeErr"></div>`);
+    $('goDev').onclick = () => { if (takeName()) { store.set('rb-dev', myName); closeModal(); authNow(); } };
+    return;
+  }
+  if (!sbClient) { flash('Sign-in is not set up yet.'); return; }
+  if (inApp) { openInBrowserHelp('Google sign-in'); return; }
+  sbClient.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + '/' + location.search } });
+}
+async function signOut() {
+  if (sbClient) { try { await sbClient.auth.signOut(); } catch (e) {} }
+  store.set('rb-dev', ''); sbToken = null; PROFILE = null;
+  send('signout'); applyFelt(); renderChip(); closeModal();
+}
+function avatarHTML(p, cls = '') {
+  return p.avatar ? `<img class="avatar ${cls}" src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : `<span class="avatar ${cls}">${esc((p.name || '?')[0].toUpperCase())}</span>`;
+}
+function renderChip() {
+  const el = $('wChip'); if (!el) return;
+  if (PROFILE) {
+    const pct = Math.round(100 * PROFILE.levelXp / PROFILE.levelNeed);
+    el.innerHTML = `<button class="pchip" id="pchip">${avatarHTML(PROFILE)}<span class="pc-text"><b>${esc(PROFILE.name)}</b><span class="pc-lvl">Level ${PROFILE.level}<i style="--p:${pct}%"></i></span></span><span class="pc-coins">● ${PROFILE.coins}</span></button>`;
+    $('pchip').onclick = profileSheet;
+  } else if (AUTH.auth) {
+    el.innerHTML = `<button class="gbtn" id="gSignIn"><svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17.5z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>Sign in with Google</button>
+      <span class="gnote">Save your level, coins and stats</span>`;
+    $('gSignIn').onclick = signIn;
+  } else el.innerHTML = '';
+}
+function profileSheet() {
+  if (!PROFILE) return;
+  const P = PROFILE, pct = Math.round(100 * P.levelXp / P.levelNeed);
+  const rate = P.games ? Math.round(100 * P.wins / P.games) + '%' : '–';
+  const store_ = P.store.map(it => {
+    const on = P.equipped && P.equipped.felt === it.id;
+    const btn = on ? '<span class="st-on">In use</span>' : it.owned ? `<button class="secondary st-btn" data-equip="${it.id}">Use</button>`
+      : it.locked ? `<span class="st-lock">Level ${it.level}</span>` : `<button class="secondary st-btn" data-buy="${it.id}"><span class="coin">●</span> ${it.price}</button>`;
+    return `<div class="st-item"><span class="swatch" data-sw="${it.id}"></span><span class="st-name">${esc(it.name)}</span>${btn}</div>`;
+  }).join('');
+  openModal('profile', `<div class="prof-head">${avatarHTML(P, 'big')}<div><h2>${esc(P.name)}</h2><span class="pc-coins">● ${P.coins} coins</span></div></div>
+    <div class="lvlbar"><div class="lvl-top"><b>Level ${P.level}</b><span>${P.levelXp} / ${P.levelNeed} XP</span></div><div class="lvl-track"><i style="width:${pct}%"></i></div></div>
+    <div class="res-grid">
+      <div><span>Games</span><b>${P.games}</b></div><div><span>Wins</span><b>${P.wins} · ${rate}</b></div>
+      <div><span>Hands played</span><b>${P.hands}</b></div><div><span>Bids made</span><b>${P.bidsMade} / ${P.bidsTotal}</b></div>
+      <div><span>Sweeps & whitewashes</span><b>${P.sweeps}</b></div><div><span>Total XP</span><b>${P.xp}</b></div>
+    </div>
+    <div class="eyebrow">Table themes</div>
+    <div class="store" id="storeList">${store_}</div>
+    <p class="hint">Earn XP every hand and coins for every game. Bigger wins earn more.</p>
+    <button class="primary" id="profClose">Done</button>
+    <button class="linkbtn" id="signOutBtn">Sign out</button>`);
+  $('profClose').onclick = closeModal;
+  $('signOutBtn').onclick = signOut;
+  $('storeList').onclick = async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const r = b.dataset.buy ? await send('buy', b.dataset.buy) : await send('equip', b.dataset.equip);
+    if (r && r.ok) { PROFILE = r.profile; applyFelt(); renderChip(); profileSheet(); if (b.dataset.buy) sfx('win'); }
+  };
+}
+function applyFelt() { document.documentElement.dataset.felt = PROFILE && PROFILE.equipped ? PROFILE.equipped.felt || 'green' : 'green'; }
+function gainToast(text, big) {
+  const t = document.createElement('div'); t.className = 'gain' + (big ? ' big' : ''); t.innerHTML = text;
+  document.body.appendChild(t); setTimeout(() => t.remove(), big ? 3200 : 2600);
+}
+sockReady.push(() => {
+  sock.on('profile', ({ profile, gain }) => {
+    PROFILE = profile; applyFelt(); renderChip();
+    if (gain && (gain.xp || gain.coins)) setTimeout(() => gainToast(`+${gain.xp} XP${gain.coins ? ` · +${gain.coins} coins` : ''}`), 900);
+    if (gain && gain.levelUp) setTimeout(() => { gainToast(`<b>Level ${gain.levelUp}!</b><span>+${50} bonus coins</span>`, true); confetti(['#f4a93a', '#fbf7ef', '#82d48e'], 1600, 90); sfx('win'); }, 1800);
+  });
+});
+
 function nameScreen() {
   openModal('name', `<div class="eyebrow">You're invited</div>
     <h2>Join table ${esc(tableCode)}</h2>
@@ -419,8 +564,15 @@ function resultScreen() {
       <div><span>${teamName(0)} total won</span><b>${S.won[0]}</b></div>
       <div><span>${teamName(1)} total won</span><b>${S.won[1]}</b></div></div>`;
   if (S.phase === 'over' || R.over) {
-    const w = (S.score || 0) > 0 ? 0 : 1;
-    openModal('over', `<div class="eyebrow">Game over · ${R.byLimit ? 'hand limit reached' : S.handNo + ' hands'}</div><h2 class="${S.spectator ? '' : w === 0 ? 'good' : 'bad'}">${teamName(w)} ${sv(w, 'wins', 'win')}</h2>${grid}
+    const w = (S.score || 0) > 0 ? 0 : 1, iWon = me0() && w === 0, margin = Math.abs(S.score || 0);
+    const trophy = `<svg viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="tg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff3c4"/><stop offset=".45" stop-color="#f4c542"/><stop offset="1" stop-color="#b57b12"/></linearGradient></defs>
+      <path d="M34 18h52v18c0 17-11 30-26 30S34 53 34 36z" fill="url(#tg)"/><path d="M34 24H18c0 14 7 23 18 24M86 24h16c0 14-7 23-18 24" fill="none" stroke="#e0a92e" stroke-width="6" stroke-linecap="round"/>
+      <rect x="54" y="64" width="12" height="18" fill="#d99a24"/><rect x="38" y="82" width="44" height="12" rx="3" fill="url(#tg)"/><rect x="32" y="94" width="56" height="10" rx="3" fill="#8a5a10"/>
+      <path d="M48 28l4 10 10 1-8 6 3 10-9-6-9 6 3-10-8-6 10-1z" fill="#fffbe6" opacity=".9" transform="translate(12 0)"/></svg>`;
+    openModal('over', `<div class="over-hero ${iWon ? 'win' : me0() ? 'lose' : ''}"><div class="trophy">${trophy}</div>
+      <div class="eyebrow">Game over · ${R.byLimit ? 'hand limit reached' : S.handNo + ' hands'}</div>
+      <h2 class="over-title ${S.spectator ? '' : w === 0 ? 'good' : 'bad'}">${iWon ? 'Your team wins!' : `${teamName(w)} ${sv(w, 'wins', 'win')}`}</h2>
+      <p class="over-sub">${margin ? `Won by ${margin} point${margin === 1 ? '' : 's'}` : ''}</p></div>${grid}
       ${S.isHost ? '<button class="primary" id="againBtn">Play again</button>' : '<p class="hint">Waiting for the host to start a new game.</p>'}
       <button class="linkbtn" id="leaveOver">Leave table</button>`);
     if ($('againBtn')) $('againBtn').onclick = () => send('again');
@@ -456,6 +608,35 @@ function render() {
   else if (S.phase === 'over' && S.result) { if (modalKind !== 'over' || shownHost !== S.isHost) { resultScreen(); shownHost = S.isHost; } }
   else if (S.result) { if (modalKind !== 'result' || shownHand !== S.result.handNo || shownHost !== S.isHost) { resultScreen(); shownHand = S.result.handNo; shownHost = S.isHost; } }
   else if (modalKind) closeModal();
+}
+
+/* ---------- confetti ---------- */
+function confetti(colors, ms = 3000, count = 150) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  let c = $('confetti');
+  if (!c) { c = document.createElement('canvas'); c.id = 'confetti'; c.className = 'confetti'; document.body.appendChild(c); }
+  const dpr = Math.min(2, window.devicePixelRatio || 1), W = innerWidth, H = innerHeight;
+  c.width = W * dpr; c.height = H * dpr; const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const parts = Array.from({ length: count }, (_, i) => ({
+    x: W * (i % 2 ? 0.15 + Math.random() * 0.2 : 0.65 + Math.random() * 0.2), y: H * 0.55 + Math.random() * 40,
+    vx: (Math.random() - 0.5) * 9, vy: -(9 + Math.random() * 9), r: 4 + Math.random() * 6, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.3,
+    col: colors[i % colors.length], shape: i % 3,
+  }));
+  const t0 = performance.now(); c.style.opacity = 1;
+  const step = now => {
+    const t = now - t0; g.clearRect(0, 0, W, H);
+    for (const p of parts) {
+      p.vy += 0.32; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+      g.save(); g.translate(p.x, p.y); g.rotate(p.rot); g.fillStyle = p.col;
+      if (p.shape === 0) g.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2);
+      else if (p.shape === 1) { g.beginPath(); g.arc(0, 0, p.r / 2.4, 0, Math.PI * 2); g.fill(); }
+      else { g.font = `${p.r * 2.2}px serif`; g.fillText(['♠', '♥', '♣', '♦'][Math.floor(p.r) % 4], -p.r / 2, p.r / 2); }
+      g.restore();
+    }
+    if (t > ms - 600) c.style.opacity = Math.max(0, (ms - t) / 600);
+    if (t < ms) requestAnimationFrame(step); else g.clearRect(0, 0, W, H);
+  };
+  requestAnimationFrame(step);
 }
 
 /* ---------- effects ---------- */
@@ -501,7 +682,19 @@ function onFx(f) {
       break;
     }
     case 'stuck': sfx('lose'); announce('Stuck', '⇄', `${esc(nm(f.seat))} can't lead`, `${teamName(f.team)} take ${f.left} trick${f.left > 1 ? 's' : ''}`, 'jann', 2000); break;
-    case 'handEnd': sfx(f.team === 0 && me0() ? 'win' : 'lose'); break;
+    case 'handEnd': {
+      const mine = me0() && f.team === 0;
+      if (f.over) {
+        const wonGame = f.gameWinner === 0;
+        if (me0() && wonGame) { sfx('fanfare'); setTimeout(() => confetti(['#f4a93a', '#ffd76a', '#fbf7ef', '#82d48e'], 4200, 220), 250); }
+        else if (!me0()) { sfx('win'); confetti(wonGame ? ['#f4a93a', '#fbf7ef'] : ['#6cc4d8', '#fbf7ef'], 3000, 140); }
+        else sfx('lose');
+      } else {
+        sfx(mine ? 'win' : 'lose');
+        if (mine && (f.kind === 'sweep' || f.kind === 'whitewash')) confetti(['#f4a93a', '#fbf7ef'], 1800, 90);
+      }
+      break;
+    }
     case 'react': {
       const pos = seatPos(f.seat); const d = document.createElement('div');
       d.className = 'react-pop'; d.textContent = f.emo; d.style.left = pos.x + '%'; d.style.top = pos.y + '%';
@@ -523,6 +716,7 @@ $('hand').addEventListener('click', e => {
   send('act', { kind: 'play', value: id });
 });
 const sock = io({ auth: { pid, name: myName || 'Player' }, autoConnect: false });
+sockReady.forEach(f => f());
 
 /* In-app browsers (WhatsApp, Facebook, Instagram) often block the microphone and speech typing */
 const UA = navigator.userAgent || '';
@@ -814,8 +1008,9 @@ function leaveTable() {
   $('trick').innerHTML = ''; hidePanel(); homeScreen();
   boot();
 }
-sock.on('connect', () => {
+sock.on('connect', async () => {
   clearTimeout(waking); $('conn').hidden = true;
+  await authNow();
   if (tableCode && myName) joinTable();
 });
 sock.on('disconnect', () => { connecting(); if (V.on) { const w = V.want; voiceLeave(false); V.want = w; } });
@@ -823,7 +1018,7 @@ sock.on('connect_error', () => connecting());
 sock.on('state', st => {
   if (awaitingCreate && !tableCode) tableCode = st.code;
   if (!tableCode || st.code !== tableCode) return;
-  S = st; render();
+  S = st; hideWelcome(); render();
 });
 sock.on('fx', f => onFx(f));
 
@@ -834,11 +1029,7 @@ syncSound();
 $('rulesBtn').onclick = () => { $('rules').hidden = false; };
 $('rulesClose').onclick = () => { $('rules').hidden = true; };
 $('rulesTut').onclick = () => { $('rules').hidden = true; openTutorial(S ? 'game' : 'home'); };
-window.tutorialPractice = () => {
-  const inp = $('nameIn'), v = (inp && inp.value.trim()) || myName;
-  if (v) { setName(v); createTable(true); }
-  else if (inp) { $('homeErr').textContent = 'Type your name, then tap Practice with bots.'; inp.focus(); }
-};
+window.tutorialPractice = () => { if (myName) { ac(); createTable(true); } else createSheet(true); };
 $('leaveBtn').onclick = () => {
   if (!S) { homeScreen(); return; }
   const b = $('leaveBtn');
@@ -860,3 +1051,4 @@ boot();
 if (tableCode) { if (myName) { connecting(); } else nameScreen(); }
 else homeScreen();
 sock.connect();
+initAuth();
