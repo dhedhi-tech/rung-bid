@@ -18,6 +18,29 @@ const tables = new Map();
 // TURN_URL, TURN_USER, TURN_PASS) relays audio for mobile networks that block direct connections.
 const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
 if (process.env.TURN_URL) ICE.push({ urls: process.env.TURN_URL.split(',').map(s => s.trim()), username: process.env.TURN_USER || '', credential: process.env.TURN_PASS || '' });
+
+// Cloudflare relay: set CF_TURN_KEY_ID and CF_TURN_API_TOKEN on Render. Short-lived logins are fetched and refreshed here.
+let cfIce = null, cfAt = 0;
+async function iceServers() {
+  const id = process.env.CF_TURN_KEY_ID, token = process.env.CF_TURN_API_TOKEN;
+  if (!id || !token) return ICE;
+  if (cfIce && Date.now() - cfAt < 6 * 60 * 60 * 1000) return cfIce;
+  try {
+    const r = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${id}/credentials/generate-ice-servers`, {
+      method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ ttl: 86400 }),
+    });
+    if (!r.ok) throw new Error('Cloudflare TURN ' + r.status);
+    const j = await r.json();
+    const list = (j.iceServers ? [].concat(j.iceServers) : []).map(sv => ({ ...sv, urls: [].concat(sv.urls).filter(u => !/:53(\?|$)/.test(u)) })).filter(sv => sv.urls.length);
+    if (!list.length) throw new Error('Cloudflare TURN: empty list');
+    cfIce = [...ICE, ...list]; cfAt = Date.now();
+    return cfIce;
+  } catch (e) { console.error('TURN credentials failed:', e.message); return ICE; }
+}
+app.get('/voice-check', async (_req, res) => {
+  const list = await iceServers();
+  res.json({ relay: list.some(sv => [].concat(sv.urls).some(u => /^turns?:/.test(u))) });
+});
 const MAX_VOICE = 8;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function newCode() {
@@ -87,13 +110,13 @@ io.on('connection', socket => {
   const voiceLeave = () => {
     if (table && table.voice.delete(socket.id)) { io.to(table.code).emit('voice:left', socket.id); table.broadcast(); }
   };
-  socket.on('voice:join', cb => {
+  socket.on('voice:join', async cb => {
     if (!table) return reply(cb, 'Not at a table');
     if (!table.voice.has(socket.id) && table.voice.size >= MAX_VOICE) return reply(cb, 'Voice chat is full (8 people).');
     const peers = [...table.voice.keys()].filter(id => id !== socket.id);
     table.voice.set(socket.id, { pid, muted: false });
     table.broadcast();
-    reply(cb, null, { peers, ice: ICE, me: socket.id });
+    reply(cb, null, { peers, ice: await iceServers(), me: socket.id });
   });
   socket.on('voice:leave', cb => { voiceLeave(); reply(cb); });
   socket.on('voice:mute', (m, cb) => {

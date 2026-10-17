@@ -562,7 +562,11 @@ function makePeer(id) {
   const pc = new RTCPeerConnection({ iceServers: V.ice });
   const P = { pc, audio: null, polite: V.me > id, makingOffer: false, ignoreOffer: false };
   V.peers.set(id, P);
-  V.stream.getTracks().forEach(t => pc.addTrack(t, V.stream));
+  V.stream.getTracks().forEach(t => {
+    const sender = pc.addTrack(t, V.stream);
+    // Speech-quality audio keeps relay data low
+    try { const prm = sender.getParameters(); prm.encodings = prm.encodings && prm.encodings.length ? prm.encodings : [{}]; prm.encodings[0].maxBitrate = 32000; sender.setParameters(prm).catch(() => {}); } catch (e) {}
+  });
   pc.onicecandidate = e => { if (e.candidate) sock.emit('voice:signal', { to: id, data: { c: e.candidate } }); };
   pc.ontrack = e => {
     if (!P.audio) { P.audio = document.createElement('audio'); P.audio.autoplay = true; P.audio.setAttribute('playsinline', ''); P.audio.hidden = true; document.body.appendChild(P.audio); }
@@ -572,7 +576,12 @@ function makePeer(id) {
     try { P.makingOffer = true; await pc.setLocalDescription(); sock.emit('voice:signal', { to: id, data: { d: pc.localDescription } }); }
     catch (e) {} finally { P.makingOffer = false; }
   };
-  pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed' && pc.restartIce) pc.restartIce(); };
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState !== 'failed') return;
+    if (!P.retried && pc.restartIce) { P.retried = true; pc.restartIce(); return; }
+    const seat = S && S.seats ? S.seats.find(x => x.voice && x.voice.sid === id) : null;
+    toast(`Voice can't reach ${seat ? seat.name : 'a player'} on their network`);
+  };
   return P;
 }
 sock.on('voice:signal', async ({ from, data }) => {
