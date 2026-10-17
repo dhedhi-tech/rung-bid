@@ -51,9 +51,10 @@ function perms(a) { if (a.length < 2) return [a]; return a.flatMap((x, i) => per
 class Abort extends Error {}
 
 class Table {
-  constructor(code, { n, joker, hostId }, io) {
+  constructor(code, { n, joker, hostId, limit }, io) {
     this.code = code; this.io = io;
     this.n = n; this.joker = !!joker; this.hostId = hostId;
+    this.limit = [0, 6, 10].includes(limit) ? limit : 10; // hand limit: 6 quick, 10 normal, 0 = no limit
     this.alive = true; this.running = false; this.phase = 'lobby';
     const names = shuffle(BOT_NAMES.slice());
     this.seats = Array.from({ length: n }, (_, i) => ({ pid: null, name: names[i], bot: true }));
@@ -195,7 +196,7 @@ class Table {
     const rotTeam = t => (t - base % 2 + 2) % 2;
     const flip = base % 2 === 1 ? -1 : 1;
     const v = {
-      code: this.code, n, joker: this.joker, phase: this.phase, me: me < 0 ? null : 0, spectator: me < 0,
+      code: this.code, n, joker: this.joker, limit: this.limit, phase: this.phase, me: me < 0 ? null : 0, spectator: me < 0,
       isHost: pid === this.hostId,
       seats: Array.from({ length: n }, (_, i) => {
         const s = this.seats[(i + base) % n];
@@ -209,7 +210,7 @@ class Table {
     const G = this.G;
     if (!G) return v;
     Object.assign(v, {
-      handNo: G.handNo, dealer: rot(G.dealer), score: G.score * flip, won: [G.won[base % 2], G.won[1 - base % 2]],
+      handNo: G.handNo, decider: !!(this.limit && G.handNo > this.limit), dealer: rot(G.dealer), score: G.score * flip, won: [G.won[base % 2], G.won[1 - base % 2]],
       round: G.round, gphase: G.phase, active: rot(G.active),
       bid: G.bid ? { value: G.bid.value, seat: rot(G.bid.seat) } : null,
       trump: G.trump, leadSuit: G.leadSuit,
@@ -234,7 +235,7 @@ class Table {
     return {
       title: this.fmt(R.title, me), winner: rotTeam(R.winner), pts: R.pts, contract: R.contract, bidder: this.fmt(`{n${R.bidSeat}}`, me),
       tricks: [R.tricks[base % 2], R.tricks[1 - base % 2]], next: R.next != null ? this.fmt(`{n${R.next}}`, me) : null,
-      over: R.over, endsAt: R.endsAt ? Math.max(0, R.endsAt - Date.now()) : 0, handNo: R.handNo,
+      over: R.over, byLimit: !!R.byLimit, deciderNext: !!R.deciderNext, endsAt: R.endsAt ? Math.max(0, R.endsAt - Date.now()) : 0, handNo: R.handNo,
     };
   }
   broadcast() {
@@ -576,10 +577,13 @@ class Table {
     if (tw[bt] >= req) { winner = bt; if (tw[ot] === 0) { pts = 2 * v; title = `Clean sweep. {t${bt}} score double`; } else { pts = v; title = `{t${bt}} made the bid`; } }
     else { winner = ot; if (tw[bt] === 0) { pts = 4 * v; title = `Whitewash. {t${ot}} score 4×`; } else { pts = 2 * v; title = `Bid broken. {t${ot}} score double`; } }
     G.score += winner === 0 ? pts : -pts; G.won[winner] += pts;
-    const over = Math.abs(G.score) >= TARGET;
+    // Game ends at a 52 point lead, or when the hand limit is reached and one team is ahead (level score: play a decider hand)
+    const limitHit = this.limit && G.handNo >= this.limit;
+    const over = Math.abs(G.score) >= TARGET || (limitHit && G.score !== 0);
     if (!over) this.nextDealer();
     G.phase = 'done'; G.main = title;
-    G.result = { title, winner, pts, contract: `${v} ${SYM[G.trump]}`, bidSeat: G.bid.seat, tricks: tw.slice(), next: over ? null : G.dealer, over, endsAt: over ? 0 : Date.now() + HAND_END_MS, handNo: G.handNo };
+    G.result = { title, winner, pts, contract: `${v} ${SYM[G.trump]}`, bidSeat: G.bid.seat, tricks: tw.slice(), next: over ? null : G.dealer, over,
+      byLimit: over && Math.abs(G.score) < TARGET, deciderNext: !over && limitHit, endsAt: over ? 0 : Date.now() + HAND_END_MS, handNo: G.handNo };
     if (over) G.over = { winner: G.score > 0 ? 0 : 1 };
     this.broadcast(); this.fx('handEnd', { team: winner });
     if (over) { this.phase = 'over'; this.broadcast(); return true; }
@@ -588,6 +592,12 @@ class Table {
     if (!this.alive) throw new Abort();
     G.result = null; G.handNo++;
     return false;
+  }
+  setLimit(pid, lim) {
+    if (pid !== this.hostId) return 'Only the host can change this';
+    if (this.phase !== 'lobby') return 'You can change game length before the game starts';
+    if (![0, 6, 10].includes(lim)) return 'Not allowed';
+    this.limit = lim; this.broadcast(); return null;
   }
   dealNow(pid) { if (pid === this.hostId && this.waitNext) this.waitNext(); }
   playAgain(pid) {

@@ -111,7 +111,7 @@
           <tr><td>Your team fails the bid</td><td>2× to them</td></tr>
           <tr><td>They break it before you win a single trick</td><td>4× to them</td></tr>
         </table>
-        <p>There is one running score, like a tug of war. Points you win cancel the other team's lead. <b>First team to lead by 52 wins.</b></p>
+        <p>There is one running score, like a tug of war. Points you win cancel the other team's lead. <b>Lead by 52 to win straight away.</b> Otherwise, the team ahead when the hand limit runs out wins (6 hands for Quick, 10 for Normal).</p>
         <p class="hint">The hand stops as soon as the result is decided, so games move fast.</p>`,
     },
     {

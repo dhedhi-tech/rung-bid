@@ -19,7 +19,8 @@ let pid = store.get('rb-pid');
 if (!pid) { pid = 'p' + Math.random().toString(36).slice(2) + Date.now().toString(36); store.set('rb-pid', pid); }
 let myName = store.get('rb-name') || '';
 let tableCode = (new URLSearchParams(location.search).get('t') || '').toUpperCase() || null;
-let homeN = 4, homeJ = false;
+let homeN = 4, homeJ = false, homeL = 10;
+const limitName = l => (l === 6 ? 'Quick · 6 hands' : l === 10 ? 'Normal · 10 hands' : 'Full · no hand limit');
 
 /* ---------- sound ---------- */
 let AC = null, muted = store.get('rb-muted') === '1';
@@ -104,7 +105,8 @@ const sv = (t, one, many) => (teamName(t) === 'Opponents' ? many : one);
 function scoreText() { const s = S.score || 0; return s > 0 ? `${teamName(0)} ${sv(0, 'leads', 'lead')} by ${s}` : s < 0 ? `${teamName(1)} ${sv(1, 'leads', 'lead')} by ${-s}` : 'Level'; }
 function renderHeader() {
   const watching = S.phase !== 'lobby' && S.lobbyNames && S.lobbyNames.length ? `<span class="watchn"> · 👀 ${S.lobbyNames.length}<span class="wl"> watching</span></span>` : '';
-  $('handNo').innerHTML = esc(S.handNo ? `Hand ${S.handNo} · ${S.n} players` : `Table ${S.code} · ${S.n} players`) + watching;
+  const hn = !S.handNo ? '' : S.decider ? 'Decider hand' : S.limit ? `Hand ${S.handNo} of ${S.limit}` : `Hand ${S.handNo}`;
+  $('handNo').innerHTML = esc(S.handNo ? `${hn} · ${S.n} players` : `Table ${S.code} · ${S.n} players`) + watching;
   $('handNo').title = watching ? 'Watching: ' + S.lobbyNames.join(', ') : '';
   document.querySelector('.sbox.ta .sname').textContent = teamName(0);
   document.querySelector('.sbox.tb .sname').textContent = teamName(1);
@@ -313,6 +315,8 @@ function homeScreen(err) {
     <div class="field"><span>Players</span><div class="seg" id="segN">
       <button data-n="4">4<small>1 deck</small></button><button data-n="6">6<small>78 cards</small></button><button data-n="8">8<small>2 decks</small></button></div></div>
     <div class="field"><span>Mode</span><div class="seg text" id="segJ"><button data-j="0">Classic</button><button data-j="1">Joker mode</button></div></div>
+    <div class="field"><span>Game length</span><div class="seg" id="segL">
+      <button data-l="6">Quick<small>6 hands</small></button><button data-l="10">Normal<small>10 hands</small></button><button data-l="0">Full<small>no limit</small></button></div></div>
     <div class="btn-col">
       <button class="primary" id="createBtn">Create table</button>
       <button class="secondary" id="practiceBtn">Practice with bots</button>
@@ -324,10 +328,12 @@ function homeScreen(err) {
   const sync = () => {
     document.querySelectorAll('#segN button').forEach(b => b.classList.toggle('on', +b.dataset.n === homeN));
     document.querySelectorAll('#segJ button').forEach(b => b.classList.toggle('on', (b.dataset.j === '1') === homeJ));
+    document.querySelectorAll('#segL button').forEach(b => b.classList.toggle('on', +b.dataset.l === homeL));
   };
   sync();
   $('segN').onclick = e => { const b = e.target.closest('button'); if (b) { homeN = +b.dataset.n; sync(); } };
   $('segJ').onclick = e => { const b = e.target.closest('button'); if (b) { homeJ = b.dataset.j === '1'; sync(); } };
+  $('segL').onclick = e => { const b = e.target.closest('button'); if (b) { homeL = +b.dataset.l; sync(); } };
   const takeName = () => {
     const v = $('nameIn').value.trim();
     if (!v) { $('homeErr').textContent = 'Type your name first so friends know who you are.'; $('nameIn').focus(); return false; }
@@ -375,7 +381,9 @@ function lobbyScreen() {
   const watchers = S.lobbyNames.length ? `<p class="hint">Not seated yet: ${S.lobbyNames.map(esc).join(', ')}</p>` : '';
   openModal('lobby', `<div class="eyebrow">Table code</div>
     <div class="codebig">${esc(S.code)}</div>
-    <p class="hint" style="margin-top:6px">${S.n} players · ${S.joker ? 'Joker mode' : 'Classic'} · teams sit alternately</p>
+    <p class="hint" style="margin-top:6px">${S.n} players · ${S.joker ? 'Joker mode' : 'Classic'} · ${S.limit ? S.limit + ' hands' : 'no hand limit'} · teams sit alternately</p>
+    ${S.isHost ? `<div class="field"><span>Game length</span><div class="seg" id="lobbyL">
+      <button data-l="6" class="${S.limit === 6 ? 'on' : ''}">Quick<small>6 hands</small></button><button data-l="10" class="${S.limit === 10 ? 'on' : ''}">Normal<small>10 hands</small></button><button data-l="0" class="${!S.limit ? 'on' : ''}">Full<small>no limit</small></button></div></div>` : ''}
     <div class="share"><span class="link" id="linkTxt">${esc(link)}</span>
       <div class="btns"><button class="secondary" id="copyBtn">Copy link</button><a class="secondary" href="${wa}" target="_blank" rel="noopener">WhatsApp</a></div></div>
     <div class="eyebrow">Pick your seat</div>
@@ -384,6 +392,7 @@ function lobbyScreen() {
     ${S.isHost ? `<button class="primary" id="startBtn">Start game</button><p class="hint" style="margin-top:8px">Bots play any empty seat. Friends can still take a bot's seat after the game starts.</p>`
       : `<p class="hint">${me0() ? 'Waiting for the host (★) to start the game.' : 'Tap an empty seat to sit down.'}</p>`}
     <button class="linkbtn" id="leaveLobby">Leave table</button>`);
+  if ($('lobbyL')) $('lobbyL').onclick = e => { const b = e.target.closest('button[data-l]'); if (b) send('setLimit', +b.dataset.l); };
   $('seatGrid').onclick = e => { const b = e.target.closest('button[data-sit]'); if (!b || b.disabled) return; send('sit', +b.dataset.sit); };
   $('copyBtn').onclick = () => {
     const done = () => { $('copyBtn').textContent = 'Copied'; setTimeout(() => { const b = $('copyBtn'); if (b) b.textContent = 'Copy link'; }, 1500); };
@@ -406,7 +415,7 @@ function resultScreen() {
       <div><span>${teamName(1)} total won</span><b>${S.won[1]}</b></div></div>`;
   if (S.phase === 'over' || R.over) {
     const w = (S.score || 0) > 0 ? 0 : 1;
-    openModal('over', `<div class="eyebrow">Game over · ${S.handNo} hands</div><h2 class="${S.spectator ? '' : w === 0 ? 'good' : 'bad'}">${teamName(w)} ${sv(w, 'wins', 'win')}</h2>${grid}
+    openModal('over', `<div class="eyebrow">Game over · ${R.byLimit ? 'hand limit reached' : S.handNo + ' hands'}</div><h2 class="${S.spectator ? '' : w === 0 ? 'good' : 'bad'}">${teamName(w)} ${sv(w, 'wins', 'win')}</h2>${grid}
       ${S.isHost ? '<button class="primary" id="againBtn">Play again</button>' : '<p class="hint">Waiting for the host to start a new game.</p>'}
       <button class="linkbtn" id="leaveOver">Leave table</button>`);
     if ($('againBtn')) $('againBtn').onclick = () => send('again');
@@ -415,6 +424,7 @@ function resultScreen() {
   }
   resultAt = Date.now() + (R.endsAt || 0);
   openModal('result', `<div class="eyebrow">Hand ${R.handNo} result</div><h2 class="${good}">${colourNames(R.title)}</h2>${grid}
+    ${R.deciderNext ? '<p><b>Scores are level after the last hand.</b> One decider hand to finish the game.</p>' : ''}
     <p>Next dealer: ${colourNames(R.next || '')}. Next hand in <b class="countdown" data-countdown>${Math.ceil((R.endsAt || 0) / 1000)}</b>s.</p>
     ${S.isHost ? '<button class="primary" id="nextBtn">Deal now</button>' : ''}`);
   if ($('nextBtn')) $('nextBtn').onclick = () => send('next');
@@ -747,7 +757,7 @@ function connecting() {
 let awaitingCreate = false;
 async function createTable(practice) {
   awaitingCreate = true;
-  const r = await send('create', { n: homeN, joker: homeJ });
+  const r = await send('create', { n: homeN, joker: homeJ, limit: homeL });
   awaitingCreate = false;
   if (!r || !r.ok) return;
   tableCode = r.code; history.replaceState(null, '', '/?t=' + r.code);
