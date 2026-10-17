@@ -22,6 +22,13 @@ app.use(express.static(path.join(__dirname, 'public'), {
   extensions: ['html'], index: false,
   setHeaders: (res, file) => { if (/\.(js|css)$/.test(file)) res.set('Cache-Control', 'no-cache'); },
 }));
+// Privacy policy and terms pages (CONTACT_EMAIL on Render sets the contact address shown)
+const legalShell = fs.readFileSync(path.join(__dirname, 'legal', 'page.html'), 'utf8');
+const contactHtml = () => { const e = (process.env.CONTACT_EMAIL || '').replace(/[<>"']/g, ''); return e ? `<a href="mailto:${e}">${e}</a>` : 'the support email shown on the Google sign-in screen'; };
+for (const [route, file, title] of [['/privacy', 'privacy.html', 'Privacy Policy'], ['/terms', 'terms.html', 'Terms of Use']]) {
+  const body = fs.readFileSync(path.join(__dirname, 'legal', file), 'utf8');
+  app.get(route, (_req, res) => res.type('html').send(legalShell.replace('{{TITLE}}', title).replace('{{BODY}}', body.split('{{CONTACT}}').join(contactHtml()))));
+}
 app.get('/config', (_req, res) => { res.set('Cache-Control', 'no-cache'); res.json(A.config()); });
 app.get('/health', (_req, res) => res.json({ ok: true, tables: tables.size }));
 

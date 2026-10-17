@@ -334,6 +334,7 @@ function welcomeScreen(err) {
       <button class="secondary" id="wPractice">Practice with bots</button>
       <div class="wrow"><button class="secondary" id="wJoin">Join with a code</button><button class="secondary" id="wTut">${firstTime ? 'Tutorial' : 'How to play'}</button></div>
       <div class="err" id="wErr">${err ? esc(err) : ''}</div>
+      <div class="wlegal"><a href="/privacy">Privacy Policy</a><span>·</span><a href="/terms">Terms of Use</a></div>
     </div>`;
   w.hidden = false;
   $('wPlay').onclick = () => createSheet(false);
