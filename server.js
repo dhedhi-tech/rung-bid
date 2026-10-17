@@ -9,7 +9,17 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { pingInterval: 10000, pingTimeout: 20000 });
 
-app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
+// Always serve the newest version: the page is never cached, and scripts get a version tag that changes on every deploy
+const fs = require('fs');
+const VERSION = Date.now().toString(36);
+const indexHtml = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8')
+  .replace('src="/app.js"', `src="/app.js?v=${VERSION}"`).replace('src="/tutorial.js"', `src="/tutorial.js?v=${VERSION}"`);
+const sendIndex = (_req, res) => { res.set('Cache-Control', 'no-cache, no-store, must-revalidate'); res.type('html').send(indexHtml); };
+app.get(['/', '/index.html'], sendIndex);
+app.use(express.static(path.join(__dirname, 'public'), {
+  extensions: ['html'], index: false,
+  setHeaders: (res, file) => { if (/\.(js|css)$/.test(file)) res.set('Cache-Control', 'no-cache'); },
+}));
 app.get('/health', (_req, res) => res.json({ ok: true, tables: tables.size }));
 
 const tables = new Map();
