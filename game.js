@@ -418,8 +418,10 @@ class Table {
     const mayTrump = p => !G.voids[p].has(T);
     const oppCuts = s => opps.some(p => G.voids[p].has(s) && mayTrump(p));
     const r = G.returnTo[seat]; G.returnTo[seat] = null;
-    if (r && r.suit !== T && of(r.suit).length && mayTrump(r.partner)) return low(of(r.suit));
-    for (const p of partners) { if (!mayTrump(p)) continue; for (const s of G.voids[p]) if (s !== T && of(s).length) return low(of(s)); }
+    // A lead that sets up partner's cut should be a low card, not an Ace or King that could be wasted
+    const cheap = s => { const c = of(s).length ? low(of(s)) : null; return c && (c.r < 13 || this.isBoss(seat, c)) ? c : null; };
+    if (r && r.suit !== T && cheap(r.suit) && mayTrump(r.partner)) return cheap(r.suit);
+    for (const p of partners) { if (!mayTrump(p)) continue; for (const s of G.voids[p]) if (s !== T && cheap(s)) return cheap(s); }
     const trumps = of(T).sort((a, b) => b.r - a.r);
     const safe = hand.filter(c => c.s !== T && !isJ(c) && !oppCuts(c.s));
     const pool = safe.length ? safe : hand.filter(c => c.s !== T && !isJ(c));
