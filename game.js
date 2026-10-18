@@ -423,8 +423,21 @@ class Table {
     const winners = legal.filter(c => !isJ(c) && this.beats(c, cur.card));
     if (!winners.length) return lowest(legal);
     const fw = winners.filter(c => c.s !== T).sort((a, b) => a.r - b.r);
+    // Partner has already played (or no partner comes after me): it's up to me, so go for the trick
+    const partnerPlayed = G.trick.some(t => t.seat % 2 === team);
+    const partnerAfter = [...Array(after).keys()].some(k => (seat + k + 1) % G.n % 2 === team);
+    const mustTry = partnerPlayed || !partnerAfter;
     if (fw.length) {
       if (after === 0) return fw[0];
+      if (mustTry) {
+        // Best chance: the card the fewest unseen cards can beat (lowest such card)
+        const gone = new Set(G.played.map(x => x.id)); for (const x of hand) gone.add(x.id);
+        const risk = c => G.fullDeck.filter(d => d.s === c.s && d.r >= c.r && d.id !== c.id && !gone.has(d.id)).length;
+        const tw = winners.filter(c => c.s === T).sort((a, b) => a.r - b.r);
+        const best = fw.slice().sort((a, b) => risk(a) - risk(b) || a.r - b.r)[0];
+        if (risk(best) > 0 && tw.length && G.leadSuit !== T) return tw[0];
+        return best;
+      }
       // Players still to come: only commit a high card if nothing left out can beat it
       const safe = fw.filter(c => this.isBoss(seat, c));
       if (safe.length) return safe[0];
