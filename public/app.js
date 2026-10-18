@@ -426,6 +426,9 @@ function gotProfile(p, daily) {
   if (!myName && p.name) setName(p.name.split(' ')[0]);
   applyFelt(); renderChip();
   if (modalKind === 'profile') profileSheet();
+  // Signed in from the invite popup: go straight to the table
+  if (invitePending) { invitePending = false; if (modalKind === 'name') closeModal(); if (tableCode && !S) joinTable(); }
+  else if (tableCode && !S && sock.connected && modalKind !== 'name') joinTable();
   if (daily) setTimeout(() => gainToast(`Daily reward · +${daily} coins`), 600);
 }
 function signIn() {
@@ -447,6 +450,7 @@ function avatarHTML(p, cls = '') {
   return p.avatar ? `<img class="avatar ${cls}" src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : `<span class="avatar ${cls}">${esc((p.name || '?')[0].toUpperCase())}</span>`;
 }
 function renderChip() {
+  renderInvAuth();
   const el = $('wChip'); if (!el) return;
   if (PROFILE) {
     const pct = Math.round(100 * PROFILE.levelXp / PROFILE.levelNeed);
@@ -505,15 +509,30 @@ function nameScreen() {
   openModal('name', `<div class="eyebrow">You're invited</div>
     <h2>Join table ${esc(tableCode)}</h2>
     <p>Rung Bid is a team bidding card game. Type your name, then pick a seat.</p>
+    <div id="invAuth"></div>
     <div class="field"><span>Your name</span><input type="text" id="nameIn" maxlength="14" autocomplete="nickname" placeholder="e.g. Atif" value="${esc(myName)}"></div>
-    <button class="primary" id="goBtn">Join table</button>
+    <button class="primary" id="goBtn">${AUTH.auth ? 'Play as guest' : 'Join table'}</button>
     <div class="err" id="homeErr"></div>
     <button class="linkbtn" id="tutLink">New to Rung Bid? Take the 2 minute tutorial</button>`);
   $('tutLink').onclick = () => openTutorial('invite');
-  const go = () => { const v = $('nameIn').value.trim(); if (!v) { $('homeErr').textContent = 'Type your name first.'; return; } setName(v); closeModal(); joinTable(); };
+  renderInvAuth();
+  const go = () => { const v = $('nameIn').value.trim(); if (!v) { $('homeErr').textContent = 'Type your name first.'; return; } setName(v); store.set('rb-guest', String(Date.now())); invitePending = false; closeModal(); joinTable(); };
   $('goBtn').onclick = go;
   $('nameIn').onkeydown = e => { if (e.key === 'Enter') go(); };
 }
+// Sign-in choice at the top of the invite popup (only when Google sign-in is set up)
+function renderInvAuth() {
+  const el = $('invAuth'); if (!el) return;
+  const b = $('goBtn'); if (b) b.textContent = AUTH.auth ? 'Play as guest' : 'Join table';
+  if (!AUTH.auth || PROFILE) { el.innerHTML = ''; return; }
+  el.innerHTML = `<button class="gbtn inv-g" id="invG"><svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17.5z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>Sign in with Google</button>
+    <div class="inv-note">Keep your level, coins and wins</div><div class="inv-or"><span>or play as guest</span></div>`;
+  $('invG').onclick = signIn;
+}
+// Signed in already (or coming back from Google)? Then skip the popup
+const looksSignedIn = () => { try { if (new URLSearchParams(location.search).has('code') || store.get('rb-dev')) return true; for (let i = 0; i < localStorage.length; i++) if (/^sb-.*-auth-token$/.test(localStorage.key(i))) return true; } catch (e) {} return false; };
+const guestRecently = () => Date.now() - Number(store.get('rb-guest') || 0) < 3 * 24 * 3600 * 1000;
+let invitePending = false;
 function shareLink() { return location.origin + '/?t=' + S.code; }
 function lobbyScreen() {
   const mySeat = S.seats.find((p, i) => i === 0 && me0());
@@ -1001,8 +1020,11 @@ async function createTable(practice) {
   tableCode = r.code; history.replaceState(null, '', '/?t=' + r.code);
   if (practice) { ac(); send('start'); }
 }
+let joinBusy = false;
 async function joinTable() {
-  const r = await send('join', tableCode);
+  if (joinBusy) return;
+  joinBusy = true;
+  let r; try { r = await send('join', tableCode); } finally { joinBusy = false; }
   if (r && r.ok) { history.replaceState(null, '', '/?t=' + r.code); if (V.want && !V.on) setTimeout(voiceJoin, 600); loadChat(); }
   else { tableCode = null; history.replaceState(null, '', '/'); S = null; homeScreen(r && r.error); }
 }
@@ -1015,7 +1037,7 @@ function leaveTable() {
 sock.on('connect', async () => {
   clearTimeout(waking); $('conn').hidden = true;
   await authNow();
-  if (tableCode && myName) joinTable();
+  if (tableCode && myName && !invitePending) joinTable();
 });
 sock.on('disconnect', () => { connecting(); if (V.on) { const w = V.want; voiceLeave(false); V.want = w; } });
 sock.on('connect_error', () => connecting());
@@ -1052,7 +1074,10 @@ function boot() {
   S = null;
 }
 boot();
-if (tableCode) { if (myName) { connecting(); } else nameScreen(); }
+if (tableCode) {
+  if (looksSignedIn() || (myName && guestRecently())) connecting();
+  else { invitePending = true; nameScreen(); }
+}
 else homeScreen();
 sock.connect();
 initAuth();
