@@ -153,7 +153,7 @@ class Table {
 
   stand(pid) {
     const p = this.players.get(pid); if (!p || p.seat == null) return;
-    const seat = p.seat; this.freeSeat(seat);
+    const seat = p.seat; p.lastSeat = seat; this.freeSeat(seat);
     if (this.pending && this.pending.seat === seat) this.pending.timeoutSoon();
     if (pid === this.hostId) this.passHost();
     this.broadcast();
@@ -342,7 +342,9 @@ class Table {
   jokerCount() { return this.G.trick.filter(t => isJ(t.card)).length; }
   trickResult() {
     const G = this.G, w = this.currentWinner();
-    if (this.jokerCount() % 2 === 0) return { team: w.seat % 2, lead: w.seat, show: w, credit: w.seat, flipped: false };
+    const jokers = G.trick.filter(t => isJ(t.card));
+    if (jokers.length >= 2) { const j2 = jokers[jokers.length - 1]; return { team: j2.seat % 2, lead: j2.seat, show: j2, credit: j2.seat, flipped: true, second: true }; }
+    if (!jokers.length) return { team: w.seat % 2, lead: w.seat, show: w, credit: w.seat, flipped: false };
     const jt = G.trick.find(t => isJ(t.card)), team = 1 - w.seat % 2;
     const key = c => (c.s === G.trump ? 2 : c.s === G.leadSuit ? 1 : 0) * 100 + c.r;
     let best = null; for (const t of G.trick) { if (t.seat % 2 !== team || isJ(t.card)) continue; if (!best || key(t.card) >= key(best.card)) best = t; }
@@ -520,9 +522,9 @@ class Table {
     G.trick.push({ seat, card }); G.played.push(card);
     if (G.trick.length > 1 && card.s !== G.leadSuit) G.voids[seat].add(G.leadSuit);
     if (isJ(card)) {
-      const cancel = this.jokerCount() === 2;
-      this.log(`{v${seat}:throw:throws} a Joker${cancel ? ' (cancels the other)' : ''}`);
-      this.broadcast(); this.fx('joker', { seat, cancel }); return;
+      const second = this.jokerCount() === 2;
+      this.log(`{v${seat}:throw:throws} a Joker${second ? ' (second Joker takes the trick)' : ''}`);
+      this.broadcast(); this.fx('joker', { seat, second }); return;
     }
     const cut = G.trick.length > 1 && card.s === G.trump && G.leadSuit !== G.trump;
     const over = cut && G.trick.slice(0, -1).some(t => t.card.s === G.trump);
@@ -556,7 +558,8 @@ class Table {
       const L = G.trick[0].seat;
       if (!res.flipped && L !== res.lead && L % 2 === res.lead % 2) G.returnTo[res.lead] = { suit: G.trick[0].card.s, partner: L };
       G.tricksWon[res.team]++; G.players[res.credit].tricks++;
-      if (res.flipped) { this.log(`Joker flips the trick to {tl${res.team}}`); G.main = `Joker reverses it. {t${res.team}} take the trick, {v${res.lead}:lead:leads} next`; }
+      if (res.second) { this.log(`Second Joker gives the trick to {tl${res.team}}`); G.main = `Second Joker. {v${res.lead}:take:takes} the trick and {v${res.lead}:lead:leads} next`; }
+      else if (res.flipped) { this.log(`Joker flips the trick to {tl${res.team}}`); G.main = `Joker reverses it. {t${res.team}} take the trick, {v${res.lead}:lead:leads} next`; }
       else G.main = `{v${res.lead}:win:wins} the trick`;
       this.broadcast();
       this.fx('trick', { team: res.team, credit: res.credit, lead: res.lead, flipped: res.flipped, showSeat: res.show.seat, showId: res.show.card.id });

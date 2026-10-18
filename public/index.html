@@ -382,6 +382,7 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
 .wr-head{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:4px 2px 0}
 .wroom{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;width:100%;text-align:left;background:var(--panel-2);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 12px;color:inherit}
 .wr-main{display:grid;gap:2px;min-width:0}.wr-main b{font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.wr-main span{font-size:12.5px;color:var(--muted)}
+.wroom.mine{border:2px solid var(--team-a);background:color-mix(in srgb,var(--team-a) 14%,var(--panel-2))}.wroom.mine .wr-main{grid-column:1/3}
 .wr-free{font-size:12px;color:var(--team-a);white-space:nowrap}.wr-go{background:var(--team-a);color:#1b1205;font-weight:700;font-size:13px;border-radius:999px;padding:6px 12px}
 .wlegal{display:flex;justify-content:center;gap:8px;font-size:12.5px;color:var(--muted);padding-top:2px}
 .wlegal a{color:var(--muted)}
@@ -552,7 +553,7 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
     <li>One joker per deck. To keep 13 cards each: 4 players drop the 2♣, 6 players drop one 5 of each suit, 8 players drop both 2♣.</li>
     <li>You can play a joker only when you can't follow suit. You can never lead with one.</li>
     <li>A joker <b>reverses</b> the trick: it goes to the other team from whoever would have won, trump cuts included. The joker player leads next.</li>
-    <li>Two jokers in one trick cancel out.</li>
+    <li>If a second joker is played in the same trick, the trick goes to the player who played the second joker, and they lead next.</li>
     <li>If you must lead and hold only jokers, you're stuck. The other team takes one trick per joker you hold.</li>
   </ul>
   <table class="score-table">

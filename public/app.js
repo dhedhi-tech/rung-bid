@@ -55,7 +55,14 @@ const SFX = {
   trickUs() { tone(784, 0, .12, { vol: .14 }); tone(1047, .09, .22, { vol: .14 }); },
   trickThem() { tone(392, 0, .12, { vol: .11 }); tone(330, .09, .2, { vol: .11 }); },
   turn() { tone(988, 0, .08, { vol: .07 }); },
-  joker() { [880, 660, 440, 660, 880].forEach((f, i) => tone(f, i * .06, .12, { type: 'square', vol: .06 })); noise(0, .3, { vol: .15, freq: 600, q: 2 }); },
+  joker() {
+    noise(0, .09, { vol: 1.1, freq: 2600, q: .45 });                 // slap
+    noise(0, .05, { vol: .6, freq: 5000, type: 'highpass' });          // crack
+    tone(160, 0, .5, { type: 'sine', vol: .55, slide: .22 });          // body thump
+    noise(.04, 1.1, { vol: .9, freq: 420, q: .7, type: 'lowpass' });   // blast rumble
+    tone(62, .04, 1.0, { type: 'triangle', vol: .4, slide: .5 });      // sub boom
+    tone(240, .08, .6, { type: 'sawtooth', vol: .07, slide: .45 });    // dark sting
+  },
   win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * .11, .35, { type: 'triangle', vol: .16 })); },
   lose() { [392, 349, 311, 262].forEach((f, i) => tone(f, i * .14, .35, { type: 'triangle', vol: .12 })); },
   pop() { tone(660, 0, .08, { vol: .08 }); },
@@ -96,7 +103,7 @@ function halfW() { const tw = ($('table') && $('table').clientWidth) || 800; ret
 function seatPos(seat) { const a = seatAngle(seat); return { x: 50 + halfW() * Math.cos(a), y: 50 + 42 * Math.sin(a) }; }
 function trickPos(seat) { const a = seatAngle(seat), r = S.n === 4 ? 16 : 20, rx = Math.min(r, halfW() - 19); return { x: 50 + rx * Math.cos(a), y: 50 + (r + 2) * Math.sin(a) }; }
 let jokerN = 0;
-const JOKER_SVG = '<svg class="j-art" viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"> <defs> <radialGradient id="rBg_@" cx="50%" cy="38%" r="65%"><stop offset="0" stop-color="#4a0b14"/><stop offset=".45" stop-color="#1a0709"/><stop offset="1" stop-color="#050304"/></radialGradient> <radialGradient id="rFace_@" cx="50%" cy="62%" r="60%"><stop offset="0" stop-color="#f1e9dc"/><stop offset=".6" stop-color="#c9bfb1"/><stop offset="1" stop-color="#5b524a"/></radialGradient> <radialGradient id="rEye_@" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#000"/><stop offset=".7" stop-color="#1a1210" stop-opacity=".9"/><stop offset="1" stop-color="#3a302a" stop-opacity="0"/></radialGradient> <linearGradient id="rCoat_@" x1="0" x2="1"><stop offset="0" stop-color="#7a0f1c"/><stop offset=".35" stop-color="#1a0b0e"/><stop offset=".7" stop-color="#0b0607"/><stop offset="1" stop-color="#5a0a15"/></linearGradient> <linearGradient id="rLimb_@" x1="0" x2="1"><stop offset="0" stop-color="#8e1222"/><stop offset=".5" stop-color="#120809"/><stop offset="1" stop-color="#3d0710"/></linearGradient> <pattern id="rDia_@" width="6" height="8" patternUnits="userSpaceOnUse"><path d="M3 0 L6 4 L3 8 L0 4 Z" fill="#b3172a" opacity=".22"/></pattern> <filter id="rGrain_@" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="1.6" numOctaves="2" seed="4"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .22 0"/><feComposite in2="SourceGraphic" operator="in"/></filter> <filter id="rGlow_@"><feGaussianBlur stdDeviation=".6"/></filter> </defs> <rect width="100" height="140" fill="url(#rBg_@)"/> <rect x="3" y="3" width="94" height="134" rx="6" fill="none" stroke="#b3172a" stroke-width="1.2"/> <rect x="6" y="6" width="88" height="128" rx="4" fill="none" stroke="#d8cdb8" stroke-width=".35" opacity=".4"/> <g id="rIdx_@" fill="#c81c30" font-family="Georgia,Times New Roman,serif" font-weight="700" font-size="6.4" text-anchor="middle"> <text x="11" y="15">J</text><text x="11" y="21.5">O</text><text x="11" y="28">K</text><text x="11" y="34.5">E</text><text x="11" y="41">R</text> </g> <use href="#rIdx_@" transform="rotate(180 50 70)"/> <ellipse cx="50" cy="124" rx="20" ry="2.5" fill="#000" opacity=".7"/> <path d="M46 92 L43 121 L45.5 121.5 L49 93 Z" fill="url(#rLimb_@)"/> <path d="M52 93 L55.5 121.5 L58 121 L55 92 Z" fill="url(#rLimb_@)"/> <path d="M45.5 121.5 Q38 124 33 120.5 Q37 121 43 120.5 Z" fill="#0d0708" stroke="#8e1222" stroke-width=".4"/> <path d="M55.5 121.5 Q63 124 68 120.5 Q63 121 57.5 120.5 Z" fill="#0d0708" stroke="#8e1222" stroke-width=".4"/> <path d="M41 56 Q50 52 59 56 L62 80 L64.5 98 L57 95 L54 99 L50 95 L46 99 L43 95 L35.5 98 L38 80 Z" fill="url(#rCoat_@)"/> <path d="M41 56 Q50 52 59 56 L62 80 L64.5 98 L57 95 L54 99 L50 95 L46 99 L43 95 L35.5 98 L38 80 Z" fill="url(#rDia_@)"/> <path d="M50 56 L50 95" stroke="#000" stroke-width=".5" opacity=".6"/> <path d="M41 56 L38 80 L35.5 98" fill="none" stroke="#d0283c" stroke-width=".35" opacity=".8"/> <path d="M41.5 58 Q35 70 34 86" fill="none" stroke="url(#rLimb_@)" stroke-width="3" stroke-linecap="round"/> <path d="M34 86 q-1.2 4 -1.6 7.5 M34.6 86.4 q-.2 4.2 -.4 8 M35.3 86.4 q.6 3.8 .8 7.2 M33.4 85.8 q-2 2.4 -2.8 4.8" stroke="#d9cfc0" stroke-width=".7" fill="none" stroke-linecap="round"/> <path d="M58.5 58 Q67 64 68 52 Q68.5 46 66 42" fill="none" stroke="url(#rLimb_@)" stroke-width="3" stroke-linecap="round"/> <g transform="translate(66 36) rotate(14)"><rect x="-4" y="-6" width="8" height="11.5" rx=".8" fill="#e6dccb"/><rect x="-3.2" y="-5.2" width="6.4" height="9.9" rx=".5" fill="none" stroke="#b3172a" stroke-width=".3"/><path d="M0 -2.2 l2 2.6 l-2 2.6 l-2 -2.6 Z" fill="#b3172a"/></g> <path d="M65.5 42.5 q-1.8 -1.5 -2.4 -4.5 M66.4 42 q-.8 -2.4 -.6 -5.4 M67.2 42.2 q.4 -2.4 1 -4.8 M64.8 43.2 q-2.4 0 -3.4 -1.4" stroke="#d9cfc0" stroke-width=".7" fill="none" stroke-linecap="round"/> <path d="M39 57 L36 50 L42 54 L44 47.5 L47 53 L50 48 L53 53 L56 47.5 L58 54 L64 50 L61 57 Q50 60 39 57 Z" fill="#100809" stroke="#b3172a" stroke-width=".45"/> <path d="M43 40 Q43 52 50 54.5 Q57 52 57 40 Q57 31 50 31 Q43 31 43 40 Z" fill="url(#rFace_@)"/> <path d="M43.5 41 Q45 49 47 51" fill="none" stroke="#5b524a" stroke-width=".5" opacity=".7"/> <path d="M56.5 41 Q55 49 53 51" fill="none" stroke="#5b524a" stroke-width=".5" opacity=".7"/> <ellipse cx="46.6" cy="40.6" rx="2.6" ry="2" fill="url(#rEye_@)"/> <ellipse cx="53.4" cy="40.6" rx="2.6" ry="2" fill="url(#rEye_@)"/> <circle cx="47.2" cy="40.8" r=".7" fill="#ff2a40" filter="url(#rGlow_@)"/><circle cx="47.2" cy="40.8" r=".35" fill="#ffb3bc"/> <circle cx="54" cy="40.8" r=".7" fill="#ff2a40" filter="url(#rGlow_@)"/><circle cx="54" cy="40.8" r=".35" fill="#ffb3bc"/> <path d="M44 38 Q46.5 37.6 48.6 39.2 M56 38 Q53.5 37.6 51.4 39.2" stroke="#2a201c" stroke-width=".55" fill="none"/> <path d="M43.6 44.8 Q50 52.6 56.4 44.8 Q53.5 48.6 50 48.9 Q46.5 48.6 43.6 44.8 Z" fill="#0a0506"/> <path d="M44.6 45.9 Q50 51.3 55.4 45.9 Q53 47.9 50 48.1 Q47 47.9 44.6 45.9 Z" fill="#d8d0c2"/> <path d="M45.6 46.7 v1 M46.6 47.3 v1.1 M47.7 47.8 v1.1 M48.8 48 v1.1 M50 48.1 v1.1 M51.2 48 v1.1 M52.3 47.8 v1.1 M53.4 47.3 v1.1 M54.4 46.7 v1" stroke="#2a1d1a" stroke-width=".28"/> <path d="M45.2 49 Q50 51.4 54.8 49" stroke="#0a0506" stroke-width=".35" fill="none"/> <path d="M43.6 44.8 q-.9 -.4 -1.3 -1.4 M56.4 44.8 q.9 -.4 1.3 -1.4" stroke="#3a2f2a" stroke-width=".45" fill="none"/> <path d="M42.5 36 Q48 29 50 30 Q52 29 57.5 36 Q56 33 50 32.4 Q44 33 42.5 36 Z" fill="#0c0607"/> <path d="M43 35 Q36 30 33 22 Q31 17 27 19 Q31 19 31.5 25 Q33 32 42 37 Z" fill="#7d0e1b" stroke="#c81c30" stroke-width=".3"/> <path d="M47 32 Q46 22 50 14 Q53 9 56 12 Q52 12 52 20 Q52 26 53 32 Z" fill="#0d0708" stroke="#7d0e1b" stroke-width=".4"/> <path d="M57 35 Q64 30 67 22 Q69 17 73 19 Q69 19 68.5 25 Q67 32 58 37 Z" fill="#120809" stroke="#c81c30" stroke-width=".3"/> <circle cx="27" cy="19.3" r="1.3" fill="#6e6458"/><circle cx="56" cy="12" r="1.3" fill="#6e6458"/><circle cx="73" cy="19.3" r="1.3" fill="#6e6458"/> <rect width="100" height="140" filter="url(#rGrain_@)" opacity=".9"/> </svg>';
+const JOKER_SVG = '<svg class="j-art" viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"> <defs> <radialGradient id="rBg_@" cx="50%" cy="38%" r="65%"><stop offset="0" stop-color="#ffffff"/><stop offset=".6" stop-color="#f7f3ec"/><stop offset="1" stop-color="#e4ddd1"/></radialGradient> <radialGradient id="rFace_@" cx="50%" cy="62%" r="60%"><stop offset="0" stop-color="#f1e9dc"/><stop offset=".6" stop-color="#c9bfb1"/><stop offset="1" stop-color="#5b524a"/></radialGradient> <radialGradient id="rEye_@" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#000"/><stop offset=".7" stop-color="#1a1210" stop-opacity=".9"/><stop offset="1" stop-color="#3a302a" stop-opacity="0"/></radialGradient> <linearGradient id="rCoat_@" x1="0" x2="1"><stop offset="0" stop-color="#7a0f1c"/><stop offset=".35" stop-color="#1a0b0e"/><stop offset=".7" stop-color="#0b0607"/><stop offset="1" stop-color="#5a0a15"/></linearGradient> <linearGradient id="rLimb_@" x1="0" x2="1"><stop offset="0" stop-color="#8e1222"/><stop offset=".5" stop-color="#120809"/><stop offset="1" stop-color="#3d0710"/></linearGradient> <pattern id="rDia_@" width="6" height="8" patternUnits="userSpaceOnUse"><path d="M3 0 L6 4 L3 8 L0 4 Z" fill="#b3172a" opacity=".22"/></pattern> <filter id="rGrain_@" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="1.6" numOctaves="2" seed="4"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .22 0"/><feComposite in2="SourceGraphic" operator="in"/></filter> <filter id="rGlow_@"><feGaussianBlur stdDeviation=".6"/></filter> </defs> <rect width="100" height="140" fill="url(#rBg_@)"/> <rect x="3" y="3" width="94" height="134" rx="6" fill="none" stroke="#b3172a" stroke-width="1.2"/> <rect x="6" y="6" width="88" height="128" rx="4" fill="none" stroke="#b3172a" stroke-width=".35" opacity=".45"/> <g id="rIdx_@" fill="#c81c30" font-family="Georgia,Times New Roman,serif" font-weight="700" font-size="6.4" text-anchor="middle"> <text x="11" y="15">J</text><text x="11" y="21.5">O</text><text x="11" y="28">K</text><text x="11" y="34.5">E</text><text x="11" y="41">R</text> </g> <use href="#rIdx_@" transform="rotate(180 50 70)"/> <ellipse cx="50" cy="124" rx="20" ry="2.5" fill="#000" opacity=".25"/> <path d="M46 92 L43 121 L45.5 121.5 L49 93 Z" fill="url(#rLimb_@)"/> <path d="M52 93 L55.5 121.5 L58 121 L55 92 Z" fill="url(#rLimb_@)"/> <path d="M45.5 121.5 Q38 124 33 120.5 Q37 121 43 120.5 Z" fill="#0d0708" stroke="#8e1222" stroke-width=".4"/> <path d="M55.5 121.5 Q63 124 68 120.5 Q63 121 57.5 120.5 Z" fill="#0d0708" stroke="#8e1222" stroke-width=".4"/> <path d="M41 56 Q50 52 59 56 L62 80 L64.5 98 L57 95 L54 99 L50 95 L46 99 L43 95 L35.5 98 L38 80 Z" fill="url(#rCoat_@)"/> <path d="M41 56 Q50 52 59 56 L62 80 L64.5 98 L57 95 L54 99 L50 95 L46 99 L43 95 L35.5 98 L38 80 Z" fill="url(#rDia_@)"/> <path d="M50 56 L50 95" stroke="#000" stroke-width=".5" opacity=".6"/> <path d="M41 56 L38 80 L35.5 98" fill="none" stroke="#d0283c" stroke-width=".35" opacity=".8"/> <path d="M41.5 58 Q35 70 34 86" fill="none" stroke="url(#rLimb_@)" stroke-width="3" stroke-linecap="round"/> <path d="M34 86 q-1.2 4 -1.6 7.5 M34.6 86.4 q-.2 4.2 -.4 8 M35.3 86.4 q.6 3.8 .8 7.2 M33.4 85.8 q-2 2.4 -2.8 4.8" stroke="#d9cfc0" stroke-width=".7" fill="none" stroke-linecap="round"/> <path d="M58.5 58 Q67 64 68 52 Q68.5 46 66 42" fill="none" stroke="url(#rLimb_@)" stroke-width="3" stroke-linecap="round"/> <g transform="translate(66 36) rotate(14)"><rect x="-4" y="-6" width="8" height="11.5" rx=".8" fill="#e6dccb"/><rect x="-3.2" y="-5.2" width="6.4" height="9.9" rx=".5" fill="none" stroke="#b3172a" stroke-width=".3"/><path d="M0 -2.2 l2 2.6 l-2 2.6 l-2 -2.6 Z" fill="#b3172a"/></g> <path d="M65.5 42.5 q-1.8 -1.5 -2.4 -4.5 M66.4 42 q-.8 -2.4 -.6 -5.4 M67.2 42.2 q.4 -2.4 1 -4.8 M64.8 43.2 q-2.4 0 -3.4 -1.4" stroke="#d9cfc0" stroke-width=".7" fill="none" stroke-linecap="round"/> <path d="M39 57 L36 50 L42 54 L44 47.5 L47 53 L50 48 L53 53 L56 47.5 L58 54 L64 50 L61 57 Q50 60 39 57 Z" fill="#100809" stroke="#b3172a" stroke-width=".45"/> <path d="M43 40 Q43 52 50 54.5 Q57 52 57 40 Q57 31 50 31 Q43 31 43 40 Z" fill="url(#rFace_@)"/> <path d="M43.5 41 Q45 49 47 51" fill="none" stroke="#5b524a" stroke-width=".5" opacity=".7"/> <path d="M56.5 41 Q55 49 53 51" fill="none" stroke="#5b524a" stroke-width=".5" opacity=".7"/> <ellipse cx="46.6" cy="40.6" rx="2.6" ry="2" fill="url(#rEye_@)"/> <ellipse cx="53.4" cy="40.6" rx="2.6" ry="2" fill="url(#rEye_@)"/> <circle cx="47.2" cy="40.8" r=".7" fill="#ff2a40" filter="url(#rGlow_@)"/><circle cx="47.2" cy="40.8" r=".35" fill="#ffb3bc"/> <circle cx="54" cy="40.8" r=".7" fill="#ff2a40" filter="url(#rGlow_@)"/><circle cx="54" cy="40.8" r=".35" fill="#ffb3bc"/> <path d="M44 38 Q46.5 37.6 48.6 39.2 M56 38 Q53.5 37.6 51.4 39.2" stroke="#2a201c" stroke-width=".55" fill="none"/> <path d="M43.6 44.8 Q50 52.6 56.4 44.8 Q53.5 48.6 50 48.9 Q46.5 48.6 43.6 44.8 Z" fill="#0a0506"/> <path d="M44.6 45.9 Q50 51.3 55.4 45.9 Q53 47.9 50 48.1 Q47 47.9 44.6 45.9 Z" fill="#d8d0c2"/> <path d="M45.6 46.7 v1 M46.6 47.3 v1.1 M47.7 47.8 v1.1 M48.8 48 v1.1 M50 48.1 v1.1 M51.2 48 v1.1 M52.3 47.8 v1.1 M53.4 47.3 v1.1 M54.4 46.7 v1" stroke="#2a1d1a" stroke-width=".28"/> <path d="M45.2 49 Q50 51.4 54.8 49" stroke="#0a0506" stroke-width=".35" fill="none"/> <path d="M43.6 44.8 q-.9 -.4 -1.3 -1.4 M56.4 44.8 q.9 -.4 1.3 -1.4" stroke="#3a2f2a" stroke-width=".45" fill="none"/> <path d="M42.5 36 Q48 29 50 30 Q52 29 57.5 36 Q56 33 50 32.4 Q44 33 42.5 36 Z" fill="#0c0607"/> <path d="M43 35 Q36 30 33 22 Q31 17 27 19 Q31 19 31.5 25 Q33 32 42 37 Z" fill="#7d0e1b" stroke="#c81c30" stroke-width=".3"/> <path d="M47 32 Q46 22 50 14 Q53 9 56 12 Q52 12 52 20 Q52 26 53 32 Z" fill="#0d0708" stroke="#7d0e1b" stroke-width=".4"/> <path d="M57 35 Q64 30 67 22 Q69 17 73 19 Q69 19 68.5 25 Q67 32 58 37 Z" fill="#120809" stroke="#c81c30" stroke-width=".3"/> <circle cx="27" cy="19.3" r="1.3" fill="#6e6458"/><circle cx="56" cy="12" r="1.3" fill="#6e6458"/><circle cx="73" cy="19.3" r="1.3" fill="#6e6458"/> <rect width="100" height="140" filter="url(#rGrain_@)" opacity=".3"/> </svg>';
 const jokerArt = () => JOKER_SVG.replace(/_@/g, '_' + (++jokerN));
 function cardHTML(c, extra = '') {
   if (isJ(c)) return `<div class="card joker ${extra}" data-id="${c.id}">${jokerArt()}</div>`;
@@ -365,11 +372,12 @@ async function loadRooms() {
 }
 function renderRooms(list) {
   const box = $('wRooms');
-  list = list.filter(r => !r.mine);
   if (!list.length) { box.innerHTML = ''; return; }
-  box.innerHTML = `<div class="wr-head">Open tables</div>` + list.map(r => `<button class="wroom" data-code="${esc(r.code)}">
+  const mine = list.filter(r => r.mine), open = list.filter(r => !r.mine);
+  const item = r => `<button class="wroom ${r.mine ? 'mine' : ''}" data-code="${esc(r.code)}">
       <span class="wr-main"><b>${esc(r.host)}'s table</b><span>${r.n} players${r.joker ? ' · Joker' : ''} · ${r.playing ? `Playing, hand ${r.hand}${r.limit ? ' of ' + r.limit : ''}` : 'Waiting to start'}</span></span>
-      <span class="wr-free">${r.free} seat${r.free > 1 ? 's' : ''} free</span><span class="wr-go">Join</span></button>`).join('');
+      ${r.mine ? '' : `<span class="wr-free">${r.free} seat${r.free > 1 ? 's' : ''} free</span>`}<span class="wr-go">${r.mine ? 'Continue' : 'Join'}</span></button>`;
+  box.innerHTML = (mine.length ? `<div class="wr-head">Your game</div>` + mine.map(item).join('') : '') + (open.length ? `<div class="wr-head">Open tables</div>` + open.map(item).join('') : '');
   box.querySelectorAll('.wroom').forEach(b => b.onclick = () => joinRoom(b.dataset.code));
 }
 function joinRoom(code) {
@@ -776,11 +784,11 @@ function showCut(seat, s, over) {
   const felt = document.querySelector('.felt'); felt.classList.remove('jolt'); void felt.offsetWidth; felt.classList.add('jolt');
   setTimeout(() => fx.remove(), 1400);
 }
-function showJoker(seat, cancel) {
+function showJoker(seat, second) {
   const to = trickPos(seat), t = tcls(seat);
   const fx = document.createElement('div');
   fx.className = `cut-fx jfx ${t}`; fx.style.left = to.x + '%'; fx.style.top = to.y + '%';
-  fx.innerHTML = `<span class="cut-ring"></span><span class="cut-label jlabel">${cancel ? 'CANCELLED' : 'REVERSE ⇄'}</span>`;
+  fx.innerHTML = `<span class="cut-ring"></span><span class="cut-label jlabel">${second ? 'TAKES IT' : 'REVERSE ⇄'}</span>`;
   $('trick').appendChild(fx);
   const felt = document.querySelector('.felt'); felt.classList.remove('spin'); void felt.offsetWidth; felt.classList.add('spin');
   setTimeout(() => fx.remove(), 1500);
@@ -795,7 +803,7 @@ function onFx(f) {
     case 'pass': sfx('pass'); break;
     case 'trump': sfx('trump'); announce('Trump', SYM[f.s], SNAME[f.s], colourNames(f.sub || ''), RED(f.s) ? 'red' : ''); break;
     case 'card': if (f.cut) { showCut(f.seat, f.s, f.over); sfx('cut'); } else sfx('card'); break;
-    case 'joker': showJoker(f.seat, f.cancel); sfx('joker'); break;
+    case 'joker': showJoker(f.seat, f.second); sfx('joker'); break;
     case 'trick': {
       const el = $('trick').querySelector(`[data-key="${f.showSeat}-${f.showId}"]`);
       if (el) el.classList.add('win', f.team === 0 ? 'ta' : 'tb');
@@ -1121,7 +1129,7 @@ async function createTable(practice) {
   const r = await send('create', { n: homeN, joker: homeJ, limit: homeL, pub: homePub });
   awaitingCreate = false;
   if (!r || !r.ok) return;
-  tableCode = r.code; history.replaceState(null, '', '/?t=' + r.code);
+  tableCode = r.code; history.replaceState(null, '', '/?t=' + r.code); store.set('rb-table', r.code);
   if (practice) { ac(); send('start'); }
 }
 let joinBusy = false;
@@ -1130,12 +1138,13 @@ async function joinTable() {
   joinBusy = true;
   const auto = autoSeat; autoSeat = false;
   let r; try { r = auto && sock.connected ? await new Promise(res => sock.emit('join', tableCode, { seat: 'auto' }, x => { if (x && x.error) flash(x.error); res(x); })) : await send('join', tableCode); } finally { joinBusy = false; }
-  if (r && r.ok) { history.replaceState(null, '', '/?t=' + r.code); if (V.want && !V.on) setTimeout(voiceJoin, 600); loadChat(); }
-  else { tableCode = null; history.replaceState(null, '', '/'); S = null; homeScreen(r && r.error); }
+  if (r && r.ok) { history.replaceState(null, '', '/?t=' + r.code); store.set('rb-table', r.code); if (V.want && !V.on) setTimeout(voiceJoin, 600); loadChat(); }
+  else { const quiet = resuming; tableCode = null; store.set('rb-table', ''); history.replaceState(null, '', '/'); S = null; homeScreen(quiet ? '' : r && r.error); }
+  resuming = false;
 }
 function leaveTable() {
   voiceLeave(true); chatMsgs = []; chatUnread = 0; closeChat(); renderChat();
-  send('leaveTable'); tableCode = null; S = null; history.replaceState(null, '', '/');
+  send('leaveTable'); tableCode = null; S = null; store.set('rb-table', ''); history.replaceState(null, '', '/');
   $('trick').innerHTML = ''; hidePanel(); homeScreen();
   boot();
 }
@@ -1180,7 +1189,10 @@ function boot() {
   S = null;
 }
 boot();
-if (tableCode) {
+// Opened the game without a link but were in a game before: go straight back to it
+let resuming = false;
+if (!tableCode && store.get('rb-table') && myName) { tableCode = store.get('rb-table'); resuming = true; history.replaceState(null, '', '/?t=' + tableCode); connecting(); }
+else if (tableCode) {
   if (looksSignedIn() || (myName && guestRecently())) connecting();
   else { invitePending = true; nameScreen(); }
 }

@@ -131,7 +131,10 @@ io.on('connection', socket => {
     // From Open tables during a game: take a free bot seat straight away
     if (opts && opts.seat === 'auto' && t.phase === 'game') {
       const p = t.players.get(pid);
-      if (p && p.seat == null) { const free = t.seats.findIndex(s => s.bot); if (free >= 0) t.sit(pid, free); }
+      if (p && p.seat == null) {
+        const free = p.lastSeat != null && t.seats[p.lastSeat].bot ? p.lastSeat : t.seats.findIndex(s => s.bot);
+        if (free >= 0) t.sit(pid, free);
+      }
     }
     reply(cb, null, { code: t.code });
   });
@@ -139,13 +142,20 @@ io.on('connection', socket => {
   socket.on('rooms', cb => {
     const list = [];
     for (const t of tables.values()) {
+      const mine = t.players.has(pid);
+      if (mine && t.phase !== 'over') {
+        const host = t.players.get(t.hostId);
+        list.push({ code: t.code, host: host ? host.name : 'Player', n: t.n, joker: t.joker, limit: t.limit, free: t.seats.filter(s => s.bot).length,
+          humans: t.seats.filter(s => !s.bot).length, playing: t.phase === 'game', hand: t.G ? t.G.handNo : 0, mine: true });
+        continue;
+      }
       if (!t.pub || t.phase === 'over' || !t.humansConnected()) continue;
       const free = t.seats.filter(s => s.bot).length; if (!free) continue;
       const host = t.players.get(t.hostId);
       list.push({ code: t.code, host: host ? host.name : 'Player', n: t.n, joker: t.joker, limit: t.limit, free,
-        humans: t.seats.filter(s => !s.bot).length, playing: t.phase === 'game', hand: t.G ? t.G.handNo : 0, mine: t.players.has(pid) });
+        humans: t.seats.filter(s => !s.bot).length, playing: t.phase === 'game', hand: t.G ? t.G.handNo : 0, mine: false });
     }
-    list.sort((a, b) => (a.playing - b.playing) || (b.humans - a.humans));
+    list.sort((a, b) => (b.mine - a.mine) || (a.playing - b.playing) || (b.humans - a.humans));
     reply(cb, null, { list: list.slice(0, 20) });
   });
 

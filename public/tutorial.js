@@ -118,7 +118,7 @@
       title: 'Joker mode (optional)',
       body: `${row([{ s: 'J', r: 0 }])}
         <p>In Joker mode each deck has a joker. You can only play it when you have none of the led suit, and you can never lead with it.</p>
-        <p>A joker <b>reverses the trick</b>: it goes to the team that would have lost. The joker player leads next. Two jokers in one trick cancel out.</p>
+        <p>A joker <b>reverses the trick</b>: it goes to the team that would have lost. The joker player leads next. If a second joker is played in the same trick, that player takes the trick.</p>
         <p class="hint">Careful: if you must lead and hold only jokers, you are stuck and the other team takes those tricks.</p>`,
     },
     {
