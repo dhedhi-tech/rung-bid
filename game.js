@@ -51,8 +51,8 @@ function perms(a) { if (a.length < 2) return [a]; return a.flatMap((x, i) => per
 class Abort extends Error {}
 
 class Table {
-  constructor(code, { n, joker, hostId, limit }, io) {
-    this.code = code; this.io = io;
+  constructor(code, { n, joker, hostId, limit, pub }, io) {
+    this.code = code; this.io = io; this.pub = !!pub; // pub: listed in Open tables on the home screen
     this.n = n; this.joker = !!joker; this.hostId = hostId;
     this.limit = [0, 6, 10].includes(limit) ? limit : 10; // hand limit: 6 quick, 10 normal, 0 = no limit
     this.alive = true; this.running = false; this.phase = 'lobby';

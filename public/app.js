@@ -24,7 +24,7 @@ let pid = store.get('rb-pid');
 if (!pid) { pid = 'p' + Math.random().toString(36).slice(2) + Date.now().toString(36); store.set('rb-pid', pid); }
 let myName = store.get('rb-name') || '';
 let tableCode = (new URLSearchParams(location.search).get('t') || '').toUpperCase() || null;
-let homeN = 4, homeJ = false, homeL = 10;
+let homeN = 4, homeJ = false, homeL = 10, homePub = true;
 const limitName = l => (l === 6 ? 'Quick · 6 hands' : l === 10 ? 'Normal · 10 hands' : 'Full · no hand limit');
 
 /* ---------- sound ---------- */
@@ -336,6 +336,7 @@ function welcomeScreen(err) {
       <button class="primary" id="wPlay">Play with friends</button>
       <button class="secondary" id="wPractice">Practice with bots</button>
       <div class="wrow"><button class="secondary" id="wJoin">Join with a code</button><button class="secondary" id="wTut">${firstTime ? 'Tutorial' : 'How to play'}</button></div>
+      <div id="wRooms" class="wrooms"></div>
       <div class="err" id="wErr">${err ? esc(err) : ''}</div>
       <div class="wlegal"><a href="/privacy">Privacy Policy</a><span>·</span><a href="/terms">Terms of Use</a></div>
     </div>`;
@@ -345,6 +346,33 @@ function welcomeScreen(err) {
   $('wJoin').onclick = joinSheet;
   $('wTut').onclick = () => openTutorial('home');
   renderChip();
+  loadRooms();
+}
+// Open tables: public tables with a free seat, refreshed while the home screen is showing
+let roomsTimer = null, autoSeat = false;
+async function loadRooms() {
+  clearTimeout(roomsTimer);
+  const w = $('welcome'), box = $('wRooms');
+  if (!w || w.hidden || !box || S) return;
+  if (sock.connected) {
+    const r = await new Promise(res => sock.emit('rooms', res));
+    if (r && r.ok && $('wRooms')) renderRooms(r.list || []);
+  }
+  roomsTimer = setTimeout(loadRooms, 5000);
+}
+function renderRooms(list) {
+  const box = $('wRooms');
+  list = list.filter(r => !r.mine);
+  if (!list.length) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="wr-head">Open tables</div>` + list.map(r => `<button class="wroom" data-code="${esc(r.code)}">
+      <span class="wr-main"><b>${esc(r.host)}'s table</b><span>${r.n} players${r.joker ? ' · Joker' : ''} · ${r.playing ? `Playing, hand ${r.hand}${r.limit ? ' of ' + r.limit : ''}` : 'Waiting to start'}</span></span>
+      <span class="wr-free">${r.free} seat${r.free > 1 ? 's' : ''} free</span><span class="wr-go">Join</span></button>`).join('');
+  box.querySelectorAll('.wroom').forEach(b => b.onclick = () => joinRoom(b.dataset.code));
+}
+function joinRoom(code) {
+  ac(); tableCode = code; autoSeat = true; clearTimeout(roomsTimer);
+  if (myName || PROFILE) joinTable();
+  else { invitePending = true; nameScreen(); }
 }
 function hideWelcome() { const w = $('welcome'); if (w) w.hidden = true; }
 function nameField() { return `<div class="field"><span>Your name</span><input type="text" id="nameIn" maxlength="14" autocomplete="nickname" placeholder="e.g. Atif" value="${esc(myName)}"></div>`; }
@@ -362,6 +390,7 @@ function createSheet(practice) {
     <div class="field"><span>Mode</span><div class="seg text" id="segJ"><button data-j="0">Classic</button><button data-j="1">Joker mode</button></div></div>
     <div class="field"><span>Game length</span><div class="seg" id="segL">
       <button data-l="6">Quick<small>6 hands</small></button><button data-l="10">Normal<small>10 hands</small></button><button data-l="0">Full<small>no limit</small></button></div></div>
+    <div class="field"><span>Who can join</span><div class="seg text" id="segP"><button data-p="1">Anyone</button><button data-p="0">Only with link</button></div></div>
     <button class="primary" id="goCreate">${practice ? 'Start practice' : 'Create table'}</button>
     <div class="err" id="homeErr"></div>
     <button class="linkbtn" id="backHome">Back</button>`);
@@ -369,8 +398,11 @@ function createSheet(practice) {
     document.querySelectorAll('#segN button').forEach(b => b.classList.toggle('on', +b.dataset.n === homeN));
     document.querySelectorAll('#segJ button').forEach(b => b.classList.toggle('on', (b.dataset.j === '1') === homeJ));
     document.querySelectorAll('#segL button').forEach(b => b.classList.toggle('on', +b.dataset.l === homeL));
+    document.querySelectorAll('#segP button').forEach(b => b.classList.toggle('on', (b.dataset.p === '1') === homePub));
   };
+  homePub = !practice;
   sync();
+  $('segP').onclick = e => { const b = e.target.closest('button'); if (b) { homePub = b.dataset.p === '1'; sync(); } };
   $('segN').onclick = e => { const b = e.target.closest('button'); if (b) { homeN = +b.dataset.n; sync(); } };
   $('segJ').onclick = e => { const b = e.target.closest('button'); if (b) { homeJ = b.dataset.j === '1'; sync(); } };
   $('segL').onclick = e => { const b = e.target.closest('button'); if (b) { homeL = +b.dataset.l; sync(); } };
@@ -1014,7 +1046,7 @@ function connecting() {
 let awaitingCreate = false;
 async function createTable(practice) {
   awaitingCreate = true;
-  const r = await send('create', { n: homeN, joker: homeJ, limit: homeL });
+  const r = await send('create', { n: homeN, joker: homeJ, limit: homeL, pub: homePub });
   awaitingCreate = false;
   if (!r || !r.ok) return;
   tableCode = r.code; history.replaceState(null, '', '/?t=' + r.code);
@@ -1024,7 +1056,8 @@ let joinBusy = false;
 async function joinTable() {
   if (joinBusy) return;
   joinBusy = true;
-  let r; try { r = await send('join', tableCode); } finally { joinBusy = false; }
+  const auto = autoSeat; autoSeat = false;
+  let r; try { r = auto && sock.connected ? await new Promise(res => sock.emit('join', tableCode, { seat: 'auto' }, x => { if (x && x.error) flash(x.error); res(x); })) : await send('join', tableCode); } finally { joinBusy = false; }
   if (r && r.ok) { history.replaceState(null, '', '/?t=' + r.code); if (V.want && !V.on) setTimeout(voiceJoin, 600); loadChat(); }
   else { tableCode = null; history.replaceState(null, '', '/'); S = null; homeScreen(r && r.error); }
 }
@@ -1038,6 +1071,7 @@ sock.on('connect', async () => {
   clearTimeout(waking); $('conn').hidden = true;
   await authNow();
   if (tableCode && myName && !invitePending) joinTable();
+  else if (!tableCode) loadRooms();
 });
 sock.on('disconnect', () => { connecting(); if (V.on) { const w = V.want; voiceLeave(false); V.want = w; } });
 sock.on('connect_error', () => connecting());

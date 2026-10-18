@@ -107,7 +107,7 @@ io.on('connection', socket => {
     const n = [4, 6, 8].includes(opts && opts.n) ? opts.n : 4;
     if (tables.size > 500) return reply(cb, 'Server is busy. Try again in a minute.');
     const code = newCode();
-    const t = new Table(code, { n, joker: !!(opts && opts.joker), hostId: pid, limit: opts && Number(opts.limit) }, io);
+    const t = new Table(code, { n, joker: !!(opts && opts.joker), hostId: pid, limit: opts && Number(opts.limit), pub: !!(opts && opts.pub) }, io);
     wireProgress(t);
     tables.set(code, t);
     leave(); table = t; t.addClient(socket, pid, name);
@@ -115,11 +115,30 @@ io.on('connection', socket => {
     reply(cb, null, { code });
   });
 
-  socket.on('join', (code, cb) => {
+  socket.on('join', (code, cb, opts) => {
+    if (typeof cb !== 'function' && typeof opts === 'function') [cb, opts] = [opts, cb];
     const t = tables.get(String(code || '').toUpperCase());
     if (!t) return reply(cb, 'This table has closed. Ask your friend for a new link, or create your own table.');
     leave(); table = t; t.addClient(socket, pid, name);
+    // From Open tables during a game: take a free bot seat straight away
+    if (opts && opts.seat === 'auto' && t.phase === 'game') {
+      const p = t.players.get(pid);
+      if (p && p.seat == null) { const free = t.seats.findIndex(s => s.bot); if (free >= 0) t.sit(pid, free); }
+    }
     reply(cb, null, { code: t.code });
+  });
+  // Open tables for the home screen: public tables with a free seat and real people still there
+  socket.on('rooms', cb => {
+    const list = [];
+    for (const t of tables.values()) {
+      if (!t.pub || t.phase === 'over' || !t.humansConnected()) continue;
+      const free = t.seats.filter(s => s.bot).length; if (!free) continue;
+      const host = t.players.get(t.hostId);
+      list.push({ code: t.code, host: host ? host.name : 'Player', n: t.n, joker: t.joker, limit: t.limit, free,
+        humans: t.seats.filter(s => !s.bot).length, playing: t.phase === 'game', hand: t.G ? t.G.handNo : 0, mine: t.players.has(pid) });
+    }
+    list.sort((a, b) => (a.playing - b.playing) || (b.humans - a.humans));
+    reply(cb, null, { list: list.slice(0, 20) });
   });
 
   socket.on('rename', (nm, cb) => {
