@@ -87,7 +87,7 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
 #trick{pointer-events:none;z-index:3}
 
 .seat{position:absolute;transform:translate(-50%,-50%);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 9px;min-width:74px;text-align:center;
-  box-shadow:0 6px 16px rgba(0,0,0,.35);transition:box-shadow .2s,border-color .2s;z-index:2}
+  box-shadow:0 6px 16px rgba(0,0,0,.35);transition:box-shadow .2s,border-color .2s;z-index:1}
 .seat .s-name{font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap}
 .seat .dot{width:8px;height:8px;border-radius:50%;flex:none}
 .seat.ta .dot{background:var(--team-a)} .seat.tb .dot{background:var(--team-b)}
@@ -410,8 +410,8 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
 .seat .s-av{width:20px;height:20px;font-size:12px;border:2px solid var(--fg)}.seat .s-av.emo{font-size:13px}
 .seat.ta .s-av{border-color:var(--team-a)}.seat.tb .s-av{border-color:var(--team-b)}
 .seat{transition:box-shadow .2s,border-color .2s,transform .25s cubic-bezier(.2,.9,.3,1.2)}
-.seat.bidding{transform:translate(-50%,-50%) scale(1.28);z-index:6}
-.seat.spot{z-index:5;box-shadow:0 0 0 3px #ffd36b,0 0 26px 6px rgba(255,211,107,.55),0 6px 16px rgba(0,0,0,.35);animation:spotGlow 2.4s ease-in-out infinite}
+.seat.bidding{transform:translate(-50%,-50%) scale(1.28);z-index:2}
+.seat.spot{z-index:2;box-shadow:0 0 0 3px #ffd36b,0 0 26px 6px rgba(255,211,107,.55),0 6px 16px rgba(0,0,0,.35);animation:spotGlow 2.4s ease-in-out infinite}
 .spot-light{position:absolute;left:50%;top:50%;width:230%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(255,226,150,.28) 0,rgba(255,226,150,.1) 40%,transparent 70%);pointer-events:none;z-index:-1}
 @keyframes spotGlow{0%,100%{box-shadow:0 0 0 3px #ffd36b,0 0 18px 4px rgba(255,211,107,.4),0 6px 16px rgba(0,0,0,.35)}50%{box-shadow:0 0 0 3px #ffd36b,0 0 32px 10px rgba(255,211,107,.65),0 6px 16px rgba(0,0,0,.35)}}
 .lvlbar{background:var(--panel-2);border-radius:12px;padding:10px 12px;margin:6px 0 4px}
