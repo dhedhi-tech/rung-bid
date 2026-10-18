@@ -162,7 +162,10 @@ function renderSeats() {
     const active = S.active === i && S.phase === 'game';
     const tmr = active && deadlineAt ? `<span class="tmr" data-tmr><i></i></span>` : '';
     const talking = p.voice && !p.voice.muted && (talkers.has(p.voice.sid) || (i === 0 && me0() && V.talking));
-    html += `<div class="seat ${t} ${active ? 'active' : ''} ${talking ? 'speaking' : ''} ${!p.bot && !p.connected ? 'offline' : ''}" data-seat="${i}" style="left:${pos.x}%;top:${pos.y}%"><div class="s-name"><span class="dot"></span>${esc(i === 0 && me0() ? 'You' : p.name)}${tag}${backs ? ' ' : ''}${backs}</div><span class="s-role">${teamTag(i)}</span><div class="s-row">${chips}</div>${tmr}</div>`;
+    const bidding = active && (S.gphase === 'bid' || S.gphase === 'trump');
+    const spot = S.bid && S.bid.seat === i && S.gphase === 'play';
+    const pic = p.av ? avatarHTML({ name: p.name, av: p.av }, 's-av') : '<span class="dot"></span>';
+    html += `<div class="seat ${t} ${active ? 'active' : ''} ${bidding ? 'bidding' : ''} ${spot ? 'spot' : ''} ${talking ? 'speaking' : ''} ${!p.bot && !p.connected ? 'offline' : ''}" data-seat="${i}" data-real="${p.real}" style="left:${pos.x}%;top:${pos.y}%;transform-origin:${pos.x < 30 ? 'left' : pos.x > 70 ? 'right' : 'center'} ${pos.y < 30 ? 'top' : pos.y > 70 ? 'bottom' : 'center'}">${spot ? '<span class="spot-light"></span>' : ''}<div class="s-name">${pic}${esc(i === 0 && me0() ? 'You' : p.name)}${tag}${backs ? ' ' : ''}${backs}</div><span class="s-role">${teamTag(i)}</span><div class="s-row">${chips}</div>${tmr}</div>`;
   }
   $('seats').innerHTML = html;
   tickTimers();
@@ -479,6 +482,10 @@ async function signOut() {
   send('signout'); applyFelt(); renderChip(); closeModal();
 }
 function avatarHTML(p, cls = '') {
+  const av = p.av;
+  if (av && av.e) return `<span class="avatar emo ${cls}">${esc(av.e)}</span>`;
+  if (av && av.u) return `<img class="avatar ${cls}" src="${esc(av.u)}" alt="" referrerpolicy="no-referrer">`;
+  if (p.av === null) return `<span class="avatar ${cls}">${esc((p.name || '?')[0].toUpperCase())}</span>`;
   return p.avatar ? `<img class="avatar ${cls}" src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : `<span class="avatar ${cls}">${esc((p.name || '?')[0].toUpperCase())}</span>`;
 }
 function renderChip() {
@@ -504,7 +511,7 @@ function profileSheet() {
       : it.locked ? `<span class="st-lock">Level ${it.level}</span>` : `<button class="secondary st-btn" data-buy="${it.id}"><span class="coin">●</span> ${it.price}</button>`;
     return `<div class="st-item"><span class="swatch" data-sw="${it.id}"></span><span class="st-name">${esc(it.name)}</span>${btn}</div>`;
   }).join('');
-  openModal('profile', `<div class="prof-head">${avatarHTML(P, 'big')}<div><h2>${esc(P.name)}</h2><span class="pc-coins">● ${P.coins} coins</span></div></div>
+  openModal('profile', `<div class="prof-head"><button class="av-edit" id="avEdit" aria-label="Change picture">${avatarHTML(P, 'big')}<span>Change</span></button><div><h2>${esc(P.name)}</h2><span class="pc-coins">● ${P.coins} coins</span></div></div>
     <div class="lvlbar"><div class="lvl-top"><b>Level ${P.level}</b><span>${P.levelXp} / ${P.levelNeed} XP</span></div><div class="lvl-track"><i style="width:${pct}%"></i></div></div>
     <div class="res-grid">
       <div><span>Games</span><b>${P.games}</b></div><div><span>Wins</span><b>${P.wins} · ${rate}</b></div>
@@ -518,11 +525,71 @@ function profileSheet() {
     <button class="linkbtn" id="signOutBtn">Sign out</button>`);
   $('profClose').onclick = closeModal;
   $('signOutBtn').onclick = signOut;
+  $('avEdit').onclick = picSheet;
   $('storeList').onclick = async e => {
     const b = e.target.closest('button'); if (!b) return;
     const r = b.dataset.buy ? await send('buy', b.dataset.buy) : await send('equip', b.dataset.equip);
     if (r && r.ok) { PROFILE = r.profile; applyFelt(); renderChip(); profileSheet(); if (b.dataset.buy) sfx('win'); }
   };
+}
+// Choose a profile picture: Google photo, a ready-made avatar, or an uploaded photo
+const AVATARS = ['🦁', '🐯', '🦊', '🐼', '🐨', '🐸', '🦉', '🐺', '🐻', '🦄', '🐵', '🐲', '🦅', '🐬', '🐝', '🌹'];
+function picSheet() {
+  if (!PROFILE) return;
+  const cur = PROFILE.pic || '';
+  openModal('pic', `<div class="eyebrow">Profile picture</div><h2>Choose your picture</h2>
+    <div class="pic-grid" id="picGrid">
+      ${PROFILE.avatar ? `<button data-pic="" class="${cur === '' ? 'on' : ''}"><img class="avatar big" src="${esc(PROFILE.avatar)}" alt="" referrerpolicy="no-referrer"><small>Google</small></button>` : ''}
+      ${AVATARS.map((e, i) => `<button data-pic="e:${i}" class="${cur === 'e:' + i ? 'on' : ''}"><span class="avatar emo big">${e}</span></button>`).join('')}
+    </div>
+    <label class="secondary pic-up">${cur === 'u' ? 'Upload a new photo' : 'Upload your photo'}<input type="file" id="picFile" accept="image/*" hidden></label>
+    <div class="err" id="picErr"></div>
+    <button class="linkbtn" id="picBack">Back</button>`);
+  const save = async val => { const r = await send('setPic', val); if (r && r.ok) { PROFILE = r.profile; renderChip(); profileSheet(); } else if (r && r.error && $('picErr')) $('picErr').textContent = r.error; };
+  $('picGrid').onclick = e => { const b = e.target.closest('button[data-pic]'); if (b) save(b.dataset.pic); };
+  $('picBack').onclick = profileSheet;
+  $('picFile').onchange = async e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    $('picErr').textContent = 'Preparing photo…';
+    try { save(await shrinkPhoto(f)); } catch (err) { $('picErr').textContent = 'Could not read that photo. Try another one.'; }
+  };
+}
+// Crop to a square and shrink to a small JPEG so it loads fast for everyone at the table
+function shrinkPhoto(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const side = Math.min(img.width, img.height), c = document.createElement('canvas'); c.width = c.height = 160;
+      c.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 160, 160);
+      URL.revokeObjectURL(url);
+      let q = 0.82, d = c.toDataURL('image/jpeg', q);
+      while (d.length > 58000 && q > 0.3) { q -= 0.12; d = c.toDataURL('image/jpeg', q); }
+      d.length > 58000 ? rej(new Error('too big')) : res(d);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('bad image')); };
+    img.src = url;
+  });
+}
+// Player card: tap any seat at the table
+async function playerCard(realSeat) {
+  const r = await send('card', realSeat); if (!r || !r.ok) return;
+  const c = r.card, me = S && S.seats[0] && S.seats[0].real === realSeat && me0();
+  let body;
+  if (c.bot) body = `<div class="prof-head"><span class="avatar big emo">🤖</span><div><h2>${esc(c.name)}</h2><span class="sub-muted">Bot player</span></div></div>`;
+  else if (c.guest) body = `<div class="prof-head">${avatarHTML({ name: c.name, av: null }, 'big')}<div><h2>${esc(c.name)}</h2><span class="sub-muted">Playing as guest</span></div></div>
+    <p class="hint">${me ? 'Sign in with Google to get a profile, a picture, levels and coins.' : 'Guests have no profile yet.'}</p>`;
+  else {
+    const rate = c.games ? Math.round(100 * c.wins / c.games) + '%' : '–';
+    const since = c.since ? new Date(c.since).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : '';
+    body = `<div class="prof-head">${avatarHTML({ name: c.name, av: c.av || null }, 'big')}<div><h2>${esc(c.name)}</h2><span class="lvl-pill">Level ${c.level}</span>${since ? `<span class="sub-muted"> · Playing since ${since}</span>` : ''}</div></div>
+    <div class="res-grid">
+      <div><span>Games</span><b>${c.games}</b></div><div><span>Wins</span><b>${c.wins} · ${rate}</b></div>
+      <div><span>Hands played</span><b>${c.hands}</b></div><div><span>Bids made</span><b>${c.bidsMade} / ${c.bidsTotal}</b></div>
+      <div><span>Sweeps & whitewashes</span><b>${c.sweeps}</b></div><div><span>Hands won</span><b>${c.handWins}</b></div>
+    </div>`;
+  }
+  openModal('card', body + `<button class="primary" id="cardClose">Close</button>`);
+  $('cardClose').onclick = closeModal;
 }
 function applyFelt() { document.documentElement.dataset.felt = PROFILE && PROFILE.equipped ? PROFILE.equipped.felt || 'green' : 'green'; }
 function gainToast(text, big) {
@@ -662,7 +729,7 @@ function render() {
   if (S.phase === 'lobby') lobbyScreen();
   else if (S.phase === 'over' && S.result) { if (modalKind !== 'over' || shownHost !== S.isHost) { resultScreen(); shownHost = S.isHost; } }
   else if (S.result) { if (modalKind !== 'result' || shownHand !== S.result.handNo || shownHost !== S.isHost) { resultScreen(); shownHand = S.result.handNo; shownHost = S.isHost; } }
-  else if (modalKind) closeModal();
+  else if (modalKind && modalKind !== 'card') closeModal();
 }
 
 /* ---------- confetti ---------- */
@@ -800,6 +867,11 @@ function openInBrowserHelp(feature) {
   };
 }
 $('reacts').innerHTML = '<span class="voicectl" id="voiceCtl"></span><button class="vbtn chatbtn" id="chatBtn" aria-label="Open chat">💬<span class="lbl"> Chat</span><span class="cbadge" id="chatBadge" hidden></span></button>' + ['👏', '😂', '😮', '🔥', '😢', '🙏'].map(e => `<button data-r="${e}" aria-label="React ${e}">${e}</button>`).join('');
+$('seats').addEventListener('click', e => {
+  const el = e.target.closest('.seat'); if (!el || !S || !S.code || S.phase === 'lobby') return;
+  if (modalKind && modalKind !== 'card') return;
+  playerCard(+el.dataset.real);
+});
 $('reacts').onclick = e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.r) send('react', b.dataset.r);

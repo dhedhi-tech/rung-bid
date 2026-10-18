@@ -19,3 +19,6 @@ create table if not exists public.profiles (
 );
 -- Only the game server (service key) reads and writes profiles
 alter table public.profiles enable row level security;
+
+-- Profile picture (added later). Safe to run more than once.
+alter table public.profiles add column if not exists pic text;

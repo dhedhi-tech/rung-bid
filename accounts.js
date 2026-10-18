@@ -77,9 +77,37 @@ function save(p) {
   clearTimeout(saveTimers.get(p.id));
   saveTimers.set(p.id, setTimeout(() => {
     saveTimers.delete(p.id);
-    const { id, ...fields } = p;
+    const { id, pic, ...fields } = p; // the picture is saved on its own (see setPic)
     sb(`/rest/v1/profiles?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(fields) }).catch(e => console.error('save profile', e.message));
   }, 800));
+}
+
+// Profile picture: 'e:<n>' for a ready-made avatar, a small JPEG (data URL) for an uploaded photo, '' for the Google photo
+const AVATARS = ['🦁', '🐯', '🦊', '🐼', '🐨', '🐸', '🦉', '🐺', '🐻', '🦄', '🐵', '🐲', '🦅', '🐬', '🐝', '🌹'];
+const picVer = s => { let h = 0; for (let i = 0; i < s.length; i += 7) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
+function avOf(p) {
+  if (!p) return null;
+  const pic = p.pic || '';
+  if (/^e:\d+$/.test(pic) && AVATARS[+pic.slice(2)]) return { e: AVATARS[+pic.slice(2)] };
+  if (pic.startsWith('data:image/')) return { u: `/pic/${p.id}?v=${picVer(pic)}` };
+  return p.avatar ? { u: p.avatar } : null;
+}
+async function setPic(p, val) {
+  val = String(val || '');
+  if (!(val === '' || /^e:\d+$/.test(val) && AVATARS[+val.slice(2)] || /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(val) && val.length <= 60000)) return 'That picture is not allowed';
+  p.pic = val;
+  if (enabled) {
+    try { await sb(`/rest/v1/profiles?id=eq.${encodeURIComponent(p.id)}`, { method: 'PATCH', body: JSON.stringify({ pic: val }) }); }
+    catch (e) { console.error('save picture', e.message); return 'Could not save the picture. Try again later.'; }
+  }
+  return null;
+}
+async function picData(id) {
+  let pic = cache.has(id) ? cache.get(id).pic : null;
+  if (pic == null && enabled && /^[0-9a-f-]{36}$/.test(id)) {
+    try { const r = await sb(`/rest/v1/profiles?id=eq.${id}&select=pic`); pic = r && r[0] ? r[0].pic : null; } catch (e) { pic = null; }
+  }
+  return pic && String(pic).startsWith('data:image/') ? pic : null;
 }
 
 function today() { return new Date().toISOString().slice(0, 10); }
@@ -104,7 +132,7 @@ function view(p) {
   if (!p) return null;
   const L = levelOf(p.xp), base = xpForLevel(L), next = xpForLevel(L + 1);
   return {
-    name: p.name, avatar: p.avatar, level: L, xp: p.xp, levelXp: p.xp - base, levelNeed: next - base, coins: p.coins,
+    name: p.name, avatar: p.avatar, av: avOf(p), pic: p.pic && !p.pic.startsWith('data:') ? p.pic : (p.pic ? 'u' : ''), level: L, xp: p.xp, levelXp: p.xp - base, levelNeed: next - base, coins: p.coins,
     games: p.games, wins: p.wins, hands: p.hands, handWins: p.hand_wins, bidsMade: p.bids_made, bidsTotal: p.bids_total, sweeps: p.sweeps,
     owned: p.owned, equipped: p.equipped,
     store: Object.entries(STORE).map(([id, it]) => ({ id, ...it, owned: p.owned.includes(id), locked: !!(it.level && L < it.level) })),
@@ -140,5 +168,5 @@ function handGains(info, seatIdx) {
 
 module.exports = {
   enabled, DEV, config: () => ({ auth: enabled || DEV, supabaseUrl: enabled ? SB_URL : '', anonKey: enabled ? ANON : '', dev: DEV && !enabled }),
-  verify, load, view, award, claimDaily, buy, equip, handGains, levelOf, STORE, XP, COINS,
+  verify, load, view, avOf, setPic, picData, AVATARS, award, claimDaily, buy, equip, handGains, levelOf, STORE, XP, COINS,
 };

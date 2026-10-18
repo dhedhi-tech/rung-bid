@@ -399,6 +399,21 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
 .avatar.big{width:56px;height:56px;font-size:22px}
 .prof-head{display:flex;gap:12px;align-items:center;margin-bottom:10px}
 .prof-head h2{margin:0 0 2px}
+.avatar.emo{background:var(--panel-2);font-size:20px;font-weight:400;border:1px solid var(--line)}.avatar.emo.big{font-size:32px}
+.av-edit{position:relative;background:none;border:0;padding:0;display:grid;justify-items:center;gap:3px;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer}
+.pic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;margin:12px 0}
+.pic-grid button{display:grid;justify-items:center;gap:3px;background:var(--panel-2);border:2px solid transparent;border-radius:12px;padding:8px 4px;color:var(--muted);font-size:11px}
+.pic-grid button.on{border-color:var(--team-a)}
+.pic-up{display:block;text-align:center;width:100%;padding:12px;border-radius:12px;cursor:pointer}
+.sub-muted{font-size:12.5px;color:var(--muted)}.lvl-pill{display:inline-block;background:var(--team-a);color:#241504;font-weight:800;font-size:12px;border-radius:999px;padding:2px 9px}
+.seat{cursor:pointer}
+.seat .s-av{width:20px;height:20px;font-size:12px;border:2px solid var(--fg)}.seat .s-av.emo{font-size:13px}
+.seat.ta .s-av{border-color:var(--team-a)}.seat.tb .s-av{border-color:var(--team-b)}
+.seat{transition:box-shadow .2s,border-color .2s,transform .25s cubic-bezier(.2,.9,.3,1.2)}
+.seat.bidding{transform:translate(-50%,-50%) scale(1.28);z-index:6}
+.seat.spot{z-index:5;box-shadow:0 0 0 3px #ffd36b,0 0 26px 6px rgba(255,211,107,.55),0 6px 16px rgba(0,0,0,.35);animation:spotGlow 2.4s ease-in-out infinite}
+.spot-light{position:absolute;left:50%;top:50%;width:230%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(255,226,150,.28) 0,rgba(255,226,150,.1) 40%,transparent 70%);pointer-events:none;z-index:-1}
+@keyframes spotGlow{0%,100%{box-shadow:0 0 0 3px #ffd36b,0 0 18px 4px rgba(255,211,107,.4),0 6px 16px rgba(0,0,0,.35)}50%{box-shadow:0 0 0 3px #ffd36b,0 0 32px 10px rgba(255,211,107,.65),0 6px 16px rgba(0,0,0,.35)}}
 .lvlbar{background:var(--panel-2);border-radius:12px;padding:10px 12px;margin:6px 0 4px}
 .lvl-top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px}
 .lvl-top span{color:var(--muted);font-variant-numeric:tabular-nums}

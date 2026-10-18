@@ -203,7 +203,7 @@ class Table {
         const pl = s.pid && this.players.get(s.pid);
         const vc = s.pid && !s.bot ? [...this.voice.entries()].find(([, x]) => x.pid === s.pid) : null;
         return { name: s.name, bot: s.bot, human: !s.bot, connected: !!(pl && pl.connected), host: s.pid === this.hostId, real: (i + base) % n,
-          voice: vc ? { sid: vc[0], muted: vc[1].muted } : null, lvl: !s.bot && s.pid && this.levelOf ? this.levelOf(s.pid) : null };
+          voice: vc ? { sid: vc[0], muted: vc[1].muted } : null, lvl: !s.bot && s.pid && this.levelOf ? this.levelOf(s.pid) : null, av: !s.bot && s.pid && this.avOf ? this.avOf(s.pid) : null };
       }),
       lobbyNames: [...this.players.values()].filter(x => x.connected && x.seat == null).map(x => x.name),
     };

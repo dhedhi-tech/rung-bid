@@ -30,6 +30,13 @@ for (const [route, file, title] of [['/privacy', 'privacy.html', 'Privacy Policy
   const body = fs.readFileSync(path.join(__dirname, 'legal', file), 'utf8');
   app.get(route, (_req, res) => res.type('html').send(legalShell.replace('{{TITLE}}', title).replace('{{BODY}}', body.split('{{CONTACT}}').join(contactHtml()))));
 }
+// Uploaded profile pictures
+app.get('/pic/:id', async (req, res) => {
+  const d = await A.picData(String(req.params.id));
+  if (!d) return res.status(404).end();
+  const m = /^data:(image\/jpeg);base64,(.+)$/.exec(d); if (!m) return res.status(404).end();
+  res.set('Cache-Control', 'public, max-age=604800, immutable'); res.type(m[1]).send(Buffer.from(m[2], 'base64'));
+});
 app.get('/config', (_req, res) => { res.set('Cache-Control', 'no-cache'); res.json(A.config()); });
 app.get('/health', (_req, res) => res.json({ ok: true, tables: tables.size }));
 
@@ -80,6 +87,7 @@ function tableInfo(t) {
 function wireProgress(t) {
   t.onGameStart = () => S.logGame({ kind: 'start', ...tableInfo(t) });
   t.levelOf = p => { const a = pidAuth.get(p); return a ? A.levelOf(a.profile.xp) : null; };
+  t.avOf = p => { const a = pidAuth.get(p); return a ? A.avOf(a.profile) : null; };
   t.onHandEnd = info => {
     if (info.over) S.logGame({ kind: 'finish', ...tableInfo(t), hands: t.G.handNo });
     for (const s of info.seats) {
@@ -182,6 +190,23 @@ io.on('connection', socket => {
   socket.on('buy', (item, cb) => {
     const a = pidAuth.get(pid); if (!a) return reply(cb, 'Sign in to collect coins');
     const err = A.buy(a.profile, String(item)); reply(cb, err, { profile: A.view(a.profile) });
+  });
+  socket.on('setPic', async (val, cb) => {
+    const a = pidAuth.get(pid); if (!a) return reply(cb, 'Sign in to choose a picture');
+    const now = Date.now(); if (socket.data.lastPic && now - socket.data.lastPic < 1500) return reply(cb, 'Slow down a little'); socket.data.lastPic = now;
+    const err = await A.setPic(a.profile, val);
+    if (!err && table) table.broadcast();
+    reply(cb, err, { profile: A.view(a.profile) });
+  });
+  // Player card: tap a seat to see that player's profile
+  socket.on('card', (realSeat, cb) => {
+    if (!table) return reply(cb, 'Not at a table');
+    const s = table.seats[Number(realSeat)]; if (!s) return reply(cb, 'No such seat');
+    if (s.bot) return reply(cb, null, { card: { name: s.name, bot: true } });
+    const a = s.pid && pidAuth.get(s.pid);
+    if (!a) return reply(cb, null, { card: { name: s.name, guest: true } });
+    const v = A.view(a.profile);
+    reply(cb, null, { card: { name: s.name, fullName: v.name, av: v.av, level: v.level, games: v.games, wins: v.wins, hands: v.hands, handWins: v.handWins, bidsMade: v.bidsMade, bidsTotal: v.bidsTotal, sweeps: v.sweeps, since: a.profile.created_at || null } });
   });
   socket.on('equip', (item, cb) => {
     const a = pidAuth.get(pid); if (!a) return reply(cb, 'Sign in first');
