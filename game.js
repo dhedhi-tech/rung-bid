@@ -320,6 +320,7 @@ class Table {
       hist: [], roundTrump: {}, main: '', deadline: 0, over: null, result: null,
     };
     this.phase = 'game'; this.running = true;
+    if (this.onGameStart) { try { this.onGameStart(); } catch (e) { console.error('stats', e); } }
     this.run();
   }
   async run() {

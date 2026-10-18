@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Game Admin</title>
+<style>
+:root{--bg:#0d1416;--card:#162125;--line:#24343a;--text:#e9f0ef;--mute:#8ea3a3;--acc:#f5a83a;--good:#4cc38a;--blue:#5aa9e6}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:980px;margin:0 auto;padding:18px 16px 40px}
+h1{font-size:22px;margin:4px 0 2px}h2{font-size:15px;color:var(--mute);font-weight:600;margin:26px 0 10px;text-transform:uppercase;letter-spacing:.06em}
+.sub{color:var(--mute);font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.tile b{display:block;font-size:26px;font-variant-numeric:tabular-nums}.tile span{color:var(--mute);font-size:13px}
+.tile.live b{color:var(--good)}
+.chart{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 12px 8px;display:flex;align-items:flex-end;gap:4px;height:170px}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
+.bar i{display:block;width:100%;max-width:26px;background:var(--acc);border-radius:4px 4px 0 0;min-height:2px}
+.bar i.n{background:var(--blue)}
+.bar small{font-size:10px;color:var(--mute);margin-top:4px;white-space:nowrap}.bar em{font-style:normal;font-size:11px;margin-bottom:2px}
+.legend{font-size:12px;color:var(--mute);margin-top:6px}.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 10px;vertical-align:-1px}
+.tw{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}th{color:var(--mute);font-weight:600;background:#121b1e}
+th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
+form{max-width:340px;margin:80px auto;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px}
+input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#0b1113;color:var(--text);font-size:16px;margin:12px 0}
+button{width:100%;padding:12px;border:0;border-radius:10px;background:var(--acc);color:#1b1205;font-weight:700;font-size:15px;cursor:pointer}
+.err{color:#ff7b7b;font-size:13px;min-height:18px}.note{background:#2a2412;border:1px solid #5a4a1c;color:#f3d38a;border-radius:10px;padding:10px 12px;font-size:13px;margin-top:12px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.top button{width:auto;padding:8px 12px;font-size:13px;background:var(--line);color:var(--text)}
+</style></head><body><main id="app"></main>
+<script>
+const app = document.getElementById('app');
+let key = ''; try { key = sessionStorage.getItem('adminKey') || ''; } catch (e) {}
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const num = v => Number(v || 0);
+const sum = (rows, f) => rows.reduce((a, r) => a + num(r[f]), 0);
+const dd = d => { const x = new Date(d + 'T00:00:00'); return x.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); };
+
+function login(msg) {
+  app.innerHTML = `<form id="f"><h1>Game admin</h1><div class="sub">Enter the admin password you set on Render.</div>
+    <input id="p" type="password" autocomplete="current-password" placeholder="Password" required><div class="err">${esc(msg || '')}</div><button>Open</button></form>`;
+  document.getElementById('f').onsubmit = e => { e.preventDefault(); key = document.getElementById('p').value; load(); };
+}
+let timer = null;
+async function load() {
+  let r, j;
+  try { r = await fetch('/admin/data', { headers: { 'x-admin-key': key } }); j = await r.json(); }
+  catch (e) { return show(null, 'Could not reach the server. Retrying…'); }
+  if (!r.ok) { try { sessionStorage.removeItem('adminKey'); } catch (e) {} clearInterval(timer); timer = null; return login(j.error); }
+  try { sessionStorage.setItem('adminKey', key); } catch (e) {}
+  show(j);
+  if (!timer) timer = setInterval(load, 30000);
+}
+let last = null;
+function show(j, warn) {
+  if (!j) { j = last; if (!j) return login(warn); } else last = j;
+  const L = j.live, D = j.daily || [], T = D.find(d => String(d.day).slice(0, 10) === j.today) || {};
+  const d7 = D.slice(0, 7), d30 = D;
+  const chartDays = D.slice(0, 14).reverse();
+  const max = Math.max(1, ...chartDays.map(d => num(d.players)));
+  const started30 = sum(d30, 'games_started');
+  const pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '–';
+  app.innerHTML = `
+  <div class="top"><div><h1>Game admin</h1><div class="sub">Updates every 30 seconds · days in Pakistan time</div></div><button id="out">Lock</button></div>
+  ${j.error ? `<div class="note">${esc(j.error)}</div>` : ''}${warn ? `<div class="note">${esc(warn)}</div>` : ''}
+  ${j.memory ? `<div class="note">Test mode: stats are not being saved (Supabase is not connected).</div>` : ''}
+  <h2>Live now</h2>
+  <div class="grid">
+    <div class="tile live"><b>${L.online}</b><span>people online</span></div>
+    <div class="tile live"><b>${L.playing}</b><span>games in progress</span></div>
+    <div class="tile live"><b>${L.people}</b><span>real players in games</span></div>
+    <div class="tile"><b>${L.waiting}</b><span>tables waiting to start</span></div>
+  </div>
+  <h2>Today</h2>
+  <div class="grid">
+    <div class="tile"><b>${num(T.players)}</b><span>players</span></div>
+    <div class="tile"><b>${num(T.new_players)}</b><span>new players</span></div>
+    <div class="tile"><b>${num(T.signups)}</b><span>Google sign-ups</span></div>
+    <div class="tile"><b>${num(T.games_started)}</b><span>games started</span></div>
+    <div class="tile"><b>${num(T.games_finished)}</b><span>games finished</span></div>
+  </div>
+  <h2>Players per day</h2>
+  <div class="chart">${chartDays.length ? chartDays.map(d => { const p = num(d.players), n = num(d.new_players); return `<div class="bar" title="${dd(d.day)}: ${p} players, ${n} new"><em>${p}</em><i class="n" style="height:${100 * n / max}%"></i><i style="height:${100 * (p - n) / max}%;border-radius:0"></i><small>${dd(d.day)}</small></div>`; }).join('') : '<div class="sub">No data yet. Play a game and refresh.</div>'}</div>
+  <div class="legend"><i style="background:var(--acc)"></i>returning players<i style="background:var(--blue)"></i>new players</div>
+  <h2>Last 7 days</h2>
+  <div class="grid">
+    <div class="tile"><b>${sum(d7, 'players')}</b><span>player-days</span></div>
+    <div class="tile"><b>${sum(d7, 'new_players')}</b><span>new players</span></div>
+    <div class="tile"><b>${sum(d7, 'signups')}</b><span>Google sign-ups</span></div>
+    <div class="tile"><b>${sum(d7, 'games_started')}</b><span>games started</span></div>
+    <div class="tile"><b>${pct(sum(d7, 'games_finished'), sum(d7, 'games_started'))}</b><span>games finished</span></div>
+  </div>
+  <h2>What people play (last 30 days)</h2>
+  <div class="grid">
+    <div class="tile"><b>${pct(sum(d30, 'joker_games'), started30)}</b><span>Joker mode</span></div>
+    <div class="tile"><b>${pct(sum(d30, 'p4'), started30)}</b><span>4 players</span></div>
+    <div class="tile"><b>${pct(sum(d30, 'p6'), started30)}</b><span>6 players</span></div>
+    <div class="tile"><b>${pct(sum(d30, 'p8'), started30)}</b><span>8 players</span></div>
+    <div class="tile"><b>${pct(sum(d30, 'bot_games'), started30)}</b><span>solo vs bots</span></div>
+  </div>
+  <h2>Day by day</h2>
+  <div class="tw"><table><tr><th>Day</th><th>Players</th><th>New</th><th>Signed in</th><th>Sign-ups</th><th>Games</th><th>Finished</th><th>Hands</th><th>Joker</th></tr>
+    ${D.map(d => `<tr><td>${dd(d.day)}</td><td>${num(d.players)}</td><td>${num(d.new_players)}</td><td>${num(d.signed_players)}</td><td>${num(d.signups)}</td><td>${num(d.games_started)}</td><td>${num(d.games_finished)}</td><td>${num(d.hands)}</td><td>${num(d.joker_games)}</td></tr>`).join('') || '<tr><td colspan="9">No data yet</td></tr>'}
+  </table></div>
+  <h2>Top players (${num(j.accounts)} accounts)</h2>
+  <div class="tw"><table><tr><th>Name</th><th>XP</th><th>Games</th><th>Wins</th><th>Coins</th><th>Joined</th></tr>
+    ${(j.top || []).map(p => `<tr><td>${esc(p.name)}</td><td>${num(p.xp)}</td><td>${num(p.games)}</td><td>${num(p.wins)}</td><td>${num(p.coins)}</td><td>${p.created_at ? dd(String(p.created_at).slice(0, 10)) : ''}</td></tr>`).join('') || '<tr><td colspan="6">No signed-in players yet</td></tr>'}
+  </table></div>`;
+  document.getElementById('out').onclick = () => { try { sessionStorage.removeItem('adminKey'); } catch (e) {} key = ''; clearInterval(timer); timer = null; login(); };
+}
+key ? load() : login();
+</script></body></html>

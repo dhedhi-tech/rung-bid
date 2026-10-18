@@ -5,6 +5,7 @@ const express = require('express');
 const { Server } = require('socket.io');
 const { Table } = require('./game');
 const A = require('./accounts');
+const S = require('./stats');
 const pidAuth = new Map(); // player id -> { profile } for signed-in players
 
 const app = express();
@@ -72,9 +73,15 @@ const cleanName = s => String(s || '').replace(/[<>{}&"'`]/g, '').trim().slice(0
 const cleanPid = s => String(s || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
 
 // XP, coins and level badges for signed-in players
+function tableInfo(t) {
+  const humans = t.seats.filter(s => !s.bot && s.pid);
+  return { code: t.code, n: t.n, joker: t.joker, lim: t.limit, humans: humans.length, signed: humans.filter(s => pidAuth.has(s.pid)).length };
+}
 function wireProgress(t) {
+  t.onGameStart = () => S.logGame({ kind: 'start', ...tableInfo(t) });
   t.levelOf = p => { const a = pidAuth.get(p); return a ? A.levelOf(a.profile.xp) : null; };
   t.onHandEnd = info => {
+    if (info.over) S.logGame({ kind: 'finish', ...tableInfo(t), hands: t.G.handNo });
     for (const s of info.seats) {
       if (!s.pid) continue;
       const a = pidAuth.get(s.pid); if (!a) continue;
@@ -90,6 +97,7 @@ io.on('connection', socket => {
   let name = cleanName(socket.handshake.auth && socket.handshake.auth.name);
   let table = null;
   if (!pid) { socket.emit('fatal', 'Missing player id'); socket.disconnect(true); return; }
+  S.playerSeen(pid, false);
 
   const reply = (cb, err, data) => { if (typeof cb === 'function') cb(err ? { error: err } : { ok: true, ...data }); };
   const leave = () => { if (table) { table.removeClient(socket.id); socket.leave(table.code); table = null; } };
@@ -138,6 +146,7 @@ io.on('connection', socket => {
   const signedIn = async (user, cb) => {
     const profile = await A.load(user);
     pidAuth.set(pid, { profile });
+    S.playerSeen(pid, true);
     const daily = A.claimDaily(profile);
     if (table) table.broadcast();
     reply(cb, null, { profile: A.view(profile), daily });
@@ -205,6 +214,36 @@ io.on('connection', socket => {
   });
 
   socket.on('disconnect', leave);
+});
+
+// ---- private admin page: set ADMIN_PASS on Render, then open /admin ----
+const adminHtml = fs.readFileSync(path.join(__dirname, 'admin', 'admin.html'), 'utf8');
+const adminFails = new Map(); // ip -> { n, at }
+function adminOk(req) {
+  const pass = process.env.ADMIN_PASS || '';
+  const ip = req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : req.ip;
+  const f = adminFails.get(ip);
+  if (f && f.n >= 8 && Date.now() - f.at < 15 * 60 * 1000) return 'locked';
+  const given = String(req.headers['x-admin-key'] || '');
+  const crypto = require('crypto');
+  const ok = pass.length >= 6 && given.length === pass.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(pass));
+  if (!ok) { adminFails.set(ip, { n: (f && Date.now() - f.at < 15 * 60 * 1000 ? f.n : 0) + 1, at: Date.now() }); if (adminFails.size > 1000) adminFails.clear(); return 'bad'; }
+  adminFails.delete(ip); return 'ok';
+}
+app.get('/admin', (_req, res) => { res.set('Cache-Control', 'no-store'); res.set('X-Robots-Tag', 'noindex'); res.type('html').send(adminHtml); });
+app.get('/admin/data', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  if (!process.env.ADMIN_PASS) return res.status(503).json({ error: 'Admin page is not set up yet. Add ADMIN_PASS on Render.' });
+  const ok = adminOk(req);
+  if (ok === 'locked') return res.status(429).json({ error: 'Too many wrong tries. Wait 15 minutes.' });
+  if (ok !== 'ok') return res.status(401).json({ error: 'Wrong password' });
+  const live = { online: io.engine.clientsCount, tables: tables.size, playing: 0, waiting: 0, people: 0, modes: { 4: 0, 6: 0, 8: 0, joker: 0 } };
+  for (const t of tables.values()) {
+    const humans = t.seats.filter(s => !s.bot && s.pid).length;
+    if (t.phase === 'game') { live.playing++; live.people += humans; live.modes[t.n]++; if (t.joker) live.modes.joker++; } else if (t.phase === 'lobby') live.waiting++;
+  }
+  try { res.json({ live, ...(await S.report()), today: S.dayOf() }); }
+  catch (e) { console.error('admin report', e.message); res.json({ live, daily: [], top: [], accounts: 0, today: S.dayOf(), error: 'Saved stats could not load. Did you run supabase-stats.sql in Supabase?' }); }
 });
 
 // Close tables nobody has used for a while
