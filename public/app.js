@@ -56,12 +56,35 @@ const SFX = {
   trickThem() { tone(392, 0, .12, { vol: .11 }); tone(330, .09, .2, { vol: .11 }); },
   turn() { tone(988, 0, .08, { vol: .07 }); },
   joker() {
-    noise(0, .09, { vol: 1.1, freq: 2600, q: .45 });                 // slap
-    noise(0, .05, { vol: .6, freq: 5000, type: 'highpass' });          // crack
-    tone(160, 0, .5, { type: 'sine', vol: .55, slide: .22 });          // body thump
-    noise(.04, 1.1, { vol: .9, freq: 420, q: .7, type: 'lowpass' });   // blast rumble
-    tone(62, .04, 1.0, { type: 'triangle', vol: .4, slide: .5 });      // sub boom
-    tone(240, .08, .6, { type: 'sawtooth', vol: .07, slide: .45 });    // dark sting
+    // Missile: a falling whistle and rising whoosh, then a loud blast with a long rumble
+    const c = ac(); if (!c) return;
+    const t = c.currentTime, out = c.createDynamicsCompressor(), boost = c.createGain();
+    out.threshold.value = -18; out.ratio.value = 6; out.attack.value = .002; out.release.value = .3; boost.gain.value = .9;
+    out.connect(boost).connect(c.destination);
+    const osc = (type, f0, f1, t0, dur, vol) => {
+      const o = c.createOscillator(), g = c.createGain(); o.type = type;
+      o.frequency.setValueAtTime(f0, t + t0); o.frequency.exponentialRampToValueAtTime(f1, t + t0 + dur);
+      g.gain.setValueAtTime(.0001, t + t0); g.gain.exponentialRampToValueAtTime(vol, t + t0 + Math.min(.08, dur / 3)); g.gain.exponentialRampToValueAtTime(.0001, t + t0 + dur);
+      o.connect(g).connect(out); o.start(t + t0); o.stop(t + t0 + dur + .05);
+    };
+    const nz = (t0, dur, vol, type, f0, f1, attack = .01) => {
+      const len = Math.ceil(c.sampleRate * dur), buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(); src.buffer = buf; f.type = type; f.Q.value = .7;
+      f.frequency.setValueAtTime(f0, t + t0); f.frequency.exponentialRampToValueAtTime(f1, t + t0 + dur);
+      g.gain.setValueAtTime(.0001, t + t0); g.gain.exponentialRampToValueAtTime(vol, t + t0 + attack); g.gain.exponentialRampToValueAtTime(.0001, t + t0 + dur);
+      src.connect(f).connect(g).connect(out); src.start(t + t0);
+    };
+    const hit = .75;
+    osc('sine', 2200, 520, 0, hit, .22);                 // incoming whistle
+    osc('triangle', 2210, 525, 0, hit, .08);             // slight wobble in the whistle
+    nz(0, hit, .35, 'bandpass', 600, 3000, hit * .9);    // rising whoosh
+    nz(hit, .12, 1.2, 'bandpass', 2400, 1200, .003);     // slap
+    nz(hit, .06, .7, 'highpass', 5000, 3000, .002);      // crack
+    osc('sine', 150, 32, hit, .9, .9);                   // boom
+    osc('triangle', 70, 28, hit + .02, 1.6, .6);         // sub rumble
+    nz(hit + .02, 2.0, 1, 'lowpass', 1400, 120, .02);    // blast rumble that fades out
+    nz(hit + .3, 1.4, .25, 'bandpass', 900, 300, .05);   // debris
   },
   win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * .11, .35, { type: 'triangle', vol: .16 })); },
   lose() { [392, 349, 311, 262].forEach((f, i) => tone(f, i * .14, .35, { type: 'triangle', vol: .12 })); },
