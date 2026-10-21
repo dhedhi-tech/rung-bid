@@ -91,7 +91,8 @@ const SFX = {
   pop() { tone(660, 0, .08, { vol: .08 }); },
   fanfare() { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, i * .12, i === 6 ? .7 : .22, { type: 'triangle', vol: .16 })); [262, 392, 523].forEach(f => tone(f, .84, .9, { type: 'sine', vol: .07 })); },
 };
-function sfx(name, ...a) { try { SFX[name](...a); } catch (e) {} }
+// No game sounds from a tab or app that isn't on screen (e.g. an old table left open in WhatsApp's browser)
+function sfx(name, ...a) { if (document.hidden) return; try { SFX[name](...a); } catch (e) {} }
 
 const sockReady = []; // socket listeners registered once the connection object exists
 /* ---------- state ---------- */
@@ -817,7 +818,7 @@ function showJoker(seat, second) {
   setTimeout(() => fx.remove(), 1500);
 }
 function onFx(f) {
-  if (!S) return;
+  if (!S || !tableCode || (S.code && S.code !== tableCode)) return;
   switch (f.type) {
     case 'deal': sfx('deal'); break;
     case 'watch': toast(f.text); sfx('pop'); break;
