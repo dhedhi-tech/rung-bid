@@ -35,7 +35,7 @@ app.get('/pic/:id', async (req, res) => {
   const d = await A.picData(String(req.params.id));
   if (!d) return res.status(404).end();
   const m = /^data:(image\/jpeg);base64,(.+)$/.exec(d); if (!m) return res.status(404).end();
-  res.set('Cache-Control', 'public, max-age=604800, immutable'); res.type(m[1]).send(Buffer.from(m[2], 'base64'));
+  res.set('Cache-Control', req.query.v ? 'public, max-age=604800, immutable' : 'public, max-age=3600'); res.type(m[1]).send(Buffer.from(m[2], 'base64'));
 });
 app.get('/config', (_req, res) => { res.set('Cache-Control', 'no-cache'); res.json(A.config()); });
 app.get('/health', (_req, res) => res.json({ ok: true, tables: tables.size }));
@@ -207,6 +207,12 @@ io.on('connection', socket => {
     const err = await A.setPic(a.profile, val);
     if (!err && table) table.broadcast();
     reply(cb, err, { profile: A.view(a.profile) });
+  });
+  socket.on('leaderboard', async (sort, cb) => {
+    const now = Date.now(); if (socket.data.lastLb && now - socket.data.lastLb < 800) return reply(cb, 'Slow down a little'); socket.data.lastLb = now;
+    if (!A.enabled && !A.DEV) return reply(cb, null, { list: [], mine: null, off: true });
+    try { const a = pidAuth.get(pid); reply(cb, null, await A.leaderboard(String(sort), a ? a.profile : null)); }
+    catch (e) { console.error('leaderboard', e.message); reply(cb, 'Leaderboard is not available right now'); }
   });
   // Player card: tap a seat to see that player's profile
   socket.on('card', (realSeat, cb) => {

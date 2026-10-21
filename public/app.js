@@ -370,6 +370,7 @@ function welcomeScreen(err) {
       <button class="primary" id="wPlay">Play with friends</button>
       <button class="secondary" id="wPractice">Practice with bots</button>
       <div class="wrow"><button class="secondary" id="wJoin">Join with a code</button><button class="secondary" id="wTut">${firstTime ? 'Tutorial' : 'How to play'}</button></div>
+      <button class="secondary" id="wLb">🏆 Leaderboard</button>
       <div id="wRooms" class="wrooms"></div>
       <div class="err" id="wErr">${err ? esc(err) : ''}</div>
       <div class="wlegal"><a href="/privacy">Privacy Policy</a><span>·</span><a href="/terms">Terms of Use</a></div>
@@ -379,6 +380,7 @@ function welcomeScreen(err) {
   $('wPractice').onclick = () => createSheet(true);
   $('wJoin').onclick = joinSheet;
   $('wTut').onclick = () => openTutorial('home');
+  $('wLb').onclick = () => lbSheet('xp');
   renderChip();
   loadRooms();
 }
@@ -601,6 +603,25 @@ function shrinkPhoto(file) {
     img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('bad image')); };
     img.src = url;
   });
+}
+// Leaderboard: top signed-in players by level or by wins
+async function lbSheet(sort) {
+  const tabs = `<div class="seg text lb-tabs" id="lbTabs"><button data-s="xp" class="${sort === 'xp' ? 'on' : ''}">Top level</button><button data-s="wins" class="${sort === 'wins' ? 'on' : ''}">Most wins</button></div>`;
+  openModal('lb', `<div class="eyebrow">Leaderboard</div><h2>Top players</h2>${tabs}<div class="lb-list" id="lbList"><div class="sub-muted">Loading…</div></div><button class="primary" id="lbClose">Close</button>`);
+  $('lbClose').onclick = closeModal;
+  $('lbTabs').onclick = e => { const b = e.target.closest('button[data-s]'); if (b && b.dataset.s !== sort) lbSheet(b.dataset.s); };
+  const r = await send('leaderboard', sort);
+  if (modalKind !== 'lb' || !$('lbList')) return;
+  if (!r || !r.ok) { $('lbList').innerHTML = `<div class="sub-muted">Could not load the leaderboard. Try again in a minute.</div>`; return; }
+  const row = p => `<div class="lb-row ${p.me ? 'me' : ''}"><span class="lb-rank">${p.rank <= 3 ? ['🥇', '🥈', '🥉'][p.rank - 1] : p.rank}</span>${avatarHTML({ name: p.name, av: p.av || null })}
+    <span class="lb-name"><b>${esc(p.name)}${p.me ? ' (you)' : ''}</b><small>Level ${p.level} · ${p.games} game${p.games === 1 ? '' : 's'}</small></span>
+    <span class="lb-val">${sort === 'wins' ? `<b>${p.wins}</b><small>wins</small>` : `<b>${p.xp}</b><small>XP</small>`}</span></div>`;
+  let html = r.list.length ? r.list.map(row).join('') : '<div class="sub-muted">No players yet. Sign in and play a game to be the first.</div>';
+  if (r.mine) html += `<div class="lb-gap">Your rank</div>` + row(r.mine);
+  else if (PROFILE && !r.list.some(p => p.me)) html += `<div class="lb-gap">Your rank</div><div class="sub-muted">Finish a game to get on the leaderboard.</div>`;
+  if (!PROFILE && AUTH.auth) html += `<div class="lb-gap"></div><button class="gbtn inv-g" id="lbSign">Sign in with Google to join the leaderboard</button>`;
+  $('lbList').innerHTML = html;
+  if ($('lbSign')) $('lbSign').onclick = signIn;
 }
 // Player card: tap any seat at the table
 async function playerCard(realSeat) {

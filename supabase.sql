@@ -22,3 +22,9 @@ alter table public.profiles enable row level security;
 
 -- Profile picture (added later). Safe to run more than once.
 alter table public.profiles add column if not exists pic text;
+
+-- Leaderboard (added later). Light view without uploaded photo data. Safe to run more than once.
+create or replace view public.leaderboard with (security_invoker = true) as
+  select id, name, avatar, case when pic like 'data:%' then 'u' else pic end as pic, xp, games, wins
+  from public.profiles;
+revoke all on public.leaderboard from anon, authenticated;

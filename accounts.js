@@ -110,6 +110,40 @@ async function picData(id) {
   return pic && String(pic).startsWith('data:image/') ? pic : null;
 }
 
+// Leaderboard of signed-in players (top 50), refreshed at most once a minute
+const lbCache = {};
+async function leaderboard(sort, me) {
+  sort = sort === 'wins' ? 'wins' : 'xp';
+  const order = sort === 'wins' ? 'wins.desc,games.asc,xp.desc' : 'xp.desc,wins.desc';
+  let rows;
+  const c = lbCache[sort];
+  if (c && Date.now() - c.at < 60 * 1000) rows = c.rows;
+  else {
+    if (enabled) {
+      try { rows = await sb(`/rest/v1/leaderboard?select=id,name,avatar,pic,xp,games,wins&games=gt.0&order=${order}&limit=50`); }
+      catch (e) { rows = await sb(`/rest/v1/profiles?select=id,name,avatar,xp,games,wins&games=gt.0&order=${order}&limit=50`); } // view not created yet
+    } else {
+      rows = [...cache.values()].filter(p => p.games > 0).map(p => ({ ...p, pic: String(p.pic || '').startsWith('data:') ? 'u' : p.pic }))
+        .sort((a, b) => sort === 'wins' ? (b.wins - a.wins) || (a.games - b.games) || (b.xp - a.xp) : (b.xp - a.xp) || (b.wins - a.wins)).slice(0, 50);
+    }
+    lbCache[sort] = { rows, at: Date.now() };
+  }
+  const shape = (r, rank) => ({ rank, name: r.name, level: levelOf(r.xp || 0), xp: r.xp || 0, wins: r.wins || 0, games: r.games || 0, me: !!(me && r.id === me.id),
+    av: r.pic === 'u' ? { u: `/pic/${r.id}` } : avOf({ ...r, pic: r.pic || '' }) });
+  const list = rows.map((r, i) => shape(r, i + 1));
+  let mine = null;
+  if (me && me.games > 0 && !list.some(r => r.me)) {
+    let ahead = 0;
+    const v = sort === 'wins' ? me.wins : me.xp;
+    if (enabled) {
+      try { const r = await fetch(SB_URL + `/rest/v1/profiles?select=id&${sort}=gt.${Number(v) || 0}&limit=1`, { headers: { apikey: SERVICE, ...(SERVICE.startsWith('sb_') ? {} : { Authorization: 'Bearer ' + SERVICE }), Prefer: 'count=exact' } });
+        ahead = Number((r.headers.get('content-range') || '/0').split('/')[1]) || 0; } catch (e) { ahead = 0; }
+    } else ahead = [...cache.values()].filter(p => (sort === 'wins' ? p.wins : p.xp) > v).length;
+    mine = shape({ ...me, pic: String(me.pic || '').startsWith('data:') ? 'u' : me.pic }, ahead + 1);
+  }
+  return { sort, list, mine };
+}
+
 function today() { return new Date().toISOString().slice(0, 10); }
 function claimDaily(p) {
   if (p.last_daily === today()) return 0;
@@ -168,5 +202,5 @@ function handGains(info, seatIdx) {
 
 module.exports = {
   enabled, DEV, config: () => ({ auth: enabled || DEV, supabaseUrl: enabled ? SB_URL : '', anonKey: enabled ? ANON : '', dev: DEV && !enabled }),
-  verify, load, view, avOf, setPic, picData, AVATARS, award, claimDaily, buy, equip, handGains, levelOf, STORE, XP, COINS,
+  verify, load, view, avOf, leaderboard, setPic, picData, AVATARS, award, claimDaily, buy, equip, handGains, levelOf, STORE, XP, COINS,
 };
