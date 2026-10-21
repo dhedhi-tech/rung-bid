@@ -69,7 +69,7 @@ class Table {
   }
 
   // ---------- membership ----------
-  addClient(socket, pid, name) {
+  addClient(socket, pid, name, opts = {}) {
     const wasHere = [...this.clients.values()].some(x => x.pid === pid);
     this.clients.set(socket.id, { socket, pid });
     let p = this.players.get(pid);
@@ -78,7 +78,7 @@ class Table {
     socket.join(this.code);
     this.touch();
     this.checkResume();
-    if (p.seat == null && this.phase === 'lobby') {
+    if (p.seat == null && this.phase === 'lobby' && !opts.noAutoSeat) {
       // Joining before the game starts: take the first empty seat (they can still move)
       const free = this.seats.findIndex(s => s.bot);
       if (free >= 0) { this.sit(pid, free); return; }
@@ -126,6 +126,25 @@ class Table {
     this.checkResume();
     if (tookFrom) this.fx('watch', { text: `${p.name} took over ${tookFrom}'s seat`, except: pid });
     this.touch(); this.broadcast();
+    return null;
+  }
+  // Same person on a second phone or app (e.g. WhatsApp's browser): the seat they could take over
+  sameNameSeat(pid) {
+    const p = this.players.get(pid); if (!p || p.seat != null) return -1;
+    const nm = String(p.name || '').trim().toLowerCase(); if (!nm) return -1;
+    return this.seats.findIndex(s => {
+      if (s.bot || !s.pid || s.pid === pid || String(s.name).trim().toLowerCase() !== nm) return false;
+      const other = this.players.get(s.pid);
+      return this.phase === 'lobby' || !(other && other.connected); // never take a seat from someone playing right now
+    });
+  }
+  takeOver(pid, seat) {
+    const p = this.players.get(pid), s = this.seats[seat]; if (!p || !s || s.bot) return 'No such seat';
+    if (p.seat != null) this.freeSeat(p.seat);
+    const old = this.players.get(s.pid); if (old) old.seat = null;
+    if (this.hostId === s.pid) this.hostId = pid;
+    s.pid = pid; s.name = p.name; p.seat = seat;
+    this.checkResume(); this.touch(); this.broadcast();
     return null;
   }
   freeSeat(seat) {
@@ -206,6 +225,7 @@ class Table {
           voice: vc ? { sid: vc[0], muted: vc[1].muted } : null, lvl: !s.bot && s.pid && this.levelOf ? this.levelOf(s.pid) : null, av: !s.bot && s.pid && this.avOf ? this.avOf(s.pid) : null };
       }),
       lobbyNames: [...this.players.values()].filter(x => x.connected && x.seat == null).map(x => x.name),
+      dup: me < 0 ? (k => (k < 0 ? null : { real: k, name: this.seats[k].name }))(this.sameNameSeat(pid)) : null,
     };
     const G = this.G;
     if (!G) return v;

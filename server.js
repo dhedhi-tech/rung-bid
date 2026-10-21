@@ -127,7 +127,14 @@ io.on('connection', socket => {
     if (typeof cb !== 'function' && typeof opts === 'function') [cb, opts] = [opts, cb];
     const t = tables.get(String(code || '').toUpperCase());
     if (!t) return reply(cb, 'This table has closed. Ask your friend for a new link, or create your own table.');
-    leave(); table = t; t.addClient(socket, pid, name);
+    leave(); table = t;
+    // Already seated here from another phone or app? Same Google account: move the seat here. Same name: ask first.
+    const acct = pidAuth.get(pid);
+    const sameAcct = acct ? t.seats.findIndex(s => !s.bot && s.pid && s.pid !== pid && pidAuth.has(s.pid) && pidAuth.get(s.pid).profile.id === acct.profile.id) : -1;
+    const lname = String(name).trim().toLowerCase();
+    const sameName = t.seats.some(s => !s.bot && s.pid && s.pid !== pid && String(s.name).trim().toLowerCase() === lname) && !(t.players.get(pid) && t.players.get(pid).seat != null);
+    t.addClient(socket, pid, name, { noAutoSeat: sameAcct >= 0 || sameName });
+    if (sameAcct >= 0) t.takeOver(pid, sameAcct);
     // From Open tables during a game: take a free bot seat straight away
     if (opts && opts.seat === 'auto' && t.phase === 'game') {
       const p = t.players.get(pid);
@@ -163,6 +170,11 @@ io.on('connection', socket => {
     name = cleanName(nm);
     if (table) { const p = table.players.get(pid); if (p) { p.name = name; if (p.seat != null && !table.seats[p.seat].bot) table.seats[p.seat].name = name; } table.broadcast(); }
     reply(cb);
+  });
+  socket.on('claim', cb => {
+    if (!table) return reply(cb, 'Not at a table');
+    const k = table.sameNameSeat(pid); if (k < 0) return reply(cb, 'That seat is not free to take over');
+    reply(cb, table.takeOver(pid, k));
   });
   socket.on('sit', (realSeat, cb) => { if (!table) return reply(cb, 'Not at a table'); reply(cb, table.sit(pid, realSeat)); });
   socket.on('stand', cb => { if (table) table.stand(pid); reply(cb); });

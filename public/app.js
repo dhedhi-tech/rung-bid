@@ -207,6 +207,7 @@ function renderHand() {
     el.innerHTML = ''; el.style.height = 'auto';
     if (S.phase === 'game' || S.phase === 'over') {
       const open = S.seats.map((p, i) => ({ p, i })).filter(x => x.p.bot);
+      if (S.dup) { el.innerHTML = `<div class="watchbar"><b>${esc(S.dup.name)}</b> is away. Is that you? <button id="dupClaim">Yes, play here</button></div>`; $('dupClaim').onclick = () => send('claim'); return; }
       el.innerHTML = `<div class="watchbar">You're watching.${open.length ? ' Take a bot seat:' : ''} ${open.map(x => `<button data-take="${x.p.real}"><span class="pn ${tcls(x.i)}">${esc(x.p.name)}</span></button>`).join('')}</div>`;
     }
     return;
@@ -686,6 +687,7 @@ const looksSignedIn = () => { try { if (new URLSearchParams(location.search).has
 const guestRecently = () => Date.now() - Number(store.get('rb-guest') || 0) < 3 * 24 * 3600 * 1000;
 let invitePending = false;
 function shareLink() { return location.origin + '/?t=' + S.code; }
+let dupNo = '';
 function lobbyScreen() {
   const mySeat = S.seats.find((p, i) => i === 0 && me0());
   const ordered = S.seats.map((p, i) => ({ p, i })).sort((a, b) => a.p.real - b.p.real);
@@ -704,7 +706,9 @@ function lobbyScreen() {
       <span class="act">${act}</span></button>`;
   }).join('');
   const watchers = S.lobbyNames.length ? `<p class="hint">Not seated yet: ${S.lobbyNames.map(esc).join(', ')}</p>` : '';
-  openModal('lobby', `<div class="eyebrow">Table code</div>
+  const dupAsk = S.dup && dupNo !== S.code + S.dup.real ? `<div class="dup-ask"><b>${esc(S.dup.name)} is already sitting here.</b><span>Is that you on another phone or app?</span>
+      <div class="btns"><button class="primary" id="dupYes">Yes, play here</button><button class="secondary" id="dupNo">No, I'm someone else</button></div></div>` : '';
+  openModal('lobby', `${dupAsk}<div class="eyebrow">Table code</div>
     <div class="codebig">${esc(S.code)}</div>
     <p class="hint" style="margin-top:6px">${S.n} players · ${S.joker ? 'Joker mode' : 'Classic'} · ${S.limit ? S.limit + ' hands' : 'no hand limit'} · teams sit alternately</p>
     ${S.isHost ? `<div class="field"><span>Game length</span><div class="seg" id="lobbyL">
@@ -725,6 +729,7 @@ function lobbyScreen() {
   };
   if ($('startBtn')) $('startBtn').onclick = () => { ac(); send('start'); };
   $('leaveLobby').onclick = leaveTable;
+  if ($('dupYes')) { $('dupYes').onclick = () => send('claim'); $('dupNo').onclick = () => { dupNo = S.code + S.dup.real; lobbyScreen(); }; }
 }
 function selectLink() { const r = document.createRange(); r.selectNodeContents($('linkTxt')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
 function resultScreen() {
