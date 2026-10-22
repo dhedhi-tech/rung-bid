@@ -1,4 +1,4 @@
-// Rung Bid game engine. The server is the referee: it holds every hand, checks every move,
+// Patta Party game engine. The server is the referee: it holds every hand, checks every move,
 // runs bots for empty or idle seats, and sends each player only what they are allowed to see.
 
 const SUITS = ['S', 'H', 'C', 'D'];

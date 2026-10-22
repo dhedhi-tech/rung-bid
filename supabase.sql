@@ -1,4 +1,4 @@
--- Rung Bid player profiles. Paste into Supabase: SQL Editor -> New query -> Run.
+-- Patta Party player profiles. Paste into Supabase: SQL Editor -> New query -> Run.
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   name text,

@@ -1,4 +1,4 @@
-/* Rung Bid online client. The server runs the game; this page draws it and sends your moves. */
+/* Patta Party online client. The server runs the game; this page draws it and sends your moves. */
 const SUITS = ['S', 'H', 'C', 'D'];
 const SYM = { S: '♠', H: '♥', D: '♦', C: '♣' };
 const SNAME = { S: 'Spades', H: 'Hearts', D: 'Diamonds', C: 'Clubs' };
@@ -363,11 +363,11 @@ function welcomeScreen(err) {
   w.innerHTML = `<div class="wtop"><div id="wChip"></div></div>
     <div class="whero">
       <div class="wfan">${fan}</div>
-      <h1 class="wlogo">Rung<em>·</em>Bid</h1>
+      <h1 class="wlogo">Patta<em>·</em>Party</h1>
       <p class="wtag">The team bidding card game for 4, 6 or 8 players</p>
     </div>
     <div class="wmenu">
-      ${firstTime ? '<div class="tut-banner"><b>New to Rung Bid?</b><span>Learn the rules in 2 minutes with a hands-on tutorial.</span></div>' : ''}
+      ${firstTime ? '<div class="tut-banner"><b>New to Patta Party?</b><span>Learn the rules in 2 minutes with a hands-on tutorial.</span></div>' : ''}
       <button class="primary" id="wPlay">Play with friends</button>
       <button class="secondary" id="wPractice">Practice with bots</button>
       <div class="wrow"><button class="secondary" id="wJoin">Join with a code</button><button class="secondary" id="wTut">${firstTime ? 'Tutorial' : 'How to play'}</button></div>
@@ -661,12 +661,12 @@ sockReady.push(() => {
 function nameScreen() {
   openModal('name', `<div class="eyebrow">You're invited</div>
     <h2>Join table ${esc(tableCode)}</h2>
-    <p>Rung Bid is a team bidding card game. Type your name, then pick a seat.</p>
+    <p>Patta Party is a team bidding card game. Type your name, then pick a seat.</p>
     <div id="invAuth"></div>
     <div class="field"><span>Your name</span><input type="text" id="nameIn" maxlength="14" autocomplete="nickname" placeholder="e.g. Atif" value="${esc(myName)}"></div>
     <button class="primary" id="goBtn">${AUTH.auth ? 'Play as guest' : 'Join table'}</button>
     <div class="err" id="homeErr"></div>
-    <button class="linkbtn" id="tutLink">New to Rung Bid? Take the 2 minute tutorial</button>`);
+    <button class="linkbtn" id="tutLink">New to Patta Party? Take the 2 minute tutorial</button>`);
   $('tutLink').onclick = () => openTutorial('invite');
   renderInvAuth();
   const go = () => { const v = $('nameIn').value.trim(); if (!v) { $('homeErr').textContent = 'Type your name first.'; return; } setName(v); store.set('rb-guest', String(Date.now())); invitePending = false; closeModal(); joinTable(); };
@@ -692,7 +692,7 @@ function lobbyScreen() {
   const mySeat = S.seats.find((p, i) => i === 0 && me0());
   const ordered = S.seats.map((p, i) => ({ p, i })).sort((a, b) => a.p.real - b.p.real);
   const link = shareLink();
-  const wa = 'https://wa.me/?text=' + encodeURIComponent(`Join my Rung Bid table (${S.n} players${S.joker ? ', Joker mode' : ''}): ${link}`);
+  const wa = 'https://wa.me/?text=' + encodeURIComponent(`Join my Patta Party table (${S.n} players${S.joker ? ', Joker mode' : ''}): ${link}`);
   const seats = ordered.map(({ p, i }) => {
     const mine = i === 0 && me0();
     const team = S.spectator ? (i % 2 === 0 ? 'Orange team' : 'Blue team') : (i % 2 === 0 ? 'Your team' : 'Opponents');
@@ -1235,7 +1235,7 @@ function boot() {
   S = { n: 4, code: '', phase: 'demo', spectator: false, seats: [{ name: 'You', bot: false, connected: true, real: 0 }, { name: 'Sana', bot: true, real: 1 }, { name: 'Bilal', bot: true, real: 2 }, { name: 'Hira', bot: true, real: 3 }], score: 0, won: [0, 0], hand: [], counts: [5, 5, 5, 5], tricks: [0, 0, 0, 0], log: [], main: '', trick: [] };
   renderHeader(); renderSeats(); renderHand();
   $('stMain').textContent = 'Create a table or join one to play'; $('stLog').textContent = '';
-  $('contract').innerHTML = '<div class="c1">Rung Bid</div><div class="c2">4, 6 or 8 players</div>';
+  $('contract').innerHTML = '<div class="c1">Patta Party</div><div class="c2">4, 6 or 8 players</div>';
   S = null;
 }
 boot();

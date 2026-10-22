@@ -1,4 +1,4 @@
-# Rung Bid
+# Patta Party
 
 Online team bidding card game for 4, 6 or 8 players. Create a table, share the link, friends join from any phone with no sign-in. Bots fill empty seats.
 

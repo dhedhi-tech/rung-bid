@@ -1,4 +1,4 @@
-/* Rung Bid tutorial: a short hands-on walkthrough for new players. Runs fully on the phone, no server needed. */
+/* Patta Party tutorial: a short hands-on walkthrough for new players. Runs fully on the phone, no server needed. */
 (function () {
   const C = (r, s) => ({ id: 'x' + r + s + Math.random(), r, s });
   const card = (c, extra = '') => (c.s === 'J'

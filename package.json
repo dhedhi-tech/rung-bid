@@ -1,7 +1,7 @@
 {
   "name": "rung-bid",
   "version": "1.0.0",
-  "description": "Rung Bid: online team bidding card game for 4, 6 or 8 players",
+  "description": "Patta Party: online team bidding card game for 4, 6 or 8 players",
   "main": "server.js",
   "scripts": { "start": "node server.js" },
   "engines": { "node": ">=18" },
