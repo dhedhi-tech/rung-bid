@@ -368,7 +368,8 @@ class Table {
     const jt = G.trick.find(t => isJ(t.card)), team = 1 - w.seat % 2;
     const key = c => (c.s === G.trump ? 2 : c.s === G.leadSuit ? 1 : 0) * 100 + c.r;
     let best = null; for (const t of G.trick) { if (t.seat % 2 !== team || isJ(t.card)) continue; if (!best || key(t.card) >= key(best.card)) best = t; }
-    return { team, lead: jt.seat, show: jt, credit: (best || jt).seat, flipped: true };
+    // The joker thrower gets the trick (unless the joker flipped it away from their own team)
+    return { team, lead: jt.seat, show: jt, credit: jt.seat % 2 === team ? jt.seat : (best || jt).seat, flipped: true };
   }
   legalCards(hand) {
     const G = this.G;

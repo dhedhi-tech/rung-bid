@@ -186,7 +186,7 @@ function renderSeats() {
       if (S.gphase === 'play' || S.gphase === 'done') chips += `<span class="chip tricks">${S.tricks[i]} won</span>`;
     }
     const cnt = S.counts ? S.counts[i] : 0;
-    const backs = (i === 0 && me0()) || S.phase === 'lobby' ? '' : `<span class="backs"><span class="mini-back"></span>${cnt}</span>`;
+    const backs = ''; // card counts removed: not needed
     const tag = (p.bot ? '<span class="tag-bot">BOT</span>' : (!p.connected ? '<span class="tag-bot">AWAY</span>' : ''))
       + (p.lvl ? `<span class="lvl-badge" title="Level ${p.lvl}">${p.lvl}</span>` : '')
       + (p.voice ? `<span class="vmic" title="${p.voice.muted ? 'Mic off' : 'In voice chat'}">${p.voice.muted ? '🔇' : '🎙'}</span>` : '');
