@@ -76,6 +76,9 @@ app.get('/voice-check', async (_req, res) => {
   res.json({ relay: list.some(sv => [].concat(sv.urls).some(u => /^turns?:/.test(u))) });
 });
 const MAX_VOICE = 8;
+// Sticker ids come from public/stickers/stickers.json (add a sticker there and its SVG file in the same folder)
+const STICKERS = new Set();
+try { for (const pk of JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'stickers', 'stickers.json'), 'utf8')).packs) for (const st of pk.stickers) STICKERS.add(st.id); } catch (e) { console.error('stickers', e.message); }
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function newCode() {
   let c;
@@ -309,6 +312,13 @@ io.on('connection', socket => {
     reply(cb, table.chat(pid, text));
   });
   socket.on('chatHistory', cb => { reply(cb, null, { list: table ? table.chatHistory(pid) : [] }); });
+  socket.on('sticker', (id, cb) => {
+    if (!table || !STICKERS.has(String(id))) return reply(cb);
+    const now = Date.now(); if (socket.data.lastReact && now - socket.data.lastReact < 1500) return reply(cb, 'Slow down a little');
+    socket.data.lastReact = now;
+    const p = table.players.get(pid); if (p && p.seat != null) table.fx('sticker', { seat: p.seat, id: String(id) });
+    reply(cb);
+  });
   socket.on('react', (emo, cb) => {
     const allowed = ['👏', '😂', '😮', '🔥', '😢', '🙏'];
     if (!table || !allowed.includes(emo)) return reply(cb);

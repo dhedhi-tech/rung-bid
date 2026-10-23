@@ -949,6 +949,12 @@ function onFx(f) {
       }
       break;
     }
+    case 'sticker': {
+      const pos = seatPos(f.seat); const d = document.createElement('div');
+      d.className = 'sticker-pop'; d.style.left = Math.min(80, Math.max(20, pos.x)) + '%'; d.style.top = Math.min(80, Math.max(14, pos.y)) + '%';
+      d.innerHTML = `<img src="/stickers/${encodeURIComponent(f.id)}.svg" alt="">`;
+      $('table').appendChild(d); setTimeout(() => d.remove(), 2600); sfx('pop'); break;
+    }
     case 'react': {
       const pos = seatPos(f.seat); const d = document.createElement('div');
       d.className = 'react-pop'; d.textContent = f.emo; d.style.left = pos.x + '%'; d.style.top = pos.y + '%';
@@ -956,6 +962,19 @@ function onFx(f) {
     }
   }
 }
+
+/* ---------- stickers ---------- */
+let STICKERS = [];
+fetch('/stickers/stickers.json').then(r => r.json()).then(j => { STICKERS = j.packs.flatMap(p => p.stickers); STICKERS.forEach(st => { const i = new Image(); i.src = `/stickers/${st.id}.svg`; }); }).catch(() => {});
+function stickerTray() {
+  let t = $('stkTray');
+  if (t && !t.hidden) { t.hidden = true; return; }
+  if (!t) { t = document.createElement('div'); t.id = 'stkTray'; t.className = 'stk-tray'; document.body.appendChild(t); }
+  t.innerHTML = STICKERS.map(st => `<button data-stk="${esc(st.id)}" aria-label="${esc(st.line)}"><img src="/stickers/${esc(st.id)}.svg" alt=""></button>`).join('') || '<div class="sub-muted">Stickers are loading…</div>';
+  t.hidden = false;
+  t.onclick = e => { const b = e.target.closest('button[data-stk]'); if (!b) return; t.hidden = true; send('sticker', b.dataset.stk); };
+}
+document.addEventListener('pointerdown', e => { const t = $('stkTray'); if (t && !t.hidden && !e.target.closest('#stkTray,#stkBtn')) t.hidden = true; });
 
 /* ---------- input ---------- */
 $('hand').addEventListener('click', e => {
@@ -998,7 +1017,7 @@ function openInBrowserHelp(feature) {
     try { navigator.clipboard.writeText(url).then(ok, () => { const r = document.createRange(); r.selectNodeContents($('inappLink')); getSelection().removeAllRanges(); getSelection().addRange(r); }); } catch (e) {}
   };
 }
-$('reacts').innerHTML = '<span class="voicectl" id="voiceCtl"></span><button class="vbtn chatbtn" id="chatBtn" aria-label="Open chat">💬<span class="lbl"> Chat</span><span class="cbadge" id="chatBadge" hidden></span></button>' + ['👏', '😂', '😮', '🔥', '😢', '🙏'].map(e => `<button data-r="${e}" aria-label="React ${e}">${e}</button>`).join('');
+$('reacts').innerHTML = '<span class="voicectl" id="voiceCtl"></span><button class="vbtn chatbtn" id="chatBtn" aria-label="Open chat">💬<span class="lbl"> Chat</span><span class="cbadge" id="chatBadge" hidden></span></button><button class="stk-btn" id="stkBtn" aria-label="Stickers">🎴</button>' + ['👏', '😂', '😮', '🔥', '😢', '🙏'].map(e => `<button data-r="${e}" aria-label="React ${e}">${e}</button>`).join('');
 $('seats').addEventListener('click', e => {
   const el = e.target.closest('.seat'); if (!el || !S || !S.code || S.phase === 'lobby') return;
   if (modalKind && modalKind !== 'card') return;
@@ -1007,6 +1026,7 @@ $('seats').addEventListener('click', e => {
 $('reacts').onclick = e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.r) send('react', b.dataset.r);
+  else if (b.id === 'stkBtn') stickerTray();
   else if (b.id === 'chatBtn') openChat();
   else if (b.id === 'vJoin') voiceJoin();
   else if (b.id === 'vMute') voiceMute(!V.muted);

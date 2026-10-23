@@ -332,7 +332,13 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
   background:var(--paper);color:var(--suit-black);font-weight:750;font-size:14px;border-radius:999px;padding:9px 16px;box-shadow:0 0 0 3px var(--team-b),0 12px 30px rgba(0,0,0,.5);transition:opacity .25s,transform .25s;max-width:calc(100vw - 32px);text-align:center}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 /* ---------- Chat ---------- */
-.reacts.watching .voicectl,.reacts.watching button[data-r]{display:none}
+.reacts.watching .voicectl,.reacts.watching button[data-r],.reacts.watching .stk-btn{display:none}
+.sticker-pop{position:absolute;z-index:8;width:118px;height:118px;transform:translate(-50%,-50%);pointer-events:none;animation:stkPop 2.6s ease-out both}
+.sticker-pop img{width:100%;height:100%;filter:drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff) drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff) drop-shadow(0 8px 12px rgba(0,0,0,.45))}
+@keyframes stkPop{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(-12deg)}12%{opacity:1;transform:translate(-50%,-50%) scale(1.12) rotate(4deg)}20%{transform:translate(-50%,-50%) scale(1) rotate(0)}82%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-62%) scale(.9)}}
+.stk-tray{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 58px);transform:translateX(-50%);z-index:46;width:min(440px,calc(100vw - 20px));max-height:46vh;overflow-y:auto;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:0 14px 40px rgba(0,0,0,.55)}
+.stk-tray button{background:var(--panel-2);border:0;border-radius:12px;padding:4px;aspect-ratio:1}.stk-tray img{width:100%;height:100%}
 .chatbtn{position:relative}
 .cbadge{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;border-radius:9px;background:var(--bad);color:#fff;font-size:11px;font-weight:800;line-height:18px;padding:0 4px;box-sizing:border-box}
 .chatpanel{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 10px);z-index:45;width:min(440px,calc(100vw - 24px));
@@ -517,7 +523,7 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
 .reacts .vbtn.off{border-color:var(--bad);color:var(--bad)}
 .vmic{font-size:11px;margin-left:3px}
 .seat.speaking{box-shadow:0 0 0 3px var(--good),0 0 18px var(--good),0 6px 16px rgba(0,0,0,.35)}
-@media (max-width:420px){.reacts button{width:34px;height:32px;font-size:16px}.reacts .vbtn{padding:0 9px;font-size:12px}}
+@media (max-width:420px){.reacts button{width:31px;height:32px;font-size:15px}.reacts{gap:3px}.reacts .vbtn{padding:0 9px;font-size:12px}}
 </style>
 </head>
 <body>
