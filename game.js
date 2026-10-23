@@ -541,12 +541,13 @@ class Table {
     };
     let last = start - 1;
     for (let k = 0; k < G.n; k++) last = await turn((start + k) % G.n);
-    // Anyone who bid this round and was then outbid by the other team gets another chance, round and round, until nobody raises
+    // Anyone who bid this round and was then outbid (by an opponent or a partner) gets another chance, round and round, until nobody raises
     for (let guard = 0; guard < 60; guard++) {
       let asked = false;
       for (let k = 1; k <= G.n; k++) {
         const seat = (last + k) % G.n;
-        if (!raised.has(seat) || out.has(seat) || !G.bid || G.bid.seat % 2 === seat % 2 || G.bid.value >= maxV) continue; // only when the other team outbid you
+        if (!raised.has(seat) || out.has(seat) || !G.bid || G.bid.seat === seat || G.bid.value >= maxV) continue;
+        if (G.bid.seat % 2 === seat % 2 && !this.isHuman(seat)) { out.add(seat); continue; } // a bot doesn't raise over its own partner
         last = await turn(seat); asked = true; break;
       }
       if (!asked) break;
