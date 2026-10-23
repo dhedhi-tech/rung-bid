@@ -387,10 +387,22 @@ class Table {
   botBid(seat, round) {
     const G = this.G, p = G.players[seat], h = p.hand.length, team = G.n / 2, per = 13 / G.n;
     if (G.bid && G.bid.seat === seat) return null;
-    const best = Math.max(...SUITS.map(s => power(p.hand, s)));
+    // Opponents hold the bid with a trump they have called: be careful
+    const oppHolds = G.bid && G.bid.seat % 2 !== seat % 2 && G.trump;
+    const oppShows = oppHolds ? Object.values(G.roundTrump || {}).filter(t => t.s === G.trump && t.seat % 2 !== seat % 2).length : 0;
+    if (oppHolds) {
+      // Strong in their trump suit? Don't take it from them: let them play and break their bid for double points
+      const tc = p.hand.filter(c => c.s === G.trump);
+      const shareT = power(p.hand, G.trump) / G.avg[h];
+      if (shareT >= 1.3 && tc.length >= Math.ceil(h / 4) && tc.some(c => c.r >= 13)) return null;
+    }
+    // Their trump suit is theirs: judge my strength on my other suits only
+    const best = Math.max(...SUITS.filter(s => !oppHolds || s !== G.trump).map(s => power(p.hand, s)));
     const share = best / G.avg[h];
     const mine = per * (1 + (share - 1) * (h / 13));
-    const est = mine + (team - 1) * per * 0.95 - [0.6, 0.3, 0.1][round - 1] + (Math.random() - 0.5) * 0.4;
+    let est = mine + (team - 1) * per * 0.95 - [0.6, 0.3, 0.1][round - 1] + (Math.random() - 0.5) * 0.4;
+    // Opponents showing the same suit again and again are strong; my partners are likely weaker. Bidding over 8+ needs more.
+    if (oppHolds) est -= 0.5 * oppShows + (G.bid.value >= 8 ? 0.6 : 0);
     const cap = [share >= 2.6 ? 7 : 6, 8, 13][round - 1];
     const jk = p.hand.filter(isJ).length;
     const jBonus = jk * (0.3 + 0.5 * Math.max(0, Math.min(1, share - 1)));
@@ -413,7 +425,11 @@ class Table {
     const G = this.G;
     if (G.supportSeat === seat && G.trump) return G.trump;
     const h = G.players[seat].hand; let best = 'S', bp = -1;
-    for (const s of SUITS) { const p = power(h, s); if (p > bp) { bp = p; best = s; } }
+    // Just took the bid from the opponents? Avoid their trump suit unless it is far stronger than my next best
+    const last = Object.values(G.roundTrump || {}).pop();
+    const avoid = G.trump && last && last.seat % 2 !== seat % 2 ? G.trump : null;
+    for (const s of SUITS) { if (s === avoid) continue; const p = power(h, s); if (p > bp) { bp = p; best = s; } }
+    if (avoid && power(h, avoid) > bp * 1.5) return avoid;
     return best;
   }
   // A card is "boss" when no card that could beat it is still out: no unseen card of the same suit
