@@ -514,11 +514,11 @@ class Table {
     await this.sleep(PACE.deal);
   }
   async biddingRound(r) {
-    const G = this.G, start = (G.dealer + 1) % G.n, before = G.bid ? G.bid.value : 0;
-    for (let k = 0; k < G.n; k++) {
-      const seat = (start + k) % G.n;
+    const G = this.G, start = (G.dealer + 1) % G.n, before = G.bid ? G.bid.value : 0, maxV = r === 1 ? 7 : 13;
+    const raised = new Set(), out = new Set(); // who bid in this round, and who then dropped out
+    const turn = async seat => {
       G.main = `Waiting for {n${seat}} to bid`;
-      const cur = G.bid ? G.bid.value : 5, maxV = r === 1 ? 7 : 13;
+      const cur = G.bid ? G.bid.value : 5;
       // The current holder may raise their own bid too (for example to change trump)
       const options = []; for (let v = Math.max(6, cur + 1); v <= maxV; v++) options.push(v);
       const v = await this.ask(seat, 'bid', { kind: 'bid', round: r, options }, () => this.botBid(seat, r),
@@ -528,14 +528,28 @@ class Table {
       if (val) {
         const support = G.supportSeat === seat && !this.isHuman(seat);
         const own = !!(G.bid && G.bid.seat === seat);
-        G.bid = { value: val, seat }; G.acts[seat] = val;
+        G.bid = { value: val, seat }; G.acts[seat] = val; raised.add(seat);
         this.log(support ? `{n${seat}} raises to ${val} to back partner's ${SNAME[G.trump]}` : own ? `{v${seat}:raise:raises} own bid to ${val}` : `{v${seat}:bid:bids} ${val}`);
         this.fx(support ? 'support' : 'bid', { seat, v: val });
       } else {
         G.acts[seat] = 'Pass'; this.log(`{v${seat}:pass:passes}`); this.fx('pass', { seat });
+        if (raised.has(seat)) out.add(seat);
       }
       if (G.supportSeat === seat && !val) G.supportSeat = -1;
       this.broadcast();
+      return seat;
+    };
+    let last = start - 1;
+    for (let k = 0; k < G.n; k++) last = await turn((start + k) % G.n);
+    // Anyone who bid this round and was then outbid by the other team gets another chance, round and round, until nobody raises
+    for (let guard = 0; guard < 60; guard++) {
+      let asked = false;
+      for (let k = 1; k <= G.n; k++) {
+        const seat = (last + k) % G.n;
+        if (!raised.has(seat) || out.has(seat) || !G.bid || G.bid.seat % 2 === seat % 2 || G.bid.value >= maxV) continue; // only when the other team outbid you
+        last = await turn(seat); asked = true; break;
+      }
+      if (!asked) break;
     }
     G.active = -1;
     if (!G.bid) {
