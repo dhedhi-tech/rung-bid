@@ -556,11 +556,13 @@ function profileSheet() {
     <div class="eyebrow">Table themes</div>
     <div class="store" id="storeList">${store_}</div>
     <p class="hint">Earn XP every hand and coins for every game. Bigger wins earn more.</p>
+    <button class="secondary fr-open" id="frOpen">👥 Friends</button>
     <button class="primary" id="profClose">Done</button>
     <button class="linkbtn" id="signOutBtn">Sign out</button>`);
   $('profClose').onclick = closeModal;
   $('signOutBtn').onclick = signOut;
   $('avEdit').onclick = picSheet;
+  $('frOpen').onclick = () => friendsSheet('profile');
   $('storeList').onclick = async e => {
     const b = e.target.closest('button'); if (!b) return;
     const r = b.dataset.buy ? await send('buy', b.dataset.buy) : await send('equip', b.dataset.equip);
@@ -624,6 +626,63 @@ async function lbSheet(sort) {
   $('lbList').innerHTML = html;
   if ($('lbSign')) $('lbSign').onclick = signIn;
 }
+// ---- friends ----
+async function friendsSheet(from) {
+  openModal('friends', `<div class="eyebrow">Friends</div><h2>Your friends</h2><div class="fr-list" id="frList"><div class="sub-muted">Loading…</div></div>
+    <p class="hint">Add friends by tapping a player at the table and choosing Add friend.</p><button class="primary" id="frBack">${from === 'profile' ? 'Back' : 'Close'}</button>`);
+  $('frBack').onclick = () => (from === 'profile' ? profileSheet() : closeModal());
+  const r = await send('friends'); if (modalKind !== 'friends' || !$('frList')) return;
+  if (!r || !r.ok) { $('frList').innerHTML = `<div class="sub-muted">Could not load your friends.</div>`; return; }
+  const by = k => r.list.filter(f => f.status === k);
+  const row = (f, btns) => `<div class="fr-row">${avatarHTML({ name: f.name, av: f.av || null })}<span class="lb-name"><b>${esc(f.name)}</b><small>${f.status === 'friend' ? (f.online ? '<i class="on-dot"></i>Online' : 'Offline') + ' · ' : ''}Level ${f.level}</small></span><span class="fr-acts">${btns}</span></div>`;
+  let html = '';
+  const inc = by('incoming'), fr = by('friend'), sent = by('sent');
+  if (inc.length) html += `<div class="lb-gap">Friend requests</div>` + inc.map(f => row(f, `<button class="mini ok" data-acc="${esc(f.id)}">Accept</button><button class="mini" data-rem="${esc(f.id)}">✕</button>`)).join('');
+  html += `<div class="lb-gap">Friends (${fr.length})</div>` + (fr.length ? fr.map(f => row(f, `<button class="mini" data-rem="${esc(f.id)}" data-ask="1" aria-label="Remove friend">✕</button>`)).join('') : '<div class="sub-muted">No friends yet.</div>');
+  if (sent.length) html += `<div class="lb-gap">Requests you sent</div>` + sent.map(f => row(f, `<button class="mini" data-rem="${esc(f.id)}">Cancel</button>`)).join('');
+  $('frList').innerHTML = html;
+  $('frList').onclick = async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.ask && b.dataset.armed !== '1') { b.dataset.armed = '1'; b.textContent = 'Remove?'; return; }
+    b.disabled = true;
+    const res = b.dataset.acc ? await send('friend:accept', b.dataset.acc) : await send('friend:remove', b.dataset.rem);
+    if (res && res.ok) friendsSheet(from); else b.disabled = false;
+  };
+}
+async function inviteSheet() {
+  openModal('invite', `<div class="eyebrow">Invite friends</div><h2>Invite to table ${esc(S.code)}</h2><div class="fr-list" id="invList"><div class="sub-muted">Loading…</div></div><button class="primary" id="invBack">Back to table</button>`);
+  $('invBack').onclick = () => { closeModal(); if (S && S.phase === 'lobby') lobbyScreen(); };
+  const r = await send('friends'); if (modalKind !== 'invite' || !$('invList')) return;
+  if (!r || !r.ok) { $('invList').innerHTML = `<div class="sub-muted">Could not load your friends.</div>`; return; }
+  const fr = r.list.filter(f => f.status === 'friend' && !f.here), on = fr.filter(f => f.online);
+  if (!fr.length) { $('invList').innerHTML = `<div class="sub-muted">No friends to invite yet. Tap a player at the table and choose Add friend, or share the WhatsApp link.</div>`; return; }
+  $('invList').innerHTML = (on.length > 1 ? `<button class="secondary" id="invAll">Invite all online friends (${on.length})</button>` : '')
+    + fr.map(f => `<div class="fr-row">${avatarHTML({ name: f.name, av: f.av || null })}<span class="lb-name"><b>${esc(f.name)}</b><small>${f.online ? '<i class="on-dot"></i>Online' : 'Offline · share the WhatsApp link instead'}</small></span><span class="fr-acts">${f.online ? `<button class="mini ok" data-inv="${esc(f.id)}">Invite</button>` : ''}</span></div>`).join('');
+  $('invList').onclick = async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const ids = b.id === 'invAll' ? on.map(f => f.id) : [b.dataset.inv];
+    b.disabled = true;
+    const res = await send('invite', ids);
+    if (res && res.ok) { b.textContent = 'Invited ✔'; if (b.id === 'invAll') $('invList').querySelectorAll('[data-inv]').forEach(x => { x.disabled = true; x.textContent = 'Invited ✔'; }); }
+    else b.disabled = false;
+  };
+}
+function invitePop(v) {
+  let el = $('invPop'); if (!el) { el = document.createElement('div'); el.id = 'invPop'; el.className = 'inv-pop'; document.body.appendChild(el); }
+  const busy = S && me0() && S.phase === 'game' && S.code !== v.code;
+  el.innerHTML = `${avatarHTML({ name: v.from, av: v.av || null })}<div class="ip-text"><b>${esc(v.from)} invited you</b><span>${v.n} players${v.joker ? ' · Joker' : ''} · ${v.playing ? 'game in progress' : 'waiting to start'}${busy ? ' · you will leave this game' : ''}</span></div>
+    <button class="mini ok" id="ipJoin">Join</button><button class="mini" id="ipNo" aria-label="Dismiss">✕</button>`;
+  el.hidden = false; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  sfx('support');
+  clearTimeout(invitePop.t); invitePop.t = setTimeout(() => { el.hidden = true; }, 30000);
+  $('ipNo').onclick = () => { el.hidden = true; };
+  $('ipJoin').onclick = () => {
+    el.hidden = true;
+    if (S && S.code === v.code) return;
+    if (S) { voiceLeave(true); chatMsgs = []; chatUnread = 0; closeChat(); renderChat(); send('leaveTable'); S = null; $('trick').innerHTML = ''; hidePanel(); }
+    hideWelcome(); joinRoom(v.code);
+  };
+}
 // Player card: tap any seat at the table
 async function playerCard(realSeat) {
   const r = await send('card', realSeat); if (!r || !r.ok) return;
@@ -642,8 +701,16 @@ async function playerCard(realSeat) {
       <div><span>Sweeps & whitewashes</span><b>${c.sweeps}</b></div><div><span>Hands won</span><b>${c.handWins}</b></div>
     </div>`;
   }
-  openModal('card', body + `<button class="primary" id="cardClose">Close</button>`);
+  let fbtn = '';
+  if (c.fid && !c.me) {
+    if (!PROFILE) fbtn = AUTH.auth ? `<p class="hint">Sign in with Google to add friends.</p>` : '';
+    else fbtn = { none: `<button class="secondary fr-btn" data-fr="add">➕ Add friend</button>`, sent: `<button class="secondary fr-btn" disabled>Friend request sent</button>`,
+      incoming: `<button class="secondary fr-btn" data-fr="accept">✔ Accept friend request</button>`, friend: `<button class="secondary fr-btn" disabled>✔ Friends</button>` }[c.friend] || '';
+  }
+  openModal('card', body + fbtn + `<button class="primary" id="cardClose">Close</button>`);
   $('cardClose').onclick = closeModal;
+  const fb = document.querySelector('.fr-btn[data-fr]');
+  if (fb) fb.onclick = async () => { fb.disabled = true; const r = await send(fb.dataset.fr === 'accept' ? 'friend:accept' : 'friend:add', c.fid); if (r && r.ok) playerCard(realSeat); else fb.disabled = false; };
 }
 function applyFelt() { document.documentElement.dataset.felt = PROFILE && PROFILE.equipped ? PROFILE.equipped.felt || 'green' : 'green'; }
 function gainToast(text, big) {
@@ -715,6 +782,7 @@ function lobbyScreen() {
       <button data-l="6" class="${S.limit === 6 ? 'on' : ''}">Quick<small>6 hands</small></button><button data-l="10" class="${S.limit === 10 ? 'on' : ''}">Normal<small>10 hands</small></button><button data-l="0" class="${!S.limit ? 'on' : ''}">Full<small>no limit</small></button></div></div>` : ''}
     <div class="share"><span class="link" id="linkTxt">${esc(link)}</span>
       <div class="btns"><button class="secondary" id="copyBtn">Copy link</button><a class="secondary" href="${wa}" target="_blank" rel="noopener">WhatsApp</a></div></div>
+    ${PROFILE ? `<button class="secondary inv-friends" id="invFriends">👥 Invite friends</button>` : ''}
     <div class="eyebrow">Pick your seat</div>
     <div class="seatgrid" id="seatGrid">${seats}</div>
     ${watchers}
@@ -729,6 +797,7 @@ function lobbyScreen() {
   };
   if ($('startBtn')) $('startBtn').onclick = () => { ac(); send('start'); };
   $('leaveLobby').onclick = leaveTable;
+  if ($('invFriends')) $('invFriends').onclick = inviteSheet;
   if ($('dupYes')) { $('dupYes').onclick = () => send('claim'); $('dupNo').onclick = () => { dupNo = S.code + S.dup.real; lobbyScreen(); }; }
 }
 function selectLink() { const r = document.createRange(); r.selectNodeContents($('linkTxt')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
@@ -784,7 +853,7 @@ function render() {
   $('reacts').hidden = S.phase === 'lobby';
   $('reacts').classList.toggle('watching', !me0());
 
-  if (S.phase === 'lobby') lobbyScreen();
+  if (S.phase === 'lobby') { if (!['invite', 'friends', 'card'].includes(modalKind)) lobbyScreen(); }
   else if (S.phase === 'over' && S.result) { if (modalKind !== 'over' || shownHost !== S.isHost) { resultScreen(); shownHost = S.isHost; } }
   else if (S.result) { if (modalKind !== 'result' || shownHand !== S.result.handNo || shownHost !== S.isHost) { resultScreen(); shownHand = S.result.handNo; shownHost = S.isHost; } }
   else if (modalKind && modalKind !== 'card') closeModal();
@@ -1212,6 +1281,12 @@ sock.on('state', st => {
   S = st; hideWelcome(); render();
 });
 sock.on('fx', f => onFx(f));
+sock.on('invite', v => invitePop(v));
+sock.on('friend:notify', v => {
+  toast(v.kind === 'request' ? `${v.name} sent you a friend request. Open your profile, then Friends.` : `${v.name} is now your friend`);
+  sfx('pop');
+  if (modalKind === 'friends') friendsSheet('profile');
+});
 
 /* ---------- header buttons ---------- */
 function syncSound() { $('soundBtn').classList.toggle('muted', muted); $('soundBtn').textContent = muted ? 'Sound off' : 'Sound'; }

@@ -144,6 +144,21 @@ async function leaderboard(sort, me) {
   return { sort, list, mine };
 }
 
+// Light profile info (name, picture, level) for a list of players, e.g. a friends list
+async function people(ids) {
+  ids = [...new Set(ids)].filter(id => /^[0-9a-zA-Z_-]{1,64}$/.test(id));
+  const out = new Map(), missing = [];
+  for (const id of ids) { const p = cache.get(id); if (p) out.set(id, { ...p, pic: String(p.pic || '').startsWith('data:') ? 'u' : p.pic }); else missing.push(id); }
+  if (enabled && missing.length) {
+    const list = missing.map(encodeURIComponent).join(',');
+    let rows;
+    try { rows = await sb(`/rest/v1/leaderboard?select=id,name,avatar,pic,xp&id=in.(${list})`); }
+    catch (e) { rows = await sb(`/rest/v1/profiles?select=id,name,avatar,xp&id=in.(${list})`); }
+    for (const r of rows || []) out.set(r.id, r);
+  }
+  return ids.filter(id => out.has(id)).map(id => { const r = out.get(id); return { id, name: r.name, level: levelOf(r.xp || 0), av: r.pic === 'u' ? { u: `/pic/${id}` } : avOf({ ...r, pic: r.pic || '' }) }; });
+}
+
 function today() { return new Date().toISOString().slice(0, 10); }
 function claimDaily(p) {
   if (p.last_daily === today()) return 0;
@@ -202,5 +217,5 @@ function handGains(info, seatIdx) {
 
 module.exports = {
   enabled, DEV, config: () => ({ auth: enabled || DEV, supabaseUrl: enabled ? SB_URL : '', anonKey: enabled ? ANON : '', dev: DEV && !enabled }),
-  verify, load, view, avOf, leaderboard, setPic, picData, AVATARS, award, claimDaily, buy, equip, handGains, levelOf, STORE, XP, COINS,
+  verify, load, view, avOf, leaderboard, people, setPic, picData, AVATARS, award, claimDaily, buy, equip, handGains, levelOf, STORE, XP, COINS,
 };

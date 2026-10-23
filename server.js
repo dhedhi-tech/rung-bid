@@ -6,6 +6,12 @@ const { Server } = require('socket.io');
 const { Table } = require('./game');
 const A = require('./accounts');
 const S = require('./stats');
+const F = require('./friends');
+// Signed-in players who are online right now: profile id -> Map(socket id -> socket)
+const online = new Map();
+const goOnline = (id, socket) => { if (!online.has(id)) online.set(id, new Map()); online.get(id).set(socket.id, socket); };
+const goOffline = (id, socket) => { const m = online.get(id); if (m) { m.delete(socket.id); if (!m.size) online.delete(id); } };
+const emitTo = (id, ev, data) => { const m = online.get(id); if (m) for (const sk of m.values()) sk.emit(ev, data); };
 const pidAuth = new Map(); // player id -> { profile } for signed-in players
 
 const app = express();
@@ -108,7 +114,7 @@ io.on('connection', socket => {
   S.playerSeen(pid, false);
 
   const reply = (cb, err, data) => { if (typeof cb === 'function') cb(err ? { error: err } : { ok: true, ...data }); };
-  const leave = () => { if (table) { table.removeClient(socket.id); socket.leave(table.code); table = null; } };
+  const leave = () => { socket.data.tableCode = null; if (table) { table.removeClient(socket.id); socket.leave(table.code); table = null; } };
   // removeClient also drops this socket from voice chat and tells the others
 
   socket.on('create', (opts, cb) => {
@@ -118,7 +124,7 @@ io.on('connection', socket => {
     const t = new Table(code, { n, joker: !!(opts && opts.joker), hostId: pid, limit: opts && Number(opts.limit), pub: !!(opts && opts.pub) }, io);
     wireProgress(t);
     tables.set(code, t);
-    leave(); table = t; t.addClient(socket, pid, name);
+    leave(); table = t; socket.data.tableCode = t.code; t.addClient(socket, pid, name);
     t.sit(pid, 0);
     reply(cb, null, { code });
   });
@@ -127,7 +133,7 @@ io.on('connection', socket => {
     if (typeof cb !== 'function' && typeof opts === 'function') [cb, opts] = [opts, cb];
     const t = tables.get(String(code || '').toUpperCase());
     if (!t) return reply(cb, 'This table has closed. Ask your friend for a new link, or create your own table.');
-    leave(); table = t;
+    leave(); table = t; socket.data.tableCode = t.code;
     // Already seated here from another phone or app? Same Google account: move the seat here. Same name: ask first.
     const acct = pidAuth.get(pid);
     const sameAcct = acct ? t.seats.findIndex(s => !s.bot && s.pid && s.pid !== pid && pidAuth.has(s.pid) && pidAuth.get(s.pid).profile.id === acct.profile.id) : -1;
@@ -194,7 +200,9 @@ io.on('connection', socket => {
   // ---- accounts ----
   const signedIn = async (user, cb) => {
     const profile = await A.load(user);
+    if (socket.data.uid && socket.data.uid !== profile.id) goOffline(socket.data.uid, socket);
     pidAuth.set(pid, { profile });
+    socket.data.uid = profile.id; goOnline(profile.id, socket);
     S.playerSeen(pid, true);
     const daily = A.claimDaily(profile);
     if (table) table.broadcast();
@@ -208,7 +216,7 @@ io.on('connection', socket => {
     if (!A.DEV || A.enabled) return reply(cb, 'Not available');
     await signedIn({ id: 'dev-' + pid, name: cleanName(nm), avatar: '' }, cb);
   });
-  socket.on('signout', cb => { pidAuth.delete(pid); if (table) table.broadcast(); reply(cb); });
+  socket.on('signout', cb => { if (socket.data.uid) { goOffline(socket.data.uid, socket); socket.data.uid = null; } pidAuth.delete(pid); if (table) table.broadcast(); reply(cb); });
   socket.on('buy', (item, cb) => {
     const a = pidAuth.get(pid); if (!a) return reply(cb, 'Sign in to collect coins');
     const err = A.buy(a.profile, String(item)); reply(cb, err, { profile: A.view(a.profile) });
@@ -226,15 +234,65 @@ io.on('connection', socket => {
     try { const a = pidAuth.get(pid); reply(cb, null, await A.leaderboard(String(sort), a ? a.profile : null)); }
     catch (e) { console.error('leaderboard', e.message); reply(cb, 'Leaderboard is not available right now'); }
   });
+  // ---- friends ----
+  const meId = () => { const a = pidAuth.get(pid); return a ? a.profile.id : null; };
+  const friendErr = (e, cb) => { console.error('friends', e.message); reply(cb, 'Friends are not available right now. Try again later.'); };
+  socket.on('friend:add', async (id, cb) => {
+    const me = meId(); if (!me) return reply(cb, 'Sign in to add friends');
+    try {
+      const r = await F.add(me, String(id)); if (r.error) return reply(cb, r.error);
+      const myName = pidAuth.get(pid).profile.name;
+      if (r.requested) emitTo(String(id), 'friend:notify', { kind: 'request', name: myName });
+      if (r.accepted) emitTo(String(id), 'friend:notify', { kind: 'accepted', name: myName });
+      reply(cb, null, { status: r.status });
+    } catch (e) { friendErr(e, cb); }
+  });
+  socket.on('friend:accept', async (id, cb) => {
+    const me = meId(); if (!me) return reply(cb, 'Sign in first');
+    try { const r = await F.accept(me, String(id)); if (r.error) return reply(cb, r.error); emitTo(String(id), 'friend:notify', { kind: 'accepted', name: pidAuth.get(pid).profile.name }); reply(cb, null, { status: r.status }); }
+    catch (e) { friendErr(e, cb); }
+  });
+  socket.on('friend:remove', async (id, cb) => {
+    const me = meId(); if (!me) return reply(cb, 'Sign in first');
+    try { await F.remove(me, String(id)); reply(cb, null, { status: 'none' }); } catch (e) { friendErr(e, cb); }
+  });
+  socket.on('friends', async cb => {
+    const me = meId(); if (!me) return reply(cb, 'Sign in to see your friends');
+    try {
+      const l = await F.links(me), ids = [...l.keys()];
+      const ppl = await A.people(ids);
+      const list = ppl.map(p => {
+        const lk = l.get(p.id), on = online.get(p.id);
+        let at = null; if (on) for (const sk of on.values()) if (sk.data.tableCode) at = sk.data.tableCode;
+        return { ...p, status: lk.status === 'accepted' ? 'friend' : lk.mine ? 'sent' : 'incoming', online: !!on, here: !!(table && at === table.code) };
+      });
+      list.sort((a, b) => (b.online - a.online) || a.name.localeCompare(b.name));
+      reply(cb, null, { list });
+    } catch (e) { friendErr(e, cb); }
+  });
+  socket.on('invite', async (ids, cb) => {
+    const me = meId(); if (!me) return reply(cb, 'Sign in to invite friends');
+    if (!table) return reply(cb, 'Open a table first');
+    const now = Date.now(); if (socket.data.lastInvite && now - socket.data.lastInvite < 3000) return reply(cb, 'Slow down a little'); socket.data.lastInvite = now;
+    try {
+      const l = await F.links(me);
+      const targets = (Array.isArray(ids) ? ids.map(String) : [...l.keys()]).filter(id => l.get(id) && l.get(id).status === 'accepted' && online.has(id)).slice(0, 50);
+      const from = pidAuth.get(pid).profile;
+      for (const id of targets) emitTo(id, 'invite', { from: from.name, av: A.avOf(from), code: table.code, n: table.n, joker: table.joker, playing: table.phase === 'game' });
+      reply(cb, null, { sent: targets.length });
+    } catch (e) { friendErr(e, cb); }
+  });
   // Player card: tap a seat to see that player's profile
-  socket.on('card', (realSeat, cb) => {
+  socket.on('card', async (realSeat, cb) => {
     if (!table) return reply(cb, 'Not at a table');
     const s = table.seats[Number(realSeat)]; if (!s) return reply(cb, 'No such seat');
     if (s.bot) return reply(cb, null, { card: { name: s.name, bot: true } });
     const a = s.pid && pidAuth.get(s.pid);
     if (!a) return reply(cb, null, { card: { name: s.name, guest: true } });
-    const v = A.view(a.profile);
-    reply(cb, null, { card: { name: s.name, fullName: v.name, av: v.av, level: v.level, games: v.games, wins: v.wins, hands: v.hands, handWins: v.handWins, bidsMade: v.bidsMade, bidsTotal: v.bidsTotal, sweeps: v.sweeps, since: a.profile.created_at || null } });
+    const v = A.view(a.profile), mine = pidAuth.get(pid);
+    let friend = null;
+    if (mine && mine.profile.id !== a.profile.id) { try { friend = await F.status(mine.profile.id, a.profile.id); } catch (e) { friend = null; } }
+    reply(cb, null, { card: { fid: a.profile.id, friend, me: !!(mine && mine.profile.id === a.profile.id), name: s.name, fullName: v.name, av: v.av, level: v.level, games: v.games, wins: v.wins, hands: v.hands, handWins: v.handWins, bidsMade: v.bidsMade, bidsTotal: v.bidsTotal, sweeps: v.sweeps, since: a.profile.created_at || null } });
   });
   socket.on('equip', (item, cb) => {
     const a = pidAuth.get(pid); if (!a) return reply(cb, 'Sign in first');
@@ -285,7 +343,7 @@ io.on('connection', socket => {
     io.to(msg.to).emit('voice:signal', { from: socket.id, data: msg.data });
   });
 
-  socket.on('disconnect', leave);
+  socket.on('disconnect', () => { if (socket.data.uid) goOffline(socket.data.uid, socket); leave(); });
 });
 
 // ---- private admin page: set ADMIN_PASS on Render, then open /admin ----
