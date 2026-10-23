@@ -1,0 +1,59 @@
+{
+  "packs": [
+    {
+      "id": "classic",
+      "name": "Patta Party",
+      "free": true,
+      "stickers": [
+        {
+          "id": "joker",
+          "line": "Joker aa gaya!"
+        },
+        {
+          "id": "rung",
+          "line": "Rung kaat diya!"
+        },
+        {
+          "id": "shabash",
+          "line": "Shabash partner!"
+        },
+        {
+          "id": "kyakiya",
+          "line": "Ye kya kiya?!"
+        },
+        {
+          "id": "sweep",
+          "line": "Sweep pakki!"
+        },
+        {
+          "id": "jaldi",
+          "line": "Jaldi khelo!"
+        },
+        {
+          "id": "jeetenge",
+          "line": "Hum hi jeetenge"
+        },
+        {
+          "id": "bid",
+          "line": "Bid tou dekho"
+        },
+        {
+          "id": "bach",
+          "line": "Bach gaye!"
+        },
+        {
+          "id": "chalo",
+          "line": "Chalo phir!"
+        },
+        {
+          "id": "waah",
+          "line": "Waah kya patta!"
+        },
+        {
+          "id": "sorry",
+          "line": "Sorry partner"
+        }
+      ]
+    }
+  ]
+}

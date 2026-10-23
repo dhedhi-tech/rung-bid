@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+<!-- Patta Party sticker: Bach gaye!. Edit the text below (id="line") or the drawing in Figma, Canva or Illustrator. -->
+<g id="art"><circle cx="100" cy="72" r="52" fill="#ffcf3f" stroke="#3a2a10" stroke-width="5"/><path d="M74.0 66.8 q7.8 7.8 15.6 0 M110.4 66.8 q7.8 7.8 15.6 0" fill="none" stroke="#3a2a10" stroke-width="6" stroke-linecap="round"/><path d="M79.2 93.84 Q100 104.24000000000001 120.8 93.84" fill="none" stroke="#3a2a10" stroke-width="6" stroke-linecap="round"/><path d="M137.44 39.76 q-12 22 0 32 q12 -10 0 -32 Z" fill="#5ec8ff" stroke="#1d5a7a" stroke-width="3"/></g>
+<g><rect x="8" y="130" width="184" height="46" rx="14" fill="#2b7fbf" stroke="#1b1b1b" stroke-width="4" transform="rotate(-4 100 160)"/><text id="line" x="100" y="162" transform="rotate(-4 100 160)" text-anchor="middle" font-family="'Baloo 2','Arial Rounded MT Bold','Arial Black',system-ui,sans-serif" font-weight="900" font-size="28" fill="#fff" stroke="#1b1b1b" stroke-width="5" paint-order="stroke" letter-spacing=".5">Bach gaye!</text></g>
+</svg>
