@@ -128,6 +128,11 @@ class Table {
     this.touch(); this.broadcast();
     return null;
   }
+  forget(pid) {
+    if ([...this.clients.values()].some(c => c.pid === pid)) return;
+    const p = this.players.get(pid); if (p && p.seat == null) this.players.delete(pid);
+    this.broadcast();
+  }
   // Same person on a second phone or app (e.g. WhatsApp's browser): the seat they could take over
   sameNameSeat(pid) {
     const p = this.players.get(pid); if (!p || p.seat != null) return -1;

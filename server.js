@@ -139,7 +139,7 @@ io.on('connection', socket => {
     const sameAcct = acct ? t.seats.findIndex(s => !s.bot && s.pid && s.pid !== pid && pidAuth.has(s.pid) && pidAuth.get(s.pid).profile.id === acct.profile.id) : -1;
     const lname = String(name).trim().toLowerCase();
     const sameName = t.seats.some(s => !s.bot && s.pid && s.pid !== pid && String(s.name).trim().toLowerCase() === lname) && !(t.players.get(pid) && t.players.get(pid).seat != null);
-    t.addClient(socket, pid, name, { noAutoSeat: sameAcct >= 0 || sameName });
+    t.addClient(socket, pid, name, { noAutoSeat: sameAcct >= 0 || sameName || !!(opts && opts.watch) });
     if (sameAcct >= 0) t.takeOver(pid, sameAcct);
     // From Open tables during a game: take a free bot seat straight away
     if (opts && opts.seat === 'auto' && t.phase === 'game') {
@@ -197,7 +197,8 @@ io.on('connection', socket => {
   socket.on('setLimit', (lim, cb) => { if (!table) return reply(cb, 'Not at a table'); reply(cb, table.setLimit(pid, Number(lim))); });
   socket.on('next', cb => { if (table) table.dealNow(pid); reply(cb); });
   socket.on('again', cb => { if (!table) return reply(cb, 'Not at a table'); reply(cb, table.playAgain(pid)); });
-  socket.on('leaveTable', cb => { if (table) table.stand(pid); leave(); reply(cb); });
+  // Leave on purpose: free the seat and forget this table, so it no longer shows as "Your game"
+  socket.on('leaveTable', cb => { const t = table; if (t) t.stand(pid); leave(); if (t) t.forget(pid); reply(cb); });
   // ---- accounts ----
   const signedIn = async (user, cb) => {
     const profile = await A.load(user);

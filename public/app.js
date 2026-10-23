@@ -408,10 +408,10 @@ function renderRooms(list) {
         <span>${r.playing ? `Playing, hand ${r.hand}${r.limit ? ' of ' + r.limit : ''}` : 'Waiting to start'}${r.names && r.names.length ? ` · with ${r.names.map(esc).join(', ')}` : ''}</span></span>
       ${r.mine ? '' : `<span class="wr-free">${r.free} seat${r.free > 1 ? 's' : ''} free</span>`}<span class="wr-go">${r.mine ? 'Continue' : 'Join'}</span></button>`;
   box.innerHTML = (mine.length ? `<div class="wr-head">Your game</div>` + mine.map(item).join('') : '') + (open.length ? `<div class="wr-head">Open tables</div>` + open.map(item).join('') : '');
-  box.querySelectorAll('.wroom').forEach(b => b.onclick = () => joinRoom(b.dataset.code));
+  box.querySelectorAll('.wroom').forEach(b => b.onclick = () => joinRoom(b.dataset.code, b.classList.contains('mine') ? 'auto' : 'watch'));
 }
-function joinRoom(code) {
-  ac(); tableCode = code; autoSeat = true; clearTimeout(roomsTimer);
+function joinRoom(code, how) {
+  ac(); tableCode = code; autoSeat = how || false; clearTimeout(roomsTimer);
   if (myName || PROFILE) joinTable();
   else { invitePending = true; nameScreen(); }
 }
@@ -1261,7 +1261,7 @@ async function joinTable() {
   if (joinBusy) return;
   joinBusy = true;
   const auto = autoSeat; autoSeat = false;
-  let r; try { r = auto && sock.connected ? await new Promise(res => sock.emit('join', tableCode, { seat: 'auto' }, x => { if (x && x.error) flash(x.error); res(x); })) : await send('join', tableCode); } finally { joinBusy = false; }
+  let r; try { r = auto && sock.connected ? await new Promise(res => sock.emit('join', tableCode, auto === 'watch' ? { watch: true } : { seat: 'auto' }, x => { if (x && x.error) flash(x.error); res(x); })) : await send('join', tableCode); } finally { joinBusy = false; }
   if (r && r.ok) { history.replaceState(null, '', '/?t=' + r.code); store.set('rb-table', r.code); if (V.want && !V.on) setTimeout(voiceJoin, 600); loadChat(); }
   else { const quiet = resuming; tableCode = null; store.set('rb-table', ''); history.replaceState(null, '', '/'); S = null; homeScreen(quiet ? '' : r && r.error); }
   resuming = false;
