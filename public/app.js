@@ -287,12 +287,13 @@ function showPanel(title, html, onClick) {
 }
 function hidePanel() { $('panel').hidden = true; $('panelBody').onclick = null; }
 function bidHistoryHTML() {
-  if (!S.hist || !S.hist.length) return '';
+  const bids = (S.hist || []).filter(h => h.v); // only bids and raises, not passes
+  if (!bids.length) return '';
   let out = '<div class="hist">';
   for (let r = 1; r <= 3; r++) {
-    const rows = S.hist.filter(h => h.r === r); if (!rows.length) continue;
+    const rows = bids.filter(h => h.r === r); if (!rows.length) continue;
     out += `<div class="hist-row"><span class="hist-r">Round ${r}</span>`;
-    out += rows.map(h => (h.v ? `<span class="hb">${pnShort(h.seat)} <b>${h.v}</b>${h.forced ? ' (forced)' : ''}</span>` : `<span class="hb pass">${pnShort(h.seat)} pass</span>`)).join('');
+    out += rows.map(h => `<span class="hb">${pnShort(h.seat)} <b>${h.v}</b>${h.forced ? ' (forced)' : ''}</span>`).join('');
     const t = S.roundTrump && S.roundTrump[r];
     if (t) out += `<span class="hb trump ${RED(t.s) ? 'red' : ''}">${SYM[t.s]} ${SNAME[t.s]} · ${t.v} by ${pnShort(t.seat)}</span>`;
     out += '</div>';
@@ -402,7 +403,9 @@ function renderRooms(list) {
   if (!list.length) { box.innerHTML = ''; return; }
   const mine = list.filter(r => r.mine), open = list.filter(r => !r.mine);
   const item = r => `<button class="wroom ${r.mine ? 'mine' : ''}" data-code="${esc(r.code)}">
-      <span class="wr-main"><b>${esc(r.host)}'s table</b><span>${r.n} players${r.joker ? ' · Joker' : ''} · ${r.playing ? `Playing, hand ${r.hand}${r.limit ? ' of ' + r.limit : ''}` : 'Waiting to start'}</span></span>
+      <span class="wr-main"><b>${esc(r.host)}'s table</b>
+        <span class="wr-tags"><i class="${r.joker ? 'jk' : ''}">${r.joker ? '🃏 Joker' : 'No Joker'}</i><i>${r.n} players</i><i>${r.limit === 6 ? 'Quick · 6 hands' : r.limit === 10 ? 'Normal · 10 hands' : 'Full game'}</i></span>
+        <span>${r.playing ? `Playing, hand ${r.hand}${r.limit ? ' of ' + r.limit : ''}` : 'Waiting to start'}${r.names && r.names.length ? ` · with ${r.names.map(esc).join(', ')}` : ''}</span></span>
       ${r.mine ? '' : `<span class="wr-free">${r.free} seat${r.free > 1 ? 's' : ''} free</span>`}<span class="wr-go">${r.mine ? 'Continue' : 'Join'}</span></button>`;
   box.innerHTML = (mine.length ? `<div class="wr-head">Your game</div>` + mine.map(item).join('') : '') + (open.length ? `<div class="wr-head">Open tables</div>` + open.map(item).join('') : '');
   box.querySelectorAll('.wroom').forEach(b => b.onclick = () => joinRoom(b.dataset.code));
