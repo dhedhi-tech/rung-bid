@@ -368,7 +368,8 @@ class Table {
   trickResult() {
     const G = this.G, w = this.currentWinner();
     const jokers = G.trick.filter(t => isJ(t.card));
-    if (jokers.length >= 2) { const j2 = jokers[jokers.length - 1]; return { team: j2.seat % 2, lead: j2.seat, show: j2, credit: j2.seat, flipped: true, second: true }; }
+    // Two jokers cancel: the highest card takes the trick, but the second joker player leads next
+    if (jokers.length >= 2) { const j2 = jokers[jokers.length - 1]; return { team: w.seat % 2, lead: j2.seat, show: w, credit: w.seat, flipped: false, second: true }; }
     if (!jokers.length) return { team: w.seat % 2, lead: w.seat, show: w, credit: w.seat, flipped: false };
     const jt = G.trick.find(t => isJ(t.card)), team = 1 - w.seat % 2;
     const key = c => (c.s === G.trump ? 2 : c.s === G.leadSuit ? 1 : 0) * 100 + c.r;
@@ -562,7 +563,7 @@ class Table {
     if (G.trick.length > 1 && card.s !== G.leadSuit) G.voids[seat].add(G.leadSuit);
     if (isJ(card)) {
       const second = this.jokerCount() === 2;
-      this.log(`{v${seat}:throw:throws} a Joker${second ? ' (second Joker takes the trick)' : ''}`);
+      this.log(`{v${seat}:throw:throws} a Joker${second ? ' (cancels the first)' : ''}`);
       this.broadcast(); this.fx('joker', { seat, second }); return;
     }
     const cut = G.trick.length > 1 && card.s === G.trump && G.leadSuit !== G.trump;
@@ -595,9 +596,9 @@ class Table {
       G.active = -1;
       const res = this.trickResult();
       const L = G.trick[0].seat;
-      if (!res.flipped && L !== res.lead && L % 2 === res.lead % 2) G.returnTo[res.lead] = { suit: G.trick[0].card.s, partner: L };
+      if (!res.flipped && !res.second && L !== res.lead && L % 2 === res.lead % 2) G.returnTo[res.lead] = { suit: G.trick[0].card.s, partner: L };
       G.tricksWon[res.team]++; G.players[res.credit].tricks++;
-      if (res.second) { this.log(`Second Joker gives the trick to {tl${res.team}}`); G.main = `Second Joker. {v${res.lead}:take:takes} the trick and {v${res.lead}:lead:leads} next`; }
+      if (res.second) { this.log(`Jokers cancel. {v${res.credit}:win:wins} the trick`); G.main = `Jokers cancel. {v${res.credit}:win:wins} the trick, {v${res.lead}:lead:leads} next`; }
       else if (res.flipped) { this.log(`Joker flips the trick to {tl${res.team}}`); G.main = `Joker reverses it. {t${res.team}} take the trick, {v${res.lead}:lead:leads} next`; }
       else G.main = `{v${res.lead}:win:wins} the trick`;
       this.broadcast();

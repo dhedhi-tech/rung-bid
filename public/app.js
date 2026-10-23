@@ -912,7 +912,7 @@ function showJoker(seat, second) {
   const to = trickPos(seat), t = tcls(seat);
   const fx = document.createElement('div');
   fx.className = `cut-fx jfx ${t}`; fx.style.left = to.x + '%'; fx.style.top = to.y + '%';
-  fx.innerHTML = `<span class="cut-ring"></span><span class="cut-label jlabel">${second ? 'TAKES IT' : 'REVERSE ⇄'}</span>`;
+  fx.innerHTML = `<span class="cut-ring"></span><span class="cut-label jlabel">${second ? 'CANCELLED' : 'REVERSE ⇄'}</span>`;
   $('trick').appendChild(fx);
   const felt = document.querySelector('.felt'); felt.classList.remove('spin'); void felt.offsetWidth; felt.classList.add('spin');
   setTimeout(() => fx.remove(), 1500);
