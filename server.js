@@ -203,6 +203,7 @@ io.on('connection', socket => {
     if (socket.data.uid && socket.data.uid !== profile.id) goOffline(socket.data.uid, socket);
     pidAuth.set(pid, { profile });
     socket.data.uid = profile.id; goOnline(profile.id, socket);
+    F.links(profile.id).then(l => socket.emit('friend:count', [...l.values()].filter(x => x.status === 'pending' && !x.mine).length)).catch(() => {});
     S.playerSeen(pid, true);
     const daily = A.claimDaily(profile);
     if (table) table.broadcast();

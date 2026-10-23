@@ -463,6 +463,7 @@ function joinSheet() {
 }
 
 /* ---------- accounts: sign in, profile, levels, coins ---------- */
+let FRQ = 0; // friend requests waiting
 let AUTH = { auth: false }, PROFILE = null, sbClient = null, sbToken = null;
 const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js';
 function loadScript(src) { return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); }); }
@@ -528,7 +529,7 @@ function renderChip() {
   const el = $('wChip'); if (!el) return;
   if (PROFILE) {
     const pct = Math.round(100 * PROFILE.levelXp / PROFILE.levelNeed);
-    el.innerHTML = `<button class="pchip" id="pchip">${avatarHTML(PROFILE)}<span class="pc-text"><b>${esc(PROFILE.name)}</b><span class="pc-lvl">Level ${PROFILE.level}<i style="--p:${pct}%"></i></span></span><span class="pc-coins">● ${PROFILE.coins}</span></button>`;
+    el.innerHTML = `<button class="pchip" id="pchip">${avatarHTML(PROFILE)}<span class="pc-text"><b>${esc(PROFILE.name)}</b><span class="pc-lvl">Level ${PROFILE.level}<i style="--p:${pct}%"></i></span></span><span class="pc-coins">● ${PROFILE.coins}</span>${FRQ ? `<span class="fr-badge">${FRQ}</span>` : ''}</button>`;
     $('pchip').onclick = profileSheet;
   } else if (AUTH.auth) {
     el.innerHTML = `<button class="gbtn" id="gSignIn"><svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17.5z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>Sign in with Google</button>
@@ -556,7 +557,7 @@ function profileSheet() {
     <div class="eyebrow">Table themes</div>
     <div class="store" id="storeList">${store_}</div>
     <p class="hint">Earn XP every hand and coins for every game. Bigger wins earn more.</p>
-    <button class="secondary fr-open" id="frOpen">👥 Friends</button>
+    <button class="secondary fr-open" id="frOpen">👥 Friends${FRQ ? ` <span class="fr-badge in">${FRQ} new</span>` : ''}</button>
     <button class="primary" id="profClose">Done</button>
     <button class="linkbtn" id="signOutBtn">Sign out</button>`);
   $('profClose').onclick = closeModal;
@@ -634,6 +635,7 @@ async function friendsSheet(from) {
   const r = await send('friends'); if (modalKind !== 'friends' || !$('frList')) return;
   if (!r || !r.ok) { $('frList').innerHTML = `<div class="sub-muted">Could not load your friends.</div>`; return; }
   const by = k => r.list.filter(f => f.status === k);
+  FRQ = by('incoming').length; renderChip();
   const row = (f, btns) => `<div class="fr-row">${avatarHTML({ name: f.name, av: f.av || null })}<span class="lb-name"><b>${esc(f.name)}</b><small>${f.status === 'friend' ? (f.online ? '<i class="on-dot"></i>Online' : 'Offline') + ' · ' : ''}Level ${f.level}</small></span><span class="fr-acts">${btns}</span></div>`;
   let html = '';
   const inc = by('incoming'), fr = by('friend'), sent = by('sent');
@@ -1282,7 +1284,9 @@ sock.on('state', st => {
 });
 sock.on('fx', f => onFx(f));
 sock.on('invite', v => invitePop(v));
+sock.on('friend:count', n => { FRQ = Number(n) || 0; renderChip(); });
 sock.on('friend:notify', v => {
+  if (v.kind === 'request') { FRQ++; renderChip(); }
   toast(v.kind === 'request' ? `${v.name} sent you a friend request. Open your profile, then Friends.` : `${v.name} is now your friend`);
   sfx('pop');
   if (modalKind === 'friends') friendsSheet('profile');
