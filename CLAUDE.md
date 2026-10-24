@@ -44,7 +44,7 @@ SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TUR
 
 ## Next steps (launch plan)
 1. Ansa: Google Play developer account (personal, $25, ID check) and buy pattaparty.com (Namecheap).
-2. Connect pattaparty.com to Render; update Supabase URL settings and Google OAuth origins.
+2. DONE (Oct 2026): pattaparty.com live on Render. Code has no hardcoded old URLs.
 3. Build the Android app (Capacitor wrapper around the site, portrait only), icon, splash, AdMob rewarded/interstitial ads; Ansa creates an AdMob account.
 4. Closed test: 12+ testers for 14 days (Google rule), then production review. Upgrade Render to the $7 plan before launch.
 5. Later: real push notifications (friends, invites), sticker packs for coins, landscape/tablet layout.
