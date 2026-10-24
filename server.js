@@ -77,8 +77,15 @@ app.get('/voice-check', async (_req, res) => {
 });
 const MAX_VOICE = 8;
 // Sticker ids come from public/stickers/stickers.json (add a sticker there and its SVG file in the same folder)
-const STICKERS = new Set();
-try { for (const pk of JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'stickers', 'stickers.json'), 'utf8')).packs) for (const st of pk.stickers) STICKERS.add(st.id); } catch (e) { console.error('stickers', e.message); }
+const STK = require('./sticker-store');
+STK.load();
+app.get('/stickers/list', async (_req, res) => { await STK.load(); res.set('Cache-Control', 'no-cache'); res.json({ list: STK.list() }); });
+app.get('/sticker-img/:id', (req, res) => {
+  const img = STK.image(String(req.params.id)); if (!img) return res.status(404).end();
+  // Pictures only: block any script inside an uploaded SVG
+  res.set('Content-Security-Policy', "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:");
+  res.set('Cache-Control', 'public, max-age=604800, immutable'); res.type(img.type).send(img.buf);
+});
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function newCode() {
   let c;
@@ -313,7 +320,7 @@ io.on('connection', socket => {
   });
   socket.on('chatHistory', cb => { reply(cb, null, { list: table ? table.chatHistory(pid) : [] }); });
   socket.on('sticker', (id, cb) => {
-    if (!table || !STICKERS.has(String(id))) return reply(cb);
+    if (!table || !STK.has(String(id))) return reply(cb);
     const now = Date.now(); if (socket.data.lastReact && now - socket.data.lastReact < 1500) return reply(cb, 'Slow down a little');
     socket.data.lastReact = now;
     const p = table.players.get(pid); if (p && p.seat != null) table.fx('sticker', { seat: p.seat, id: String(id) });
@@ -387,6 +394,27 @@ app.get('/admin/data', async (req, res) => {
   }
   try { res.json({ live, ...(await S.report()), today: S.dayOf() }); }
   catch (e) { console.error('admin report', e.message); res.json({ live, daily: [], top: [], accounts: 0, today: S.dayOf(), error: 'Saved stats could not load. Did you run supabase-stats.sql in Supabase?' }); }
+});
+
+// Stickers on the admin page: list, upload, remove
+const adminGate = (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  if (!process.env.ADMIN_PASS) { res.status(503).json({ error: 'Admin page is not set up yet. Add ADMIN_PASS on Render.' }); return false; }
+  const ok = adminOk(req);
+  if (ok === 'locked') { res.status(429).json({ error: 'Too many wrong tries. Wait 15 minutes.' }); return false; }
+  if (ok !== 'ok') { res.status(401).json({ error: 'Wrong password' }); return false; }
+  return true;
+};
+app.get('/admin/stickers', async (req, res) => { if (!adminGate(req, res)) return; await STK.load(); res.json({ list: STK.list() }); });
+app.post('/admin/stickers', express.json({ limit: '500kb' }), async (req, res) => {
+  if (!adminGate(req, res)) return;
+  try { const r = await STK.add(req.body && req.body.line, req.body && req.body.data); if (r.error) return res.status(400).json(r); res.json({ ok: true, ...r }); }
+  catch (e) { console.error('sticker add', e.message); res.status(500).json({ error: 'Could not save. Did you run supabase-stickers.sql in Supabase?' }); }
+});
+app.delete('/admin/stickers/:id', async (req, res) => {
+  if (!adminGate(req, res)) return;
+  try { const r = await STK.remove(String(req.params.id)); if (r.error) return res.status(400).json(r); res.json({ ok: true }); }
+  catch (e) { console.error('sticker remove', e.message); res.status(500).json({ error: 'Could not remove the sticker' }); }
 });
 
 // Close tables nobody has used for a while

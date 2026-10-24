@@ -952,7 +952,8 @@ function onFx(f) {
     case 'sticker': {
       const pos = seatPos(f.seat); const d = document.createElement('div');
       d.className = 'sticker-pop'; d.style.left = Math.min(80, Math.max(20, pos.x)) + '%'; d.style.top = Math.min(80, Math.max(14, pos.y)) + '%';
-      d.innerHTML = `<img src="/stickers/${encodeURIComponent(f.id)}.svg" alt="">`;
+      const st = STICKERS.find(x => x.id === f.id);
+      d.innerHTML = `<img src="${esc(st ? st.src : '/stickers/' + encodeURIComponent(f.id) + '.svg')}" alt="">`;
       $('table').appendChild(d); setTimeout(() => d.remove(), 2600); sfx('pop'); break;
     }
     case 'react': {
@@ -965,12 +966,13 @@ function onFx(f) {
 
 /* ---------- stickers ---------- */
 let STICKERS = [];
-fetch('/stickers/stickers.json').then(r => r.json()).then(j => { STICKERS = j.packs.flatMap(p => p.stickers); STICKERS.forEach(st => { const i = new Image(); i.src = `/stickers/${st.id}.svg`; }); }).catch(() => {});
+const loadStickers = () => fetch('/stickers/list').then(r => r.json()).then(j => { STICKERS = j.list || []; STICKERS.forEach(st => { const i = new Image(); i.src = st.src; }); }).catch(() => {});
+loadStickers(); setInterval(loadStickers, 10 * 60 * 1000); // new stickers from the admin page show up without a reload
 function stickerTray() {
   let t = $('stkTray');
   if (t && !t.hidden) { t.hidden = true; return; }
   if (!t) { t = document.createElement('div'); t.id = 'stkTray'; t.className = 'stk-tray'; document.body.appendChild(t); }
-  t.innerHTML = STICKERS.map(st => `<button data-stk="${esc(st.id)}" aria-label="${esc(st.line)}"><img src="/stickers/${esc(st.id)}.svg" alt=""></button>`).join('') || '<div class="sub-muted">Stickers are loading…</div>';
+  t.innerHTML = STICKERS.map(st => `<button data-stk="${esc(st.id)}" aria-label="${esc(st.line)}"><img src="${esc(st.src)}" alt=""></button>`).join('') || '<div class="sub-muted">Stickers are loading…</div>';
   t.hidden = false;
   t.onclick = e => { const b = e.target.closest('button[data-stk]'); if (!b) return; t.hidden = true; send('sticker', b.dataset.stk); };
 }

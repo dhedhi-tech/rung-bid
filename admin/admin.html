@@ -25,8 +25,13 @@ form{max-width:340px;margin:80px auto;background:var(--card);border:1px solid va
 input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#0b1113;color:var(--text);font-size:16px;margin:12px 0}
 button{width:100%;padding:12px;border:0;border-radius:10px;background:var(--acc);color:#1b1205;font-weight:700;font-size:15px;cursor:pointer}
 .err{color:#ff7b7b;font-size:13px;min-height:18px}.note{background:#2a2412;border:1px solid #5a4a1c;color:#f3d38a;border-radius:10px;padding:10px 12px;font-size:13px;margin-top:12px}
+.stk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.stk{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;display:grid;justify-items:center;gap:4px;font-size:12.5px;text-align:center}
+.stk img{width:96px;height:96px;object-fit:contain}.stk small{color:var(--mute)}.stk .rm{width:auto;padding:5px 10px;font-size:12px;background:#3a2020;color:#ffb3b3}
+.up{display:grid;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px;max-width:420px}
+.up input[type=text]{margin:0}#stkPrev img{width:120px;height:120px;object-fit:contain;background:#0f4a44;border-radius:10px}
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.top button{width:auto;padding:8px 12px;font-size:13px;background:var(--line);color:var(--text)}
-</style></head><body><main id="app"></main>
+</style></head><body><main id="app"></main><main id="stkAdmin" hidden></main>
 <script>
 const app = document.getElementById('app');
 let key = ''; try { key = sessionStorage.getItem('adminKey') || ''; } catch (e) {}
@@ -105,7 +110,64 @@ function show(j, warn) {
   <div class="tw"><table><tr><th>Name</th><th>XP</th><th>Games</th><th>Wins</th><th>Coins</th><th>Joined</th></tr>
     ${(j.top || []).map(p => `<tr><td>${esc(p.name)}</td><td>${num(p.xp)}</td><td>${num(p.games)}</td><td>${num(p.wins)}</td><td>${num(p.coins)}</td><td>${p.created_at ? dd(String(p.created_at).slice(0, 10)) : ''}</td></tr>`).join('') || '<tr><td colspan="6">No signed-in players yet</td></tr>'}
   </table></div>`;
-  document.getElementById('out').onclick = () => { try { sessionStorage.removeItem('adminKey'); } catch (e) {} key = ''; clearInterval(timer); timer = null; login(); };
+  document.getElementById('out').onclick = () => { try { sessionStorage.removeItem('adminKey'); } catch (e) {} key = ''; clearInterval(timer); timer = null; document.getElementById('stkAdmin').hidden = true; stkShown = false; login(); };
+  if (!stkShown) { stkShown = true; stickersAdmin(); }
+}
+// ---- stickers: upload your own, remove ones you added ----
+let stkShown = false;
+async function stickersAdmin(msg) {
+  const box = document.getElementById('stkAdmin'); box.hidden = false;
+  let list = [];
+  try { const r = await fetch('/admin/stickers', { headers: { 'x-admin-key': key } }); const j = await r.json(); list = j.list || []; } catch (e) {}
+  box.innerHTML = `<h2>Stickers (${list.length})</h2>
+    <div class="stk-grid">${list.map(st => `<div class="stk"><img src="${esc(st.src)}" alt=""><span>${esc(st.line)}</span>${st.builtin ? '<small>Built in</small>' : `<button class="rm" data-rm="${esc(st.id)}">Remove</button>`}</div>`).join('')}</div>
+    <div class="up"><b>Add a sticker</b><span class="sub">PNG, JPG, WebP or SVG. A square picture with a transparent background looks best. It appears for all players within 10 minutes.</span>
+      <input type="file" id="stkFile" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+      <div id="stkPrev"></div>
+      <input type="text" id="stkLine" maxlength="30" placeholder="Sticker line, e.g. Kya baat hai!">
+      <button id="stkAdd">Add sticker</button><div class="err" id="stkErr">${esc(msg || '')}</div></div>`;
+  let data = '';
+  document.getElementById('stkFile').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return; data = '';
+    try { data = await prepPic(f); document.getElementById('stkPrev').innerHTML = `<img src="${data}" alt="">`; document.getElementById('stkErr').textContent = ''; }
+    catch (err) { document.getElementById('stkErr').textContent = err.message; }
+  };
+  document.getElementById('stkAdd').onclick = async () => {
+    const line = document.getElementById('stkLine').value.trim();
+    if (!data) return (document.getElementById('stkErr').textContent = 'Choose a picture first');
+    if (!line) return (document.getElementById('stkErr').textContent = 'Type the sticker line');
+    const b = document.getElementById('stkAdd'); b.disabled = true; b.textContent = 'Saving…';
+    const r = await fetch('/admin/stickers', { method: 'POST', headers: { 'x-admin-key': key, 'Content-Type': 'application/json' }, body: JSON.stringify({ line, data }) });
+    const j = await r.json().catch(() => ({}));
+    stickersAdmin(r.ok ? 'Added ✔' : j.error || 'Could not save');
+  };
+  box.querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => {
+    if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'Sure?'; return; }
+    const r = await fetch('/admin/stickers/' + encodeURIComponent(b.dataset.rm), { method: 'DELETE', headers: { 'x-admin-key': key } });
+    const j = await r.json().catch(() => ({})); stickersAdmin(r.ok ? 'Removed' : j.error);
+  });
+}
+// SVG stays as it is; photos are shrunk to 320 px so they load fast in the game
+function prepPic(file) {
+  return new Promise((res, rej) => {
+    if (file.size > 3 * 1024 * 1024) return rej(new Error('Picture is too big (max 3 MB)'));
+    const rd = new FileReader();
+    rd.onload = () => {
+      if (file.type === 'image/svg+xml') { const d = String(rd.result); return d.length > 400000 ? rej(new Error('SVG is too big (max 300 KB)')) : res(d); }
+      const img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, 320 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        let d = c.toDataURL('image/webp', .9); if (!d.startsWith('data:image/webp')) d = c.toDataURL('image/png');
+        res(d);
+      };
+      img.onerror = () => rej(new Error('Could not read that picture'));
+      img.src = rd.result;
+    };
+    rd.onerror = () => rej(new Error('Could not read that file'));
+    rd.readAsDataURL(file);
+  });
 }
 key ? load() : login();
 </script></body></html>
