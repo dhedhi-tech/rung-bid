@@ -205,8 +205,9 @@ function renderSeats() {
       }
       const won = (S.gphase === 'play' || S.gphase === 'done') && S.tricks[i] ? `<span class="cb won">${S.tricks[i]}</span>` : '';
       const dealer = S.phase !== 'lobby' && i === S.dealer ? `<span class="cb dealer">D</span>` : '';
+      const who = p.bot ? `<span class="cb who" title="Bot">🤖</span>` : !p.connected ? `<span class="cb who away" title="Away">💤</span>` : '';
       const face = p.av ? avatarHTML({ name: p.name, av: p.av }, 'c-av') : `<span class="avatar c-av">${esc((i === 0 && me0() ? 'You' : p.name)[0].toUpperCase())}</span>`;
-      html += `<div class="seat compact ${t} ${active ? 'active' : ''} ${bidding ? 'bidding' : ''} ${spot ? 'spot' : ''} ${talking ? 'speaking' : ''} ${!p.bot && !p.connected ? 'offline' : ''}" data-seat="${i}" data-real="${p.real}" style="left:${pos.x}%;top:${pos.y}%">${spot ? '<span class="spot-light"></span>' : ''}<span class="c-face">${face}${badge}${dealer}${won}</span><span class="c-name">${esc(i === 0 && me0() ? 'You' : p.name)}</span>${tmr}</div>`;
+      html += `<div class="seat compact ${t} ${active ? 'active' : ''} ${bidding ? 'bidding' : ''} ${spot ? 'spot' : ''} ${talking ? 'speaking' : ''} ${!p.bot && !p.connected ? 'offline' : ''}" data-seat="${i}" data-real="${p.real}" style="left:${pos.x}%;top:${pos.y}%">${spot ? '<span class="spot-light"></span>' : ''}<span class="c-face">${face}${badge}${dealer}${won}${who}</span><span class="c-name">${esc(i === 0 && me0() ? 'You' : p.name)}</span>${tmr}</div>`;
       continue;
     }
     html += `<div class="seat ${t} ${active ? 'active' : ''} ${bidding ? 'bidding' : ''} ${spot ? 'spot' : ''} ${talking ? 'speaking' : ''} ${!p.bot && !p.connected ? 'offline' : ''}" data-seat="${i}" data-real="${p.real}" style="left:${pos.x}%;top:${pos.y}%;transform-origin:${pos.x < 30 ? 'left' : pos.x > 70 ? 'right' : 'center'} ${pos.y < 30 ? 'top' : pos.y > 70 ? 'bottom' : 'center'}">${spot ? '<span class="spot-light"></span>' : ''}<div class="s-name">${pic}${esc(i === 0 && me0() ? 'You' : p.name)}${tag}${backs ? ' ' : ''}${backs}</div><span class="s-role">${teamTag(i)}</span><div class="s-row">${chips}</div>${tmr}</div>`;
@@ -726,7 +727,7 @@ async function playerCard(realSeat) {
       incoming: `<button class="secondary fr-btn" data-fr="accept">✔ Accept friend request</button>`, friend: `<button class="secondary fr-btn" disabled>✔ Friends</button>` }[c.friend] || '';
   }
   const si = S ? S.seats.findIndex(x => x.real === realSeat) : -1;
-  const rel = si < 0 ? '' : `<div class="card-rel ${tcls(si)}">${si === 0 && me0() ? 'You' : teamTag(si)}${S.seats[si].bot ? ' · Bot' : ''}${S.dealer === si && S.phase !== 'lobby' ? ' · Dealer' : ''}</div>`;
+  const rel = si < 0 ? '' : `<div class="card-rel ${tcls(si)}">${si === 0 && me0() ? 'You' : teamTag(si)}${S.seats[si].bot ? ' · Bot' : !S.seats[si].connected ? ' · Away' : ''}${S.dealer === si && S.phase !== 'lobby' ? ' · Dealer' : ''}</div>`;
   openModal('card', rel + body + fbtn + `<button class="primary" id="cardClose">Close</button>`);
   $('cardClose').onclick = closeModal;
   const fb = document.querySelector('.fr-btn[data-fr]');
