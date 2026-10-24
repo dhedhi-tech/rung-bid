@@ -196,6 +196,19 @@ function renderSeats() {
     const bidding = active && (S.gphase === 'bid' || S.gphase === 'trump');
     const spot = S.bid && S.bid.seat === i && S.gphase === 'play';
     const pic = p.av ? avatarHTML({ name: p.name, av: p.av }, 's-av') : '<span class="dot"></span>';
+    if (S.n === 8) {
+      // 8 players: small round picture with the name only. Tap it for details.
+      let badge = '';
+      if (S.phase !== 'lobby') {
+        if (S.bid && S.bid.seat === i) badge = `<span class="cb holder ${t}">${S.bid.value}${S.trump ? SYM[S.trump] : ''}</span>`;
+        else if (S.gphase === 'bid' && S.acts && S.acts[i] !== undefined) badge = S.acts[i] === 'Pass' ? `<span class="cb pass">–</span>` : `<span class="cb bid">${S.acts[i]}</span>`;
+      }
+      const won = (S.gphase === 'play' || S.gphase === 'done') && S.tricks[i] ? `<span class="cb won">${S.tricks[i]}</span>` : '';
+      const dealer = S.phase !== 'lobby' && i === S.dealer ? `<span class="cb dealer">D</span>` : '';
+      const face = p.av ? avatarHTML({ name: p.name, av: p.av }, 'c-av') : `<span class="avatar c-av">${esc((i === 0 && me0() ? 'You' : p.name)[0].toUpperCase())}</span>`;
+      html += `<div class="seat compact ${t} ${active ? 'active' : ''} ${bidding ? 'bidding' : ''} ${spot ? 'spot' : ''} ${talking ? 'speaking' : ''} ${!p.bot && !p.connected ? 'offline' : ''}" data-seat="${i}" data-real="${p.real}" style="left:${pos.x}%;top:${pos.y}%">${spot ? '<span class="spot-light"></span>' : ''}<span class="c-face">${face}${badge}${dealer}${won}</span><span class="c-name">${esc(i === 0 && me0() ? 'You' : p.name)}</span>${tmr}</div>`;
+      continue;
+    }
     html += `<div class="seat ${t} ${active ? 'active' : ''} ${bidding ? 'bidding' : ''} ${spot ? 'spot' : ''} ${talking ? 'speaking' : ''} ${!p.bot && !p.connected ? 'offline' : ''}" data-seat="${i}" data-real="${p.real}" style="left:${pos.x}%;top:${pos.y}%;transform-origin:${pos.x < 30 ? 'left' : pos.x > 70 ? 'right' : 'center'} ${pos.y < 30 ? 'top' : pos.y > 70 ? 'bottom' : 'center'}">${spot ? '<span class="spot-light"></span>' : ''}<div class="s-name">${pic}${esc(i === 0 && me0() ? 'You' : p.name)}${tag}${backs ? ' ' : ''}${backs}</div><span class="s-role">${teamTag(i)}</span><div class="s-row">${chips}</div>${tmr}</div>`;
   }
   $('seats').innerHTML = html;
@@ -712,7 +725,9 @@ async function playerCard(realSeat) {
     else fbtn = { none: `<button class="secondary fr-btn" data-fr="add">➕ Add friend</button>`, sent: `<button class="secondary fr-btn" disabled>Friend request sent</button>`,
       incoming: `<button class="secondary fr-btn" data-fr="accept">✔ Accept friend request</button>`, friend: `<button class="secondary fr-btn" disabled>✔ Friends</button>` }[c.friend] || '';
   }
-  openModal('card', body + fbtn + `<button class="primary" id="cardClose">Close</button>`);
+  const si = S ? S.seats.findIndex(x => x.real === realSeat) : -1;
+  const rel = si < 0 ? '' : `<div class="card-rel ${tcls(si)}">${si === 0 && me0() ? 'You' : teamTag(si)}${S.seats[si].bot ? ' · Bot' : ''}${S.dealer === si && S.phase !== 'lobby' ? ' · Dealer' : ''}</div>`;
+  openModal('card', rel + body + fbtn + `<button class="primary" id="cardClose">Close</button>`);
   $('cardClose').onclick = closeModal;
   const fb = document.querySelector('.fr-btn[data-fr]');
   if (fb) fb.onclick = async () => { fb.disabled = true; const r = await send(fb.dataset.fr === 'accept' ? 'friend:accept' : 'friend:add', c.fid); if (r && r.ok) playerCard(realSeat); else fb.disabled = false; };
