@@ -196,8 +196,8 @@ function renderSeats() {
     const bidding = active && (S.gphase === 'bid' || S.gphase === 'trump');
     const spot = S.bid && S.bid.seat === i && S.gphase === 'play';
     const pic = p.av ? avatarHTML({ name: p.name, av: p.av }, 's-av') : '<span class="dot"></span>';
-    if (S.n === 8) {
-      // 8 players: small round picture with the name only. Tap it for details.
+    {
+      // Small round picture with the name only. Tap it for details.
       let badge = '';
       if (S.phase !== 'lobby') {
         if (S.bid && S.bid.seat === i) badge = `<span class="cb holder ${t}">${S.bid.value}${S.trump ? SYM[S.trump] : ''}</span>`;

@@ -402,7 +402,7 @@ class Table {
     const mine = per * (1 + (share - 1) * (h / 13));
     let est = mine + (team - 1) * per * 0.95 - [0.6, 0.3, 0.1][round - 1] + (Math.random() - 0.5) * 0.4;
     // Opponents showing the same suit again and again are strong; my partners are likely weaker. Bidding over 8+ needs more.
-    if (oppHolds) est -= 0.5 * Math.max(0, oppShows - 1) + (G.bid.value >= 8 ? 0.6 : 0); // only once they've shown it twice
+    if (oppHolds) est -= 0.5 * oppShows + (G.bid.value >= 8 ? 0.6 : 0);
     const cap = [share >= 2.6 ? 7 : 6, 8, 13][round - 1];
     const jk = p.hand.filter(isJ).length;
     const jBonus = jk * (0.3 + 0.5 * Math.max(0, Math.min(1, share - 1)));
