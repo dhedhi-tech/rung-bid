@@ -46,7 +46,7 @@ jobs:
 
       - name: Build app bundle
         working-directory: android-app/android
-        run: chmod +x gradlew && ./gradlew --no-daemon bundleRelease
+        run: chmod +x gradlew && ./gradlew --no-daemon bundleRelease assembleRelease
 
       - name: Publish to Releases
         env:
@@ -55,6 +55,9 @@ jobs:
           if [ -n "$UPLOAD_KEY_PASSWORD" ]; then KIND="ready for Play Console"; else KIND="UNSIGNED test build, add the UPLOAD_KEY_PASSWORD secret"; fi
           OUT="patta-party-$VERSION_NAME.aab"
           cp android/app/build/outputs/bundle/release/app-release.aab "$OUT"
-          gh release create "app-$VERSION_NAME" "$OUT" --target "$GITHUB_SHA" --prerelease \
+          # .apk = install directly on a phone for testing; .aab = upload to Play Console
+          APK="patta-party-$VERSION_NAME-phone-test.apk"
+          cp android/app/build/outputs/apk/release/app-release*.apk "$APK"
+          gh release create "app-$VERSION_NAME" "$OUT" "$APK" --target "$GITHUB_SHA" --prerelease \
             --title "Patta Party app $VERSION_NAME ($KIND)" \
-            --notes "Android app build $VERSION_CODE from branch ${GITHUB_REF_NAME}. Upload the .aab file in Play Console."
+            --notes "Android app build $VERSION_CODE from branch ${GITHUB_REF_NAME}. Play Console: upload the .aab file. Phone test: download the .apk on your Android phone and install it."
