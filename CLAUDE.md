@@ -39,12 +39,20 @@ Live on Render (auto-deploys every push to `main`), accounts in Supabase, code o
 ## Features (live)
 Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open tables list (public tables, join as audience), "Your game" resume, same-person-on-two-apps seat take-over, Google sign-in (Supabase), levels/coins/badges/felt store, profile pictures (Google, 16 emoji avatars, upload), leaderboard, friends + invites + request badge, chat + speech typing, voice chat (WebRTC mesh; TURN via ExpressTURN env vars TURN_URL/TURN_USER/TURN_PASS), emoji reactions, stickers (tray + popups; Ansa uploads more on /admin), round seats on the table edge, bid leader spotlight, active bidder enlarged, joker missile sound, admin stats page.
 
+## Android app (android-app/)
+- Capacitor 8 wrapper that loads https://pattaparty.com (server.url), app id `com.dhedhitech.pattaparty`, portrait only, targetSdk 36. Play developer name: Dhedhi Tech (console Gmail tech.dhedhi@gmail.com).
+- The app adds `PattaPartyApp` to the user agent; `NATIVE_APP` in app.js. In the app, Google sign-in opens the phone browser (Capacitor Browser) and returns via `com.dhedhitech.pattaparty://auth?code=...` (App plugin `appUrlOpen` then `exchangeCodeForSession`). That URL must be in Supabase Auth > URL Configuration > Redirect URLs. Voice chat is allowed in the app (RECORD_AUDIO permission).
+- Icons/splash: put new art in `android-app/assets/` (icon-only.png, icon-foreground.png, icon-background.png 1024px; splash.png 2732px) then `npx @capacitor/assets generate --android`. Current icon is temporary.
+- Build: `.github/workflows/android.yml` runs on any push touching android-app/ (any branch) or by hand; it publishes a signed .aab to GitHub Releases. versionCode = workflow run number.
+- Upload key: `android-app/upload-key.jks.enc` (AES-256, openssl pbkdf2 200000), alias `upload`. Password is the GitHub secret UPLOAD_KEY_PASSWORD (Ansa keeps a copy). Never print it. No secret = unsigned test build.
+- This session's proxy blocks the GitHub Actions API; check results via the Releases API.
+
 ## Render environment (names only)
 SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TURN_USER, TURN_PASS, optional CONTACT_EMAIL. Never print or store their values.
 
 ## Next steps (launch plan)
-1. Ansa: Google Play developer account (personal, $25, ID check) and buy pattaparty.com (Namecheap).
+1. Play developer account applied Oct 25 2026 (personal, developer name Dhedhi Tech), ID check pending. pattaparty.com bought.
 2. DONE (Oct 2026): pattaparty.com live on Render. Code has no hardcoded old URLs.
-3. Build the Android app (Capacitor wrapper around the site, portrait only), icon, splash, AdMob rewarded/interstitial ads; Ansa creates an AdMob account.
+3. IN PROGRESS: Android app built (see Android app section). Still to do: real logo, AdMob rewarded/interstitial ads (Ansa creates an AdMob account), Play store listing.
 4. Closed test: 12+ testers for 14 days (Google rule), then production review. Upgrade Render to the $7 plan before launch.
 5. Later: real push notifications (friends, invites), sticker packs for coins, landscape/tablet layout.
