@@ -1,0 +1,60 @@
+# Builds the Patta Party Android app (.aab for Google Play) and attaches it to a GitHub Release.
+# Runs when anything in android-app/ changes, or by hand from the Actions tab ("Run workflow").
+# Does not touch the live website (Render only deploys main).
+name: Android app
+
+on:
+  push:
+    paths:
+      - 'android-app/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      UPLOAD_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
+      VERSION_CODE: ${{ github.run_number }}
+      VERSION_NAME: 1.0.${{ github.run_number }}
+    defaults:
+      run:
+        working-directory: android-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npx cap sync android
+
+      - name: Unlock upload key
+        if: env.UPLOAD_KEY_PASSWORD != ''
+        run: |
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in upload-key.jks.enc -out "$RUNNER_TEMP/upload.jks" -pass env:UPLOAD_KEY_PASSWORD
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$UPLOAD_KEY_PASSWORD" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$UPLOAD_KEY_PASSWORD" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=upload" >> "$GITHUB_ENV"
+
+      - name: Build app bundle
+        working-directory: android-app/android
+        run: chmod +x gradlew && ./gradlew --no-daemon bundleRelease
+
+      - name: Publish to Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "$UPLOAD_KEY_PASSWORD" ]; then KIND="ready for Play Console"; else KIND="UNSIGNED test build, add the UPLOAD_KEY_PASSWORD secret"; fi
+          OUT="patta-party-$VERSION_NAME.aab"
+          cp android/app/build/outputs/bundle/release/app-release.aab "$OUT"
+          gh release create "app-$VERSION_NAME" "$OUT" --target "$GITHUB_SHA" --prerelease \
+            --title "Patta Party app $VERSION_NAME ($KIND)" \
+            --notes "Android app build $VERSION_CODE from branch ${GITHUB_REF_NAME}. Upload the .aab file in Play Console."

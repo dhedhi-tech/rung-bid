@@ -485,6 +485,25 @@ function joinSheet() {
 /* ---------- accounts: sign in, profile, levels, coins ---------- */
 let FRQ = 0; // friend requests waiting
 let AUTH = { auth: false }, PROFILE = null, sbClient = null, sbToken = null;
+// Running inside the Patta Party Android app (the app adds "PattaPartyApp" to the user agent)
+const NATIVE_APP = /PattaPartyApp/.test(navigator.userAgent || '');
+const APP_AUTH_URL = 'com.dhedhitech.pattaparty://auth';
+const capPlugin = n => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[n]) || null;
+// Google blocks sign-in inside app webviews, so the app signs in through the phone's browser and comes back with a code
+async function appAuthReturn(url) {
+  if (!url || url.indexOf(APP_AUTH_URL) !== 0 || !sbClient) return;
+  const B = capPlugin('Browser'); if (B) { try { await B.close(); } catch (e) {} }
+  const code = new URL(url).searchParams.get('code');
+  if (!code) return;
+  const { data, error } = await sbClient.auth.exchangeCodeForSession(code);
+  if (error) { flash('Sign-in did not finish. Please try again.'); return; }
+  setToken(data.session ? data.session.access_token : null);
+}
+function initAppAuth() {
+  const A = capPlugin('App'); if (!A) return;
+  A.addListener('appUrlOpen', e => appAuthReturn(e && e.url));
+  if (A.getLaunchUrl) A.getLaunchUrl().then(r => appAuthReturn(r && r.url)).catch(() => {});
+}
 const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js';
 function loadScript(src) { return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); }); }
 async function initAuth() {
@@ -497,6 +516,7 @@ async function initAuth() {
       sbClient.auth.onAuthStateChange((_ev, sess) => setToken(sess ? sess.access_token : null));
       const { data } = await sbClient.auth.getSession();
       setToken(data.session ? data.session.access_token : null);
+      if (NATIVE_APP) initAppAuth();
     } catch (e) { console.warn('auth', e); }
   } else if (AUTH.dev && store.get('rb-dev')) authNow();
 }
@@ -529,6 +549,11 @@ function signIn() {
     return;
   }
   if (!sbClient) { flash('Sign-in is not set up yet.'); return; }
+  if (NATIVE_APP && capPlugin('Browser')) {
+    sbClient.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: APP_AUTH_URL, skipBrowserRedirect: true } })
+      .then(({ data }) => { if (data && data.url) capPlugin('Browser').open({ url: data.url }); else flash('Sign-in could not start. Please try again.'); });
+    return;
+  }
   if (inApp) { openInBrowserHelp('Google sign-in'); return; }
   sbClient.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + '/' + location.search } });
 }
@@ -1015,7 +1040,8 @@ sockReady.forEach(f => f());
 /* In-app browsers (WhatsApp, Facebook, Instagram) often block the microphone and speech typing */
 const UA = navigator.userAgent || '';
 const isAndroid = /Android/i.test(UA), isIOS = /iPhone|iPad|iPod/i.test(UA);
-const inApp = /WhatsApp|FBAN|FBAV|FB_IAB|Instagram|Line\//i.test(UA) || (isAndroid && /; wv\)/.test(UA)) || (isIOS && !/Safari\//.test(UA));
+// Our own Android app (Capacitor) is a webview too, but it allows the mic, so it is not treated as a blocked in-app browser
+const inApp = !NATIVE_APP && (/WhatsApp|FBAN|FBAV|FB_IAB|Instagram|Line\//i.test(UA) || (isAndroid && /; wv\)/.test(UA)) || (isIOS && !/Safari\//.test(UA)));
 function openInBrowserHelp(feature) {
   let d = $('inapp');
   if (!d) { d = document.createElement('div'); d.className = 'modal tut-modal'; d.id = 'inapp'; document.body.appendChild(d); }

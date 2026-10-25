@@ -1,0 +1,20 @@
+{
+  "appId": "com.dhedhitech.pattaparty",
+  "appName": "Patta Party",
+  "webDir": "www",
+  "server": {
+    "url": "https://pattaparty.com",
+    "androidScheme": "https"
+  },
+  "appendUserAgent": "PattaPartyApp",
+  "android": {
+    "backgroundColor": "#0c1618"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "backgroundColor": "#0c1618",
+      "showSpinner": false
+    }
+  }
+}
