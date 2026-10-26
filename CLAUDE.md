@@ -37,7 +37,12 @@ Live on Render (auto-deploys every push to `main`), accounts in Supabase, code o
 - Play: partner win and return, void tracking, `isBoss` (no unseen card can beat it), go for the trick once the partner has played.
 
 ## Features (live)
-Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open tables list (public tables, join as audience), "Your game" resume, same-person-on-two-apps seat take-over, Google sign-in (Supabase), levels/coins/badges/felt store, profile pictures (Google, 16 emoji avatars, upload), leaderboard, friends + invites + request badge, chat + speech typing, voice chat (WebRTC mesh; TURN via ExpressTURN env vars TURN_URL/TURN_USER/TURN_PASS), emoji reactions, stickers (tray + popups; Ansa uploads more on /admin), round seats on the table edge, bid leader spotlight, active bidder enlarged, joker missile sound, admin stats page.
+Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open tables list (public tables, join as audience), "Your game" resume, same-person-on-two-apps seat take-over, Google sign-in (Supabase), levels/coins/badges/felt store, profile pictures (Google, 16 emoji avatars, upload), leaderboard, friends + invites + request badge, chat + speech typing, voice chat (WebRTC mesh; TURN via ExpressTURN env vars TURN_URL/TURN_USER/TURN_PASS), emoji reactions, stickers (tray + popups; Ansa uploads more on /admin), round seats on the table edge, bid leader spotlight, active bidder enlarged, joker missile sound, admin stats page, guided practice coach.
+
+## Guided practice (coach)
+- Practice sheet has "Coach tips" On/Off (on until `rb-coached` is set; the tutorial's last button always turns it on). Create sends `guided: true`; server sets `table.guided` (forces private).
+- Server (game.js): `guidedOn()` = guided + hand 1 + exactly one seated human. Then no turn timer, `ask.hint` from the bots' own logic (`coachHint`: bid value/suit, trump, card id + reason code), and `coach` socket event: `{hold}` pauses the game at the next sleep while a tip is open (auto-release 120s), `{off}` = Skip tips. Joker mode: the player is dealt the joker in their first 5 cards.
+- Client `public/coach.js`: tip bubble (positions: top for bid/trump/joker-in-hand, above the hand otherwise, bottom for the hand-end tip), gold glow on the coach pick, tips for deals, rounds, trump, first tricks, joker played/cancel/stuck, and the score at hand end.
 
 ## Android app (android-app/)
 - Capacitor 8 wrapper that loads https://pattaparty.com (server.url), app id `com.dhedhitech.pattaparty`, portrait only, targetSdk 36. Play developer name: Dhedhi Tech (console Gmail tech.dhedhi@gmail.com).

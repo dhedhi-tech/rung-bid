@@ -66,6 +66,8 @@ class Table {
     this.lastActive = Date.now();
     this.G = null;
     this.waitNext = null;
+    this.guided = false;      // guided practice: coach tips during the first hand
+    this.hold = null;         // coach bubble open: the game waits until the player taps "Got it"
   }
 
   // ---------- membership ----------
@@ -193,8 +195,55 @@ class Table {
 
   // ---------- pacing ----------
   sleep(ms) {
-    return new Promise((res, rej) => setTimeout(() => this.alive ? res() : rej(new Abort()), ms));
+    return new Promise((res, rej) => setTimeout(() => this.alive ? res() : rej(new Abort()), ms)).then(() => this.coachWait());
   }
+
+  // ---------- guided practice (coach) ----------
+  // Only while one real player is seated and during the first hand
+  guidedOn() {
+    return this.guided && this.G && this.G.handNo === 1 && this.seats.filter((_, i) => this.isHuman(i)).length === 1;
+  }
+  coachWait() {
+    if (!this.hold || !this.guidedOn()) return Promise.resolve();
+    return this.hold.p.then(() => { if (!this.alive) throw new Abort(); });
+  }
+  setHold(on) {
+    if (on && !this.hold && this.guidedOn()) {
+      let r; const p = new Promise(res => { r = res; });
+      const t = setTimeout(() => this.setHold(false), 120000); // never stuck for long
+      this.hold = { p, release: () => { clearTimeout(t); r(); } };
+    } else if (!on && this.hold) { const h = this.hold; this.hold = null; h.release(); }
+  }
+  coach(pid, msg) {
+    const p = this.players.get(pid); if (!p || p.seat == null || !msg) return;
+    if (msg.off) { this.guided = false; this.setHold(false); return; }
+    this.setHold(!!msg.hold);
+  }
+  // What the bots would do in this seat, with a short reason code for the coach bubble
+  coachHint(seat, kind) {
+    const G = this.G, hand = G.players[seat].hand;
+    if (kind === 'bid') {
+      const keep = G.supportSeat; const v = this.botBid(seat, G.round); G.supportSeat = keep;
+      const suit = SUITS.slice().sort((a, b) => power(hand, b) - power(hand, a))[0];
+      return { v: v || null, suit, partnerHolds: !!(G.bid && G.bid.seat % 2 === seat % 2), oppHolds: !!(G.bid && G.bid.seat % 2 !== seat % 2) };
+    }
+    if (kind === 'trump') { const keep = G.supportSeat; const s = this.botTrump(seat); G.supportSeat = keep; return { s }; }
+    const keep = G.returnTo[seat]; const card = this.botPlay(seat); G.returnTo[seat] = keep;
+    const T = G.trump, team = seat % 2;
+    let why;
+    if (!G.trick.length) why = card.s === T ? 'leadTrump' : this.isBoss(seat, card) ? 'leadBoss' : 'leadLow';
+    else if (isJ(card)) why = 'joker';
+    else {
+      const res = this.trickResult(), cur = this.currentWinner();
+      const wins = res.team !== team && !res.flipped && this.beats(card, cur.card);
+      if (res.team === team) why = 'partnerWins';
+      else if (wins && card.s === T && G.leadSuit !== T) why = 'cut';
+      else if (wins) why = 'win';
+      else why = card.s === G.leadSuit ? 'cantWin' : 'throwLow';
+    }
+    return { id: card.id, why };
+  }
+
 
   // ---------- text with per-viewer names ----------
   // {n3} name of seat 3, {v3:bid:bids} "You bid" / "Sana bids", {t1} team name, {tl1} lowercase
@@ -220,7 +269,7 @@ class Table {
     const rotTeam = t => (t - base % 2 + 2) % 2;
     const flip = base % 2 === 1 ? -1 : 1;
     const v = {
-      code: this.code, n, joker: this.joker, limit: this.limit, phase: this.phase, me: me < 0 ? null : 0, spectator: me < 0,
+      code: this.code, n, joker: this.joker, guided: this.guided, limit: this.limit, phase: this.phase, me: me < 0 ? null : 0, spectator: me < 0,
       isHost: pid === this.hostId,
       seats: Array.from({ length: n }, (_, i) => {
         const s = this.seats[(i + base) % n];
@@ -307,12 +356,14 @@ class Table {
       G.deadline = 0; this.broadcast();
       return this.sleep(PACE.bot).then(() => fallback());
     }
+    const guided = this.guidedOn();
     const ms = TURN_MS[kind];
-    G.deadline = Date.now() + ms;
+    G.deadline = guided ? 0 : Date.now() + ms; // guided practice: no turn timer
+    if (guided) { try { askView = { ...askView, hint: this.coachHint(seat, kind) }; } catch (e) { console.error('coach', e); } }
     return new Promise((resolve, reject) => {
       let done = false;
       const finish = val => { if (done) return; done = true; clearTimeout(timer); this.pending = null; G.deadline = 0; if (!this.alive) reject(new Abort()); else resolve(val); };
-      const timer = setTimeout(() => finish(fallback()), ms);
+      const timer = guided ? null : setTimeout(() => finish(fallback()), ms);
       this.pending = {
         seat, kind, askView,
         submit: val => { if (!valid(val)) return 'Not allowed'; finish(val); return null; },
@@ -355,6 +406,7 @@ class Table {
   }
   destroy() {
     this.alive = false;
+    this.setHold(false);
     if (this.abortWait) this.abortWait();
     if (this.pending) this.pending.abort();
     if (this.waitNext) this.waitNext();
@@ -671,6 +723,7 @@ class Table {
     if (over) return true;
     await new Promise(res => { const t = setTimeout(res, HAND_END_MS); this.waitNext = () => { clearTimeout(t); res(); }; });
     this.waitNext = null;
+    await this.coachWait();
     if (!this.alive) throw new Abort();
     G.result = null; G.handNo++;
     return false;
@@ -694,6 +747,12 @@ class Table {
     });
     G.players.forEach(p => { p.hand = []; p.tricks = 0; });
     G.deck = shuffle(buildDeck(G.n, G.joker));
+    if (G.joker && this.guidedOn()) {
+      const h = this.seats.findIndex((_, i) => this.isHuman(i)), start = (G.dealer + 1) % G.n;
+      const pos = G.deck.length - 1 - (((h - start) % G.n + G.n) % G.n + 2 * G.n); // their 3rd card of the first deal
+      const j = G.deck.findIndex(isJ);
+      if (h >= 0 && j >= 0) [G.deck[j], G.deck[pos]] = [G.deck[pos], G.deck[j]];
+    }
     this.log(`{v${G.dealer}:deal:deals}`);
     const plan = [5, 4, 4];
     for (let r = 1; r <= 3; r++) {

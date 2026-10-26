@@ -131,7 +131,9 @@ io.on('connection', socket => {
     const n = [4, 6, 8].includes(opts && opts.n) ? opts.n : 4;
     if (tables.size > 500) return reply(cb, 'Server is busy. Try again in a minute.');
     const code = newCode();
-    const t = new Table(code, { n, joker: !!(opts && opts.joker), hostId: pid, limit: opts && Number(opts.limit), pub: !!(opts && opts.pub) }, io);
+    const guided = !!(opts && opts.guided);
+    const t = new Table(code, { n, joker: !!(opts && opts.joker), hostId: pid, limit: opts && Number(opts.limit), pub: !!(opts && opts.pub) && !guided }, io);
+    t.guided = guided;
     wireProgress(t);
     tables.set(code, t);
     leave(); table = t; socket.data.tableCode = t.code; t.addClient(socket, pid, name);
@@ -204,6 +206,7 @@ io.on('connection', socket => {
     if (msg.kind === 'trump') val = String(val);
     reply(cb, table.act(pid, msg.kind, val));
   });
+  socket.on('coach', (msg, cb) => { if (table) table.coach(pid, msg); reply(cb); });
   socket.on('setLimit', (lim, cb) => { if (!table) return reply(cb, 'Not at a table'); reply(cb, table.setLimit(pid, Number(lim))); });
   socket.on('next', cb => { if (table) table.dealNow(pid); reply(cb); });
   socket.on('again', cb => { if (!table) return reply(cb, 'Not at a table'); reply(cb, table.playAgain(pid)); });

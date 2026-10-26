@@ -497,6 +497,20 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
 .tut-banner b{color:var(--team-a);font-size:14.5px}
 .tut-open{width:100%;margin-bottom:6px}
 .tut-modal{z-index:40}
+/* Coach (guided practice) */
+.coach{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 8px);transform:translateX(-50%);z-index:54;width:min(420px,calc(100vw - 20px));box-sizing:border-box;
+  background:var(--panel);border:1px solid var(--team-a);border-radius:14px;padding:12px 14px 10px;box-shadow:0 14px 40px rgba(0,0,0,.6);font-size:14px;line-height:1.45}
+.coach.low{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 12px)}
+.coach.pop{animation:coachIn .28s cubic-bezier(.2,.8,.3,1)}
+@keyframes coachIn{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
+.coach-eye{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--team-a);margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.coach-ic{font-size:15px;letter-spacing:0}
+.coach-txt b{color:var(--fg)}
+.coach-btns{display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:10px}
+.coach-btns .primary{width:auto;padding:8px 22px;margin:0}
+.coach-btns .linkbtn{margin:0;padding:6px 0}
+.coach-pick{outline:3px solid #ffd76a;outline-offset:2px;animation:coachGlow 1.1s ease-in-out infinite}
+@keyframes coachGlow{50%{outline-color:rgba(255,215,106,.25)}}
 .sheet.tut{width:min(480px,100%)}
 .tut-top{display:flex;justify-content:space-between;align-items:center}
 .tut-x{background:none;border:0;color:var(--muted);font-size:18px;padding:4px 6px}
@@ -614,5 +628,6 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
 <script src="/socket.io/socket.io.js"></script>
 <script src="/app.js"></script>
 <script src="/tutorial.js"></script>
+<script src="/coach.js"></script>
 </body>
 </html>

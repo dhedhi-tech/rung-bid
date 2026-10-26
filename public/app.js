@@ -24,7 +24,7 @@ let pid = store.get('rb-pid');
 if (!pid) { pid = 'p' + Math.random().toString(36).slice(2) + Date.now().toString(36); store.set('rb-pid', pid); }
 let myName = store.get('rb-name') || '';
 let tableCode = (new URLSearchParams(location.search).get('t') || '').toUpperCase() || null;
-let homeN = 4, homeJ = false, homeL = 10, homePub = true;
+let homeN = 4, homeJ = false, homeL = 10, homePub = true, homeCoach = true;
 const limitName = l => (l === 6 ? 'Quick · 6 hands' : l === 10 ? 'Normal · 10 hands' : 'Full · no hand limit');
 
 /* ---------- sound ---------- */
@@ -448,6 +448,7 @@ function createSheet(practice) {
     <div class="field"><span>Mode</span><div class="seg text" id="segJ"><button data-j="0">Classic</button><button data-j="1">Joker mode</button></div></div>
     <div class="field"><span>Game length</span><div class="seg" id="segL">
       <button data-l="6">Quick<small>6 hands</small></button><button data-l="10">Normal<small>10 hands</small></button><button data-l="0">Full<small>no limit</small></button></div></div>
+    ${practice ? '<div class="field"><span>Coach tips</span><div class="seg text" id="segC"><button data-c="1">On</button><button data-c="0">Off</button></div></div>' : ''}
     <div class="field"><span>Who can join</span><div class="seg text" id="segP"><button data-p="1">Anyone</button><button data-p="0">Only with link</button></div></div>
     <button class="primary" id="goCreate">${practice ? 'Start practice' : 'Create table'}</button>
     <div class="err" id="homeErr"></div>
@@ -457,8 +458,11 @@ function createSheet(practice) {
     document.querySelectorAll('#segJ button').forEach(b => b.classList.toggle('on', (b.dataset.j === '1') === homeJ));
     document.querySelectorAll('#segL button').forEach(b => b.classList.toggle('on', +b.dataset.l === homeL));
     document.querySelectorAll('#segP button').forEach(b => b.classList.toggle('on', (b.dataset.p === '1') === homePub));
+    document.querySelectorAll('#segC button').forEach(b => b.classList.toggle('on', (b.dataset.c === '1') === homeCoach));
   };
   homePub = !practice;
+  homeCoach = !store.get('rb-coached'); // on until the player has finished one guided hand
+  if ($('segC')) $('segC').onclick = e => { const b = e.target.closest('button'); if (b) { homeCoach = b.dataset.c === '1'; sync(); } };
   sync();
   $('segP').onclick = e => { const b = e.target.closest('button'); if (b) { homePub = b.dataset.p === '1'; sync(); } };
   $('segN').onclick = e => { const b = e.target.closest('button'); if (b) { homeN = +b.dataset.n; sync(); } };
@@ -1317,7 +1321,7 @@ function connecting() {
 let awaitingCreate = false;
 async function createTable(practice) {
   awaitingCreate = true;
-  const r = await send('create', { n: homeN, joker: homeJ, limit: homeL, pub: homePub });
+  const r = await send('create', { n: homeN, joker: homeJ, limit: homeL, pub: homePub, guided: !!(practice && homeCoach) });
   awaitingCreate = false;
   if (!r || !r.ok) return;
   tableCode = r.code; history.replaceState(null, '', '/?t=' + r.code); store.set('rb-table', r.code);
@@ -1369,7 +1373,7 @@ syncSound();
 $('rulesBtn').onclick = () => { $('rules').hidden = false; };
 $('rulesClose').onclick = () => { $('rules').hidden = true; };
 $('rulesTut').onclick = () => { $('rules').hidden = true; openTutorial(S ? 'game' : 'home'); };
-window.tutorialPractice = () => { if (myName) { ac(); createTable(true); } else createSheet(true); };
+window.tutorialPractice = () => { homeCoach = true; if (myName) { ac(); createTable(true); } else createSheet(true); };
 $('leaveBtn').onclick = () => {
   if (!S) { homeScreen(); return; }
   const b = $('leaveBtn');
