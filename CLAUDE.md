@@ -41,7 +41,7 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 
 ## Guided practice (coach)
 - Practice sheet has "Coach tips" On/Off (on until `rb-coached` is set; the tutorial's last button always turns it on). Create sends `guided: true`; server sets `table.guided` (forces private).
-- Server (game.js): `guidedOn()` = guided + hand 1 + exactly one seated human. Then no turn timer, `ask.hint` from the bots' own logic (`coachHint`: bid value/suit, trump, card id + reason code), and `coach` socket event: `{hold}` pauses the game at the next sleep while a tip is open (auto-release 120s), `{off}` = Skip tips. Joker mode: the player is dealt the joker in their first 5 cards.
+- Server (game.js): `guidedOn()` = guided + hand 1 + exactly one seated human. Then no turn timer, `ask.hint` from the bots' own logic (`coachHint`: bid value/suit, trump, card id + reason code), and `coach` socket event: `{hold}` pauses the game at the next sleep while a tip is open (auto-release 120s), `{off}` = Skip tips. Hand 1 is rigged (`rigDeck`, `G.rigged`): the player gets top trump-suit cards + aces (+ a joker in the first 5 cards in Joker mode), teammates get ~3 of 4 good cards, and the coach bids safely (never over a teammate, max 8). Player's team wins ~98% when following the coach (4/6/8p tested). 6/8p: tips about 2 decks and identical cards (last played wins).
 - Client `public/coach.js`: tip bubble (positions: top for bid/trump/joker-in-hand, above the hand otherwise, bottom for the hand-end tip), gold glow on the coach pick, tips for deals, rounds, trump, first tricks, joker played/cancel/stuck, and the score at hand end.
 
 ## Android app (android-app/)

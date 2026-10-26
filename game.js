@@ -223,9 +223,15 @@ class Table {
   coachHint(seat, kind) {
     const G = this.G, hand = G.players[seat].hand;
     if (kind === 'bid') {
-      const keep = G.supportSeat; const v = this.botBid(seat, G.round); G.supportSeat = keep;
+      const keep = G.supportSeat; let v = this.botBid(seat, G.round), safe = false; G.supportSeat = keep;
+      if (G.rigged && v) {
+        // Winning first hand: bid safely. Never over your own partner, and no higher than needed (max 8)
+        const cur = G.bid ? G.bid.value : 5;
+        v = G.bid && G.bid.seat % 2 === seat % 2 ? null : Math.min(v, Math.max(7, cur + 1));
+        if (v > 8) { v = null; safe = true; }
+      }
       const suit = SUITS.slice().sort((a, b) => power(hand, b) - power(hand, a))[0];
-      return { v: v || null, suit, partnerHolds: !!(G.bid && G.bid.seat % 2 === seat % 2), oppHolds: !!(G.bid && G.bid.seat % 2 !== seat % 2) };
+      return { v: v || null, safe, suit, partnerHolds: !!(G.bid && G.bid.seat % 2 === seat % 2), oppHolds: !!(G.bid && G.bid.seat % 2 !== seat % 2) };
     }
     if (kind === 'trump') { const keep = G.supportSeat; const s = this.botTrump(seat); G.supportSeat = keep; return { s }; }
     const keep = G.returnTo[seat]; const card = this.botPlay(seat); G.returnTo[seat] = keep;
@@ -574,6 +580,41 @@ class Table {
     return low(groups[suits[0]]);
   }
 
+  // Guided practice, first hand: deal the new player's team the strong cards so they get a confident first win.
+  // The player gets the top trump-suit cards and aces (and a joker in their first 5 cards in Joker mode); partners get most of the other good cards.
+  rigDeck() {
+    const G = this.G, n = G.n, h = this.seats.findIndex((_, i) => this.isHuman(i)); if (h < 0) return;
+    const T = SUITS[Math.floor(Math.random() * 4)];
+    const val = c => (isJ(c) ? 100 : (c.s === T ? 50 : 0) + c.r);
+    const pool = shuffle(G.deck.slice()).sort((a, b) => val(b) - val(a));
+    const take = c => pool.splice(pool.indexOf(c), 1)[0];
+    const hands = Array.from({ length: n }, () => []);
+    const mine = hands[h];
+    const jok = pool.find(isJ); if (jok) mine.push(take(jok));
+    pool.filter(c => c.s === T).slice(0, 4).forEach(c => mine.push(take(c)));
+    pool.filter(c => c.s !== T && !isJ(c) && c.r === 14).slice(0, 2).forEach(c => mine.push(take(c)));
+    const lows = shuffle(pool.filter(c => !isJ(c) && c.r <= 9 && c.s !== T)); while (mine.length < 13 && lows.length) mine.push(take(lows.pop()));
+    // The rest: from strongest down, partners get about 3 of every 4 good cards
+    const partners = [...Array(n).keys()].filter(i => i !== h && i % 2 === h % 2), opps = [...Array(n).keys()].filter(i => i % 2 !== h % 2);
+    const room = side => side.filter(i => hands[i].length < 13);
+    for (const c of pool.slice()) {
+      const pr = room(partners), op = room(opps);
+      const side = !op.length || (pr.length && (isJ(c) || Math.random() < 0.78)) ? pr : op; // a second joker (8 players) goes to a partner
+      hands[side[Math.floor(Math.random() * side.length)]].push(take(c));
+    }
+    // Deal order: the player's first 5 cards hold their best trumps (and the joker), so they can bid in round 1
+    mine.sort((a, b) => val(b) - val(a));
+    const first = [...mine.slice(0, 4), mine[mine.length - 1]];
+    const firstSet = new Set(first);
+    hands[h] = [...first, ...shuffle(mine.filter(c => !firstSet.has(c)))];
+    for (let i = 0; i < n; i++) if (i !== h) shuffle(hands[i]);
+    // Rebuild the deck so deal() hands out exactly these cards (deal pops from the end, 5 then 4 then 4)
+    const start = (G.dealer + 1) % n, popped = [], next = Array(n).fill(0);
+    for (const k of [5, 4, 4]) for (let i = 0; i < k; i++) for (let j = 0; j < n; j++) { const st = (start + j) % n; popped.push(hands[st][next[st]++]); }
+    if (popped.some(c => !c) || popped.length !== G.deck.length) return; // safety: keep the normal shuffle
+    G.deck = popped.reverse(); G.rigged = true;
+  }
+
   // ---------- flow ----------
   async deal(k) {
     const G = this.G, start = (G.dealer + 1) % G.n;
@@ -747,12 +788,8 @@ class Table {
     });
     G.players.forEach(p => { p.hand = []; p.tricks = 0; });
     G.deck = shuffle(buildDeck(G.n, G.joker));
-    if (G.joker && this.guidedOn()) {
-      const h = this.seats.findIndex((_, i) => this.isHuman(i)), start = (G.dealer + 1) % G.n;
-      const pos = G.deck.length - 1 - (((h - start) % G.n + G.n) % G.n + 2 * G.n); // their 3rd card of the first deal
-      const j = G.deck.findIndex(isJ);
-      if (h >= 0 && j >= 0) [G.deck[j], G.deck[pos]] = [G.deck[pos], G.deck[j]];
-    }
+    G.rigged = false;
+    if (this.guidedOn()) this.rigDeck();
     this.log(`{v${G.dealer}:deal:deals}`);
     const plan = [5, 4, 4];
     for (let r = 1; r <= 3; r++) {
