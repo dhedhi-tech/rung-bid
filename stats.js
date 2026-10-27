@@ -68,4 +68,4 @@ function memReport() {
   return { daily, top: [], accounts: 0, memory: true };
 }
 
-module.exports = { enabled, playerSeen, logGame, report, dayOf };
+module.exports = { enabled, playerSeen, logGame, report, dayOf, sb };

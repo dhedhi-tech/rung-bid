@@ -734,6 +734,36 @@ function invitePop(v) {
     hideWelcome(); joinRoom(v.code);
   };
 }
+// Muted players (on this phone only): their chat, voice, stickers and reactions are hidden
+const MUTES = new Set((() => { try { return JSON.parse(store.get('rb-mutes') || '[]'); } catch (e) { return []; } })());
+const isMuted = mid => !!mid && MUTES.has(mid);
+const seatMuted = s => !!(S && S.seats[s] && isMuted(S.seats[s].mid));
+function setMute(mid, on) {
+  if (!mid) return;
+  if (on) MUTES.add(mid); else MUTES.delete(mid);
+  const all = [...MUTES]; store.set('rb-mutes', JSON.stringify(all.slice(-300)));
+  if (on) chatUnread = 0;
+  applyVoiceMutes(); renderChat();
+}
+function applyVoiceMutes() {
+  if (!S || !V.peers) return;
+  for (const [id, P] of V.peers) { const st = S.seats.find(x => x.voice && x.voice.sid === id); if (P.audio) P.audio.muted = !!(st && isMuted(st.mid)); }
+}
+const REPORT_REASONS = ['Bad language', 'Bullying or harassment', 'Cheating', 'Bad name or picture', 'Something else'];
+function reportSheet(realSeat, name, mid) {
+  openModal('card', `<div class="eyebrow">Report player</div><h2>Report ${esc(name)}</h2><p class="hint">What's the problem? We'll check it.</p>
+    <div class="rep-list">${REPORT_REASONS.map(r => `<button class="secondary" data-rr="${esc(r)}">${esc(r)}</button>`).join('')}</div>
+    <button class="linkbtn" id="repBack">Back</button>`);
+  $('repBack').onclick = () => playerCard(realSeat);
+  document.querySelector('.rep-list').onclick = async e => {
+    const b = e.target.closest('button[data-rr]'); if (!b) return;
+    document.querySelectorAll('.rep-list button').forEach(x => { x.disabled = true; });
+    const r = await send('report', { real: realSeat, reason: b.dataset.rr });
+    if (!r || !r.ok) { document.querySelectorAll('.rep-list button').forEach(x => { x.disabled = false; }); return; }
+    setMute(mid, true); closeModal();
+    toast(r.already ? `You already reported ${name}. They are muted for you.` : `Thanks, report sent. ${name} is muted for you.`);
+  };
+}
 // Player card: tap any seat at the table
 async function playerCard(realSeat) {
   const r = await send('card', realSeat); if (!r || !r.ok) return;
@@ -760,8 +790,15 @@ async function playerCard(realSeat) {
   }
   const si = S ? S.seats.findIndex(x => x.real === realSeat) : -1;
   const rel = si < 0 ? '' : `<div class="card-rel ${tcls(si)}">${si === 0 && me0() ? 'You' : teamTag(si)}${S.seats[si].bot ? ' · Bot' : !S.seats[si].connected ? ' · Away' : ''}${S.dealer === si && S.phase !== 'lobby' ? ' · Dealer' : ''}</div>`;
-  openModal('card', rel + body + fbtn + `<button class="primary" id="cardClose">Close</button>`);
+  // Mute and Report for other real players
+  const st = si >= 0 ? S.seats[si] : null, other = st && !st.bot && st.mid && !(si === 0 && me0()) && !c.me;
+  const safety = other ? `<div class="card-safety"><button class="secondary" id="cardMute">${isMuted(st.mid) ? '🔊 Unmute' : '🔇 Mute'}</button><button class="secondary" id="cardReport">🚩 Report</button></div>` : '';
+  openModal('card', rel + body + fbtn + safety + `<button class="primary" id="cardClose">Close</button>`);
   $('cardClose').onclick = closeModal;
+  if (other) {
+    $('cardMute').onclick = () => { const on = !isMuted(st.mid); setMute(st.mid, on); toast(on ? `${st.name} is muted. You won't see their chat or hear their voice.` : `${st.name} is unmuted.`); playerCard(realSeat); };
+    $('cardReport').onclick = () => reportSheet(realSeat, st.name, st.mid);
+  }
   const fb = document.querySelector('.fr-btn[data-fr]');
   if (fb) fb.onclick = async () => { fb.disabled = true; const r = await send(fb.dataset.fr === 'accept' ? 'friend:accept' : 'friend:add', c.fid); if (r && r.ok) playerCard(realSeat); else fb.disabled = false; };
 }
@@ -902,7 +939,7 @@ function render() {
   renderTricks(); renderHeader(); renderSeats(); renderHand(); renderStatus(); renderTrickCards();
   const t = myTurnText() || (S.ask && S.ask.kind === 'bid' ? 'Your bid' : S.ask && S.ask.kind === 'trump' ? 'Call trump' : null);
   if (t) $('stMain').textContent = t;
-  renderAsk();
+  renderAsk(); applyVoiceMutes();
   $('reacts').hidden = S.phase === 'lobby';
   $('reacts').classList.toggle('watching', !me0());
 
@@ -998,6 +1035,7 @@ function onFx(f) {
       break;
     }
     case 'sticker': {
+      if (seatMuted(f.seat)) break;
       const pos = seatPos(f.seat); const d = document.createElement('div');
       d.className = 'sticker-pop'; d.style.left = Math.min(80, Math.max(20, pos.x)) + '%'; d.style.top = Math.min(80, Math.max(14, pos.y)) + '%';
       const st = STICKERS.find(x => x.id === f.id);
@@ -1005,6 +1043,7 @@ function onFx(f) {
       $('table').appendChild(d); setTimeout(() => d.remove(), 2600); sfx('pop'); break;
     }
     case 'react': {
+      if (seatMuted(f.seat)) break;
       const pos = seatPos(f.seat); const d = document.createElement('div');
       d.className = 'react-pop'; d.textContent = f.emo; d.style.left = pos.x + '%'; d.style.top = pos.y + '%';
       $('table').appendChild(d); setTimeout(() => d.remove(), 1900); sfx('pop'); break;
@@ -1141,6 +1180,7 @@ function makePeer(id) {
   pc.ontrack = e => {
     if (!P.audio) { P.audio = document.createElement('audio'); P.audio.autoplay = true; P.audio.setAttribute('playsinline', ''); P.audio.hidden = true; document.body.appendChild(P.audio); }
     P.audio.srcObject = e.streams[0]; P.audio.play().catch(() => {});
+    applyVoiceMutes();
   };
   pc.onnegotiationneeded = async () => {
     try { P.makingOffer = true; await pc.setLocalDescription(); sock.emit('voice:signal', { to: id, data: { d: pc.localDescription } }); }
@@ -1273,7 +1313,8 @@ function renderChat() {
   const b = $('chatBadge'); if (b) { b.hidden = !chatUnread; b.textContent = chatUnread > 9 ? '9+' : chatUnread; }
   if (!chatOpen) return;
   const list = $('chatList');
-  list.innerHTML = chatMsgs.length ? chatMsgs.map(m => {
+  const shown = chatMsgs.filter(m => m.mine || !isMuted(m.mid));
+  list.innerHTML = shown.length ? shown.map(m => {
     const cls = m.seat == null ? 'aud' : tcls(m.seat);
     const who = m.seat == null && !m.mine ? `${esc(m.name)} <small>(audience)</small>` : esc(m.name);
     return `<div class="cmsg ${m.mine ? 'mine' : ''}"><span class="pn ${cls}">${who}</span> ${esc(m.text)}</div>`;
@@ -1285,7 +1326,7 @@ async function loadChat() {
   if (r && r.ok) { chatMsgs = r.list; renderChat(); }
 }
 function chatBubble(m) {
-  if (m.seat == null || !S || S.phase === 'lobby') return;
+  if (m.seat == null || !S || S.phase === 'lobby' || (!m.mine && isMuted(m.mid))) return;
   const pos = seatPos(m.seat), d = document.createElement('div');
   d.className = 'chat-bubble ' + tcls(m.seat); d.textContent = m.text.length > 60 ? m.text.slice(0, 57) + '…' : m.text;
   d.style.left = pos.x + '%'; d.style.top = pos.y + '%';
@@ -1293,7 +1334,7 @@ function chatBubble(m) {
 }
 sock.on('chat', m => {
   chatMsgs.push(m); if (chatMsgs.length > 50) chatMsgs.shift();
-  if (!chatOpen && !m.mine) { chatUnread++; sfx('pop'); }
+  if (!chatOpen && !m.mine && !isMuted(m.mid)) { chatUnread++; sfx('pop'); }
   renderChat(); chatBubble(m);
 });
 

@@ -37,7 +37,12 @@ Live on Render (auto-deploys every push to `main`), accounts in Supabase, code o
 - Play: partner win and return, void tracking, `isBoss` (no unseen card can beat it), go for the trick once the partner has played.
 
 ## Features (live)
-Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open tables list (public tables, join as audience), "Your game" resume, same-person-on-two-apps seat take-over, Google sign-in (Supabase), levels/coins/badges/felt store, profile pictures (Google, 16 emoji avatars, upload), leaderboard, friends + invites + request badge, chat + speech typing, voice chat (WebRTC mesh; TURN via ExpressTURN env vars TURN_URL/TURN_USER/TURN_PASS), emoji reactions, stickers (tray + popups; Ansa uploads more on /admin), round seats on the table edge, bid leader spotlight, active bidder enlarged, joker missile sound, admin stats page, guided practice coach.
+Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open tables list (public tables, join as audience), "Your game" resume, same-person-on-two-apps seat take-over, Google sign-in (Supabase), levels/coins/badges/felt store, profile pictures (Google, 16 emoji avatars, upload), leaderboard, friends + invites + request badge, chat + speech typing, voice chat (WebRTC mesh; TURN via ExpressTURN env vars TURN_URL/TURN_USER/TURN_PASS), emoji reactions, stickers (tray + popups; Ansa uploads more on /admin), round seats on the table edge, bid leader spotlight, active bidder enlarged, joker missile sound, admin stats page, guided practice coach, mute + report players.
+
+## Mute and report
+- Player card (tap a seat) shows 🔇 Mute and 🚩 Report for other real players. Seats and chat entries carry `mid` (hash of account id, else player id; `midOf` in game.js, `t.idOf` set in server.js).
+- Mute is per phone (localStorage `rb-mutes`): hides their chat, chat bubbles, stickers, reactions and silences their voice (`applyVoiceMutes`).
+- Report: reasons list, server `report` event saves reason, both names/pids/account ids and the reported player's last 20 chat lines at that table (`reports.js`, Supabase table from `supabase-reports.sql`), one report per player per table, max 10 per connection. Reporting also mutes. Admin page shows Player reports.
 
 ## Guided practice (coach)
 - Practice sheet has "Coach tips" On/Off (on until `rb-coached` is set; the tutorial's last button always turns it on). Create sends `guided: true`; server sets `table.guided` (forces private).

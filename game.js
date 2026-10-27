@@ -1,6 +1,7 @@
 // Patta Party game engine. The server is the referee: it holds every hand, checks every move,
 // runs bots for empty or idle seats, and sends each player only what they are allowed to see.
 
+const crypto = require('crypto');
 const SUITS = ['S', 'H', 'C', 'D'];
 const SYM = { S: '♠', H: '♥', D: '♦', C: '♣' };
 const SNAME = { S: 'Spades', H: 'Hearts', D: 'Diamonds', C: 'Clubs' };
@@ -159,10 +160,18 @@ class Table {
     if (p) p.seat = null;
     s.pid = null; s.bot = true; s.name = this.botName(seat);
   }
+  // Mute id: a short code for a person (their account if signed in, else their player id), so players can mute them on their own phone
+  midOf(pid) {
+    if (!pid) return null;
+    const id = this.idOf ? this.idOf(pid) : null, k = id ? 'u:' + id : 'p:' + pid;
+    if (!this.mids) this.mids = new Map();
+    let m = this.mids.get(k); if (!m) { m = crypto.createHash('sha256').update(k).digest('hex').slice(0, 12); this.mids.set(k, m); }
+    return m;
+  }
   // ---------- text chat ----------
   chatEntry(m, viewerPid) {
     const vp = viewerPid && this.players.get(viewerPid); const me = vp && vp.seat != null ? vp.seat : -1; const base = me < 0 ? 0 : me;
-    return { id: m.id, name: m.pid === viewerPid ? 'You' : m.name, mine: m.pid === viewerPid, text: m.text, ts: m.ts,
+    return { id: m.id, name: m.pid === viewerPid ? 'You' : m.name, mine: m.pid === viewerPid, mid: this.midOf(m.pid), text: m.text, ts: m.ts,
       seat: m.seat == null ? null : (m.seat - base + this.n) % this.n };
   }
   chat(pid, text) {
@@ -281,7 +290,7 @@ class Table {
         const s = this.seats[(i + base) % n];
         const pl = s.pid && this.players.get(s.pid);
         const vc = s.pid && !s.bot ? [...this.voice.entries()].find(([, x]) => x.pid === s.pid) : null;
-        return { name: s.name, bot: s.bot, human: !s.bot, connected: !!(pl && pl.connected), host: s.pid === this.hostId, real: (i + base) % n,
+        return { name: s.name, bot: s.bot, human: !s.bot, mid: !s.bot && s.pid ? this.midOf(s.pid) : null, connected: !!(pl && pl.connected), host: s.pid === this.hostId, real: (i + base) % n,
           voice: vc ? { sid: vc[0], muted: vc[1].muted } : null, lvl: !s.bot && s.pid && this.levelOf ? this.levelOf(s.pid) : null, av: !s.bot && s.pid && this.avOf ? this.avOf(s.pid) : null };
       }),
       lobbyNames: [...this.players.values()].filter(x => x.connected && x.seat == null).map(x => x.name),

@@ -31,7 +31,12 @@ button{width:100%;padding:12px;border:0;border-radius:10px;background:var(--acc)
 .up{display:grid;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px;max-width:420px}
 .up input[type=text]{margin:0}#stkPrev img{width:120px;height:120px;object-fit:contain;background:#0f4a44;border-radius:10px}
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.top button{width:auto;padding:8px 12px;font-size:13px;background:var(--line);color:var(--text)}
-</style></head><body><main id="app"></main><main id="stkAdmin" hidden></main>
+.rep-list{display:grid;gap:10px;margin-bottom:24px}
+.rep{border:1px solid #2b444b;border-radius:10px;padding:10px 12px;display:grid;gap:4px;font-size:14px}
+.rep-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.rep-why{font-weight:800;color:#f4a93a}
+.rep-chat{background:rgba(255,255,255,.05);border-radius:8px;padding:6px 8px;font-size:13px;max-height:140px;overflow:auto}
+</style></head><body><main id="app"></main><main id="repAdmin" hidden></main><main id="stkAdmin" hidden></main>
 <script>
 const app = document.getElementById('app');
 let key = ''; try { key = sessionStorage.getItem('adminKey') || ''; } catch (e) {}
@@ -110,8 +115,24 @@ function show(j, warn) {
   <div class="tw"><table><tr><th>Name</th><th>XP</th><th>Games</th><th>Wins</th><th>Coins</th><th>Joined</th></tr>
     ${(j.top || []).map(p => `<tr><td>${esc(p.name)}</td><td>${num(p.xp)}</td><td>${num(p.games)}</td><td>${num(p.wins)}</td><td>${num(p.coins)}</td><td>${p.created_at ? dd(String(p.created_at).slice(0, 10)) : ''}</td></tr>`).join('') || '<tr><td colspan="6">No signed-in players yet</td></tr>'}
   </table></div>`;
-  document.getElementById('out').onclick = () => { try { sessionStorage.removeItem('adminKey'); } catch (e) {} key = ''; clearInterval(timer); timer = null; document.getElementById('stkAdmin').hidden = true; stkShown = false; login(); };
+  document.getElementById('out').onclick = () => { try { sessionStorage.removeItem('adminKey'); } catch (e) {} key = ''; clearInterval(timer); timer = null; document.getElementById('stkAdmin').hidden = true; document.getElementById('repAdmin').hidden = true; stkShown = false; login(); };
   if (!stkShown) { stkShown = true; stickersAdmin(); }
+  reportsAdmin();
+}
+// ---- player reports (Report button on a player's card in the game) ----
+async function reportsAdmin() {
+  const box = document.getElementById('repAdmin'); box.hidden = false;
+  let list = [], err = '';
+  try { const r = await fetch('/admin/reports', { headers: { 'x-admin-key': key } }); const j = await r.json(); list = j.list || []; err = j.error || ''; } catch (e) { err = 'Could not load reports'; }
+  const when = t => { const d = new Date(t); return d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
+  const who = (n, uid) => `<b>${esc(n || '?')}</b>${uid ? ' <small>(account)</small>' : ' <small>(guest)</small>'}`;
+  box.innerHTML = `<h2>Player reports (${list.length})</h2>${err ? `<div class="note">${esc(err)}</div>` : ''}
+    ${list.length ? `<div class="rep-list">${list.map(r => `<div class="rep">
+      <div class="rep-top"><span class="rep-why">${esc(r.reason)}</span><span class="sub">${esc(when(r.at))} · table ${esc(r.table_code || '')}</span></div>
+      <div>${who(r.reported_name, r.reported_uid)} reported by ${who(r.reporter_name, r.reporter_uid)}</div>
+      ${r.reported_uid ? `<div class="sub">Account id: ${esc(r.reported_uid)}</div>` : ''}
+      ${(r.chat || []).length ? `<div class="rep-chat">${r.chat.map(m => `<div>“${esc(m.t)}”</div>`).join('')}</div>` : '<div class="sub">No chat messages from them at that table.</div>'}
+    </div>`).join('')}</div>` : '<div class="sub">No reports yet.</div>'}`;
 }
 // ---- stickers: upload your own, remove ones you added ----
 let stkShown = false;

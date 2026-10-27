@@ -6,6 +6,7 @@ const { Server } = require('socket.io');
 const { Table } = require('./game');
 const A = require('./accounts');
 const S = require('./stats');
+const R = require('./reports');
 const F = require('./friends');
 // Signed-in players who are online right now: profile id -> Map(socket id -> socket)
 const online = new Map();
@@ -104,6 +105,7 @@ function wireProgress(t) {
   t.onGameStart = () => S.logGame({ kind: 'start', ...tableInfo(t) });
   t.levelOf = p => { const a = pidAuth.get(p); return a ? A.levelOf(a.profile.xp) : null; };
   t.avOf = p => { const a = pidAuth.get(p); return a ? A.avOf(a.profile) : null; };
+  t.idOf = p => { const a = pidAuth.get(p); return a ? a.profile.id : null; };
   t.onHandEnd = info => {
     if (info.over) S.logGame({ kind: 'finish', ...tableInfo(t), hands: t.G.handNo });
     for (const s of info.seats) {
@@ -310,6 +312,24 @@ io.on('connection', socket => {
     if (mine && mine.profile.id !== a.profile.id) { try { friend = await F.status(mine.profile.id, a.profile.id); } catch (e) { friend = null; } }
     reply(cb, null, { card: { fid: a.profile.id, friend, me: !!(mine && mine.profile.id === a.profile.id), name: s.name, fullName: v.name, av: v.av, level: v.level, games: v.games, wins: v.wins, hands: v.hands, handWins: v.handWins, bidsMade: v.bidsMade, bidsTotal: v.bidsTotal, sweeps: v.sweeps, since: a.profile.created_at || null } });
   });
+  // Report a player from their player card. Saved with their last chat lines at this table for the admin page.
+  socket.on('report', async (msg, cb) => {
+    if (!table || !msg) return reply(cb, 'Not at a table');
+    const s = table.seats[Number(msg.real)], reason = String(msg.reason || '');
+    if (!s || s.bot || !s.pid || s.pid === pid) return reply(cb, 'You can only report other players');
+    if (!R.REASONS.includes(reason)) return reply(cb, 'Pick a reason');
+    const done = socket.data.reported || (socket.data.reported = new Set()), key = table.code + ':' + s.pid;
+    if (done.has(key)) return reply(cb, null, { already: true });
+    if (done.size >= 10) return reply(cb, 'Too many reports. Try again later.');
+    done.add(key);
+    const me = table.players.get(pid), myAuth = pidAuth.get(pid), theirAuth = pidAuth.get(s.pid);
+    const chat = table.chatLog.filter(m => m.pid === s.pid).slice(-20).map(m => ({ t: m.text, at: m.ts }));
+    try {
+      await R.add({ table_code: table.code, reason, reporter_name: me ? me.name : name, reporter_pid: pid, reporter_uid: myAuth ? myAuth.profile.id : null,
+        reported_name: s.name, reported_pid: s.pid, reported_uid: theirAuth ? theirAuth.profile.id : null, chat });
+      reply(cb);
+    } catch (e) { console.error('report', e.message); done.delete(key); reply(cb, 'Could not send the report. Try again in a minute.'); }
+  });
   socket.on('equip', (item, cb) => {
     const a = pidAuth.get(pid); if (!a) return reply(cb, 'Sign in first');
     const err = A.equip(a.profile, String(item)); reply(cb, err, { profile: A.view(a.profile) });
@@ -418,6 +438,12 @@ app.delete('/admin/stickers/:id', async (req, res) => {
   if (!adminGate(req, res)) return;
   try { const r = await STK.remove(String(req.params.id)); if (r.error) return res.status(400).json(r); res.json({ ok: true }); }
   catch (e) { console.error('sticker remove', e.message); res.status(500).json({ error: 'Could not remove the sticker' }); }
+});
+
+app.get('/admin/reports', async (req, res) => {
+  if (!adminGate(req, res)) return;
+  try { res.json({ list: await R.list() }); }
+  catch (e) { console.error('reports', e.message); res.json({ list: [], error: 'Reports could not load. Did you run supabase-reports.sql in Supabase?' }); }
 });
 
 // Close tables nobody has used for a while
