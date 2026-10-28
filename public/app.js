@@ -1441,5 +1441,22 @@ else if (tableCode) {
   else { invitePending = true; nameScreen(); }
 }
 else homeScreen();
+// Android back button (app only): close what is open, else press twice to leave the table or exit the app
+let backAt = 0;
+function appBack() {
+  const vis = id => $(id) && !$(id).hidden;
+  if (vis('stkTray')) { $('stkTray').hidden = true; return; }
+  if (vis('inapp')) { $('inapp').hidden = true; return; }
+  if (vis('tut') && $('tutClose')) { $('tutClose').click(); return; }
+  if (vis('rules')) { $('rules').hidden = true; return; }
+  if (chatOpen) { closeChat(); return; }
+  if (modalKind && !['lobby', 'result', 'over', 'name'].includes(modalKind)) { closeModal(); return; }
+  const atTable = !!(S && tableCode);
+  if (Date.now() - backAt > 2500) { backAt = Date.now(); toast(atTable ? 'Press back again to leave the table' : 'Press back again to exit'); return; }
+  backAt = 0;
+  if (atTable) leaveTable();
+  else { const A = capPlugin('App'); if (A && A.exitApp) A.exitApp(); }
+}
+if (NATIVE_APP) { const A = capPlugin('App'); if (A) A.addListener('backButton', appBack); }
 sock.connect();
 initAuth();

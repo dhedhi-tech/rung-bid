@@ -56,6 +56,7 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Build: `.github/workflows/android.yml` runs on any push touching android-app/ (any branch) or by hand; it publishes a signed .aab to GitHub Releases. versionCode = workflow run number.
 - Upload key: `android-app/upload-key.jks.enc` (AES-256, openssl pbkdf2 200000), alias `upload`. Password is the GitHub secret UPLOAD_KEY_PASSWORD (Ansa keeps a copy). Never print it. No secret = unsigned test build.
 - This session's proxy blocks the GitHub Actions API; check results via the Releases API.
+- Android back button (`appBack` at the end of app.js, App plugin `backButton`): closes sticker tray / help / tutorial / rules / chat / closable sheets; otherwise press twice: leave the table, or exit the app on the home screen. Added Oct 28 after tester feedback.
 
 ## Render environment (names only)
 SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TURN_USER, TURN_PASS, optional CONTACT_EMAIL. Never print or store their values.
@@ -66,6 +67,6 @@ SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TUR
 3. IN PROGRESS: Android app built (see Android app section). Still to do: real logo, AdMob rewarded/interstitial ads (Ansa creates an AdMob account), Play store listing.
 4. Closed test PUBLISHED Oct 28 2026 (track "Closed testing - Alpha", version 5 / 1.0.5, Pakistan only, 16 testers, WhatsApp testers group). Needs 12+ opted in for 14 days, then Apply for production. Upgrade Render to the $7 plan before launch.
    - Waiting on Ansa: run supabase-reports.sql, add CONTACT_EMAIL on Render, say "deploy" for mute/report.
-   - Before production (Ansa said wait): Delete my account button (Google requires). Back button and vibration only if testers ask. Real logo, AdMob (then Ads + Advertising ID answers change to Yes), Play Store video (YouTube link).
+   - Before production (Ansa said wait): Delete my account button (Google requires). Back button DONE (tester asked). Vibration only if testers ask. Real logo, AdMob (then Ads + Advertising ID answers change to Yes), Play Store video (YouTube link).
    - Play Console answers given: app access No restriction, ads No, target audience 18+, content rating interactions Yes, data safety (name, email, user IDs, photos, voice + chat ephemeral, app interactions, device IDs), advertising ID No.
 5. Later: real push notifications (friends, invites), sticker packs for coins, landscape/tablet layout.
