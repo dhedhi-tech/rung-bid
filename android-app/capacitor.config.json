@@ -3,8 +3,12 @@
   "appName": "Patta Party",
   "webDir": "www",
   "server": {
-    "url": "https://pattaparty.com",
-    "androidScheme": "https"
+    "url": "https://www.pattaparty.com",
+    "androidScheme": "https",
+    "allowNavigation": [
+      "pattaparty.com",
+      "www.pattaparty.com"
+    ]
   },
   "appendUserAgent": "PattaPartyApp",
   "android": {

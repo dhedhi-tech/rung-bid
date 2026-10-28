@@ -50,7 +50,7 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Client `public/coach.js`: tip bubble (positions: top for bid/trump/joker-in-hand, above the hand otherwise, bottom for the hand-end tip), gold glow on the coach pick, tips for deals, rounds, trump, first tricks, joker played/cancel/stuck, and the score at hand end.
 
 ## Android app (android-app/)
-- Capacitor 8 wrapper that loads https://pattaparty.com (server.url), app id `com.dhedhitech.pattaparty`, portrait only, targetSdk 36. Play developer name: Dhedhi Tech (console Gmail tech.dhedhi@gmail.com).
+- Capacitor 8 wrapper that loads https://www.pattaparty.com (server.url; the apex redirects to www on Render, and a redirect to another host makes Capacitor open Chrome, fixed in version 6), app id `com.dhedhitech.pattaparty`, portrait only, targetSdk 36. Play developer name: Dhedhi Tech (console Gmail tech.dhedhi@gmail.com).
 - The app adds `PattaPartyApp` to the user agent; `NATIVE_APP` in app.js. In the app, Google sign-in opens the phone browser (Capacitor Browser) and returns via `com.dhedhitech.pattaparty://auth?code=...` (App plugin `appUrlOpen` then `exchangeCodeForSession`). That URL must be in Supabase Auth > URL Configuration > Redirect URLs. Voice chat is allowed in the app (RECORD_AUDIO permission).
 - Icons/splash: put new art in `android-app/assets/` (icon-only.png, icon-foreground.png, icon-background.png 1024px; splash.png 2732px) then `npx @capacitor/assets generate --android`. Current icon is temporary.
 - Build: `.github/workflows/android.yml` runs on any push touching android-app/ (any branch) or by hand; it publishes a signed .aab to GitHub Releases. versionCode = workflow run number.
