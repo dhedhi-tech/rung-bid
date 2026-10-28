@@ -44,13 +44,14 @@ function logGame(row) {
 // ---- report for the admin page ----
 async function report() {
   if (!enabled) return memReport();
-  const [daily, top, count] = await Promise.all([
+  const [daily, top, count, recent] = await Promise.all([
     sb('/rest/v1/admin_daily?select=*&order=day.desc&limit=30'),
     sb('/rest/v1/profiles?select=name,xp,coins,games,wins,created_at&order=games.desc,xp.desc&limit=15'),
     sb('/rest/v1/profiles?select=id&limit=1', { headers: { Prefer: 'count=exact' } }),
+    sb('/rest/v1/profiles?select=name,created_at,games,xp&order=created_at.desc&limit=30'),
   ]);
   const total = count.range ? Number(count.range.split('/')[1]) || 0 : 0;
-  return { daily: daily.data || [], top: top.data || [], accounts: total };
+  return { daily: daily.data || [], top: top.data || [], accounts: total, recent: recent.data || [] };
 }
 function memReport() {
   const days = new Set([...mem.days.keys(), ...mem.log.map(l => dayOf(l.at))]);

@@ -114,6 +114,10 @@ function show(j, warn) {
   <h2>Top players (${num(j.accounts)} accounts)</h2>
   <div class="tw"><table><tr><th>Name</th><th>XP</th><th>Games</th><th>Wins</th><th>Coins</th><th>Joined</th></tr>
     ${(j.top || []).map(p => `<tr><td>${esc(p.name)}</td><td>${num(p.xp)}</td><td>${num(p.games)}</td><td>${num(p.wins)}</td><td>${num(p.coins)}</td><td>${p.created_at ? dd(String(p.created_at).slice(0, 10)) : ''}</td></tr>`).join('') || '<tr><td colspan="6">No signed-in players yet</td></tr>'}
+  </table></div>
+  <h2>Recent sign-ups</h2>
+  <div class="tw"><table><tr><th>Name</th><th>Signed up</th><th>Games</th><th>XP</th></tr>
+    ${(j.recent || []).map(p => `<tr><td>${esc(p.name)}</td><td>${p.created_at ? esc(new Date(p.created_at).toLocaleString('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })) : ''}</td><td>${num(p.games)}</td><td>${num(p.xp)}</td></tr>`).join('') || '<tr><td colspan="4">No sign-ups yet</td></tr>'}
   </table></div>`;
   document.getElementById('out').onclick = () => { try { sessionStorage.removeItem('adminKey'); } catch (e) {} key = ''; clearInterval(timer); timer = null; document.getElementById('stkAdmin').hidden = true; document.getElementById('repAdmin').hidden = true; stkShown = false; login(); };
   if (!stkShown) { stkShown = true; stickersAdmin(); }
