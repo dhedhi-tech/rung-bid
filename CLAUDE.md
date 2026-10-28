@@ -66,8 +66,8 @@ SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TUR
 1. Play developer account applied Oct 25 2026 (personal, developer name Dhedhi Tech), ID check pending. pattaparty.com bought.
 2. DONE (Oct 2026): pattaparty.com live on Render. Code has no hardcoded old URLs.
 3. IN PROGRESS: Android app built (see Android app section). Still to do: real logo, AdMob rewarded/interstitial ads (Ansa creates an AdMob account), Play store listing.
-4. Closed test PUBLISHED Oct 28 2026 (track "Closed testing - Alpha", version 5 / 1.0.5, Pakistan only, 16 testers, WhatsApp testers group). Needs 12+ opted in for 14 days, then Apply for production. Upgrade Render to the $7 plan before launch.
-   - Waiting on Ansa: run supabase-reports.sql, add CONTACT_EMAIL on Render, say "deploy" for mute/report.
+4. Closed test PUBLISHED Oct 28 2026 (track "Closed testing - Alpha", version 6 / 1.0.6 live same day (opens in-app), Pakistan only, 16 testers, WhatsApp testers group). Needs 12+ opted in for 14 days, then Apply for production. Upgrade Render to the $7 plan before launch.
+   - Deployed Oct 28: mute/report, back button, admin recent sign-ups + app usage. Ansa to run supabase-reports.sql and supabase-app.sql if not done; add CONTACT_EMAIL on Render.
    - Before production (Ansa said wait): Delete my account button (Google requires). Back button DONE (tester asked). Vibration only if testers ask. Real logo, AdMob (then Ads + Advertising ID answers change to Yes), Play Store video (YouTube link).
    - Play Console answers given: app access No restriction, ads No, target audience 18+, content rating interactions Yes, data safety (name, email, user IDs, photos, voice + chat ephemeral, app interactions, device IDs), advertising ID No.
 5. Later: real push notifications (friends, invites), sticker packs for coins, landscape/tablet layout.
