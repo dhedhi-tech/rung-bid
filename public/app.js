@@ -1077,7 +1077,7 @@ $('hand').addEventListener('click', e => {
   S.ask = null; renderHand();
   send('act', { kind: 'play', value: id });
 });
-const sock = io({ auth: { pid, name: myName || 'Player' }, autoConnect: false });
+const sock = io({ auth: { pid, name: myName || 'Player', app: NATIVE_APP ? 1 : 0 }, autoConnect: false });
 sockReady.forEach(f => f());
 
 /* In-app browsers (WhatsApp, Facebook, Instagram) often block the microphone and speech typing */

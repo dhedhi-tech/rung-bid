@@ -19,7 +19,7 @@ let warned = false;
 const quiet = e => { if (!warned) { warned = true; console.error('stats:', e.message, '(run supabase-stats.sql in Supabase)'); } };
 
 // ---- memory copy (local testing only) ----
-const mem = { days: new Map(), log: [] }; // days: day -> Map(pid -> signed)
+const mem = { days: new Map(), log: [], app: new Map() }; // days: day -> Map(pid -> signed)
 
 // Each player is recorded once per day; again only if they sign in later that day
 const seen = new Map(); // pid -> 'day|signed'
@@ -35,6 +35,21 @@ function playerSeen(pid, signed) {
   }).catch(quiet);
 }
 
+// Players using the Android app: one row per player per day (account id added once they sign in)
+const appSeenMap = new Map(); // pid -> 'day|uid'
+function appSeen(pid, uid) {
+  const day = dayOf(), key = day + '|' + (uid || ''), prev = appSeenMap.get(pid);
+  if (prev === key || (prev && prev.startsWith(day + '|') && prev !== day + '|' && !uid)) return;
+  appSeenMap.set(pid, key);
+  if (appSeenMap.size > 50000) appSeenMap.clear();
+  if (!enabled) { mem.app.set(day + '|' + pid, uid || (mem.app.get(day + '|' + pid) || null)); return; }
+  sb('/rest/v1/app_days?on_conflict=day,pid', {
+    method: 'POST', headers: { Prefer: (uid ? 'resolution=merge-duplicates' : 'resolution=ignore-duplicates') + ',return=minimal' },
+    body: JSON.stringify(uid ? { day, pid, uid } : { day, pid }),
+  }).catch(e => { if (!appWarned) { appWarned = true; console.error('app stats:', e.message, '(run supabase-app.sql in Supabase)'); } });
+}
+let appWarned = false;
+
 function logGame(row) {
   const r = { kind: row.kind, code: row.code, n: row.n, joker: !!row.joker, lim: row.lim, humans: row.humans, signed: row.signed, hands: row.hands || null };
   if (!enabled) { mem.log.push({ ...r, at: Date.now() }); if (mem.log.length > 20000) mem.log.shift(); return; }
@@ -48,10 +63,12 @@ async function report() {
     sb('/rest/v1/admin_daily?select=*&order=day.desc&limit=30'),
     sb('/rest/v1/profiles?select=name,xp,coins,games,wins,created_at&order=games.desc,xp.desc&limit=15'),
     sb('/rest/v1/profiles?select=id&limit=1', { headers: { Prefer: 'count=exact' } }),
-    sb('/rest/v1/profiles?select=name,created_at,games,xp&order=created_at.desc&limit=30'),
+    sb('/rest/v1/profiles?select=id,name,created_at,games,xp&order=created_at.desc&limit=30'),
   ]);
   const total = count.range ? Number(count.range.split('/')[1]) || 0 : 0;
-  return { daily: daily.data || [], top: top.data || [], accounts: total, recent: recent.data || [] };
+  let app = [];
+  try { const since = dayOf(Date.now() - 30 * 86400000); app = (await sb(`/rest/v1/app_days?select=day,pid,uid&day=gte.${since}&limit=20000`)).data || []; } catch (e) { app = null; }
+  return { daily: daily.data || [], top: top.data || [], accounts: total, recent: recent.data || [], app };
 }
 function memReport() {
   const days = new Set([...mem.days.keys(), ...mem.log.map(l => dayOf(l.at))]);
@@ -66,7 +83,8 @@ function memReport() {
       bot_games: st.filter(l => l.humans === 1).length,
     };
   });
-  return { daily, top: [], accounts: 0, memory: true };
+  const app = [...mem.app.entries()].map(([k, uid]) => ({ day: k.split('|')[0], pid: k.split('|')[1], uid }));
+  return { daily, top: [], accounts: 0, memory: true, app };
 }
 
-module.exports = { enabled, playerSeen, logGame, report, dayOf, sb };
+module.exports = { enabled, playerSeen, appSeen, logGame, report, dayOf, sb };

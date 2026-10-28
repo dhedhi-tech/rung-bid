@@ -36,6 +36,7 @@ button{width:100%;padding:12px;border:0;border-radius:10px;background:var(--acc)
 .rep-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .rep-why{font-weight:800;color:#f4a93a}
 .rep-chat{background:rgba(255,255,255,.05);border-radius:8px;padding:6px 8px;font-size:13px;max-height:140px;overflow:auto}
+.apptag{display:inline-block;font-size:11px;font-weight:800;background:#2e7d5b;color:#fff;border-radius:6px;padding:1px 6px;margin-left:4px;vertical-align:middle}
 </style></head><body><main id="app"></main><main id="repAdmin" hidden></main><main id="stkAdmin" hidden></main>
 <script>
 const app = document.getElementById('app');
@@ -69,6 +70,10 @@ function show(j, warn) {
   const max = Math.max(1, ...chartDays.map(d => num(d.players)));
   const started30 = sum(d30, 'games_started');
   const pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '–';
+  // Android app players: per day, and which accounts have used the app
+  const A = j.app || [], appDay = {}, appUids = new Set();
+  for (const r of A) { const d = String(r.day).slice(0, 10); appDay[d] = (appDay[d] || 0) + 1; if (r.uid) appUids.add(r.uid); }
+  const appToday = j.app ? num(appDay[j.today]) : '–';
   app.innerHTML = `
   <div class="top"><div><h1>Game admin</h1><div class="sub">Updates every 30 seconds · days in Pakistan time</div></div><button id="out">Lock</button></div>
   ${j.error ? `<div class="note">${esc(j.error)}</div>` : ''}${warn ? `<div class="note">${esc(warn)}</div>` : ''}
@@ -79,12 +84,14 @@ function show(j, warn) {
     <div class="tile live"><b>${L.playing}</b><span>games in progress</span></div>
     <div class="tile live"><b>${L.people}</b><span>real players in games</span></div>
     <div class="tile"><b>${L.waiting}</b><span>tables waiting to start</span></div>
+    <div class="tile live"><b>${num(L.inApp)}</b><span>using the app now</span></div>
   </div>
   <h2>Today</h2>
   <div class="grid">
     <div class="tile"><b>${num(T.players)}</b><span>players</span></div>
     <div class="tile"><b>${num(T.new_players)}</b><span>new players</span></div>
     <div class="tile"><b>${num(T.signups)}</b><span>Google sign-ups</span></div>
+    <div class="tile"><b>${appToday}</b><span>played in the app</span></div>
     <div class="tile"><b>${num(T.games_started)}</b><span>games started</span></div>
     <div class="tile"><b>${num(T.games_finished)}</b><span>games finished</span></div>
   </div>
@@ -108,16 +115,16 @@ function show(j, warn) {
     <div class="tile"><b>${pct(sum(d30, 'bot_games'), started30)}</b><span>solo vs bots</span></div>
   </div>
   <h2>Day by day</h2>
-  <div class="tw"><table><tr><th>Day</th><th>Players</th><th>New</th><th>Signed in</th><th>Sign-ups</th><th>Games</th><th>Finished</th><th>Hands</th><th>Joker</th></tr>
-    ${D.map(d => `<tr><td>${dd(d.day)}</td><td>${num(d.players)}</td><td>${num(d.new_players)}</td><td>${num(d.signed_players)}</td><td>${num(d.signups)}</td><td>${num(d.games_started)}</td><td>${num(d.games_finished)}</td><td>${num(d.hands)}</td><td>${num(d.joker_games)}</td></tr>`).join('') || '<tr><td colspan="9">No data yet</td></tr>'}
+  <div class="tw"><table><tr><th>Day</th><th>Players</th><th>New</th><th>Signed in</th><th>Sign-ups</th><th>Games</th><th>Finished</th><th>Hands</th><th>Joker</th><th>App</th></tr>
+    ${D.map(d => `<tr><td>${dd(d.day)}</td><td>${num(d.players)}</td><td>${num(d.new_players)}</td><td>${num(d.signed_players)}</td><td>${num(d.signups)}</td><td>${num(d.games_started)}</td><td>${num(d.games_finished)}</td><td>${num(d.hands)}</td><td>${num(d.joker_games)}</td><td>${j.app ? num(appDay[String(d.day).slice(0, 10)]) : '–'}</td></tr>`).join('') || '<tr><td colspan="10">No data yet</td></tr>'}
   </table></div>
   <h2>Top players (${num(j.accounts)} accounts)</h2>
   <div class="tw"><table><tr><th>Name</th><th>XP</th><th>Games</th><th>Wins</th><th>Coins</th><th>Joined</th></tr>
     ${(j.top || []).map(p => `<tr><td>${esc(p.name)}</td><td>${num(p.xp)}</td><td>${num(p.games)}</td><td>${num(p.wins)}</td><td>${num(p.coins)}</td><td>${p.created_at ? dd(String(p.created_at).slice(0, 10)) : ''}</td></tr>`).join('') || '<tr><td colspan="6">No signed-in players yet</td></tr>'}
   </table></div>
-  <h2>Recent sign-ups</h2>
+  <h2>Recent sign-ups</h2>${j.app === null ? '<div class="note">App usage could not load. Did you run supabase-app.sql in Supabase?</div>' : '<div class="sub">The App tag shows players who have signed in inside the Android app (last 30 days).</div>'}
   <div class="tw"><table><tr><th>Name</th><th>Signed up</th><th>Games</th><th>XP</th></tr>
-    ${(j.recent || []).map(p => `<tr><td>${esc(p.name)}</td><td>${p.created_at ? esc(new Date(p.created_at).toLocaleString('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })) : ''}</td><td>${num(p.games)}</td><td>${num(p.xp)}</td></tr>`).join('') || '<tr><td colspan="4">No sign-ups yet</td></tr>'}
+    ${(j.recent || []).map(p => `<tr><td>${esc(p.name)}${appUids.has(p.id) ? ' <span class="apptag">App</span>' : ''}</td><td>${p.created_at ? esc(new Date(p.created_at).toLocaleString('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })) : ''}</td><td>${num(p.games)}</td><td>${num(p.xp)}</td></tr>`).join('') || '<tr><td colspan="4">No sign-ups yet</td></tr>'}
   </table></div>`;
   document.getElementById('out').onclick = () => { try { sessionStorage.removeItem('adminKey'); } catch (e) {} key = ''; clearInterval(timer); timer = null; document.getElementById('stkAdmin').hidden = true; document.getElementById('repAdmin').hidden = true; stkShown = false; login(); };
   if (!stkShown) { stkShown = true; stickersAdmin(); }

@@ -56,6 +56,7 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Build: `.github/workflows/android.yml` runs on any push touching android-app/ (any branch) or by hand; it publishes a signed .aab to GitHub Releases. versionCode = workflow run number.
 - Upload key: `android-app/upload-key.jks.enc` (AES-256, openssl pbkdf2 200000), alias `upload`. Password is the GitHub secret UPLOAD_KEY_PASSWORD (Ansa keeps a copy). Never print it. No secret = unsigned test build.
 - This session's proxy blocks the GitHub Actions API; check results via the Releases API.
+- App usage tracking: client sends `auth.app` = NATIVE_APP; server `socket.data.app` -> `S.appSeen(pid, uid)` into Supabase `app_days` (from `supabase-app.sql`). Admin shows "using the app now", "played in the app" today, an App column per day, and an App tag on Recent sign-ups for accounts that signed in inside the app.
 - Android back button (`appBack` at the end of app.js, App plugin `backButton`): closes sticker tray / help / tutorial / rules / chat / closable sheets; otherwise press twice: leave the table, or exit the app on the home screen. Added Oct 28 after tester feedback.
 
 ## Render environment (names only)

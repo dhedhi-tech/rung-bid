@@ -124,6 +124,8 @@ io.on('connection', socket => {
   let table = null;
   if (!pid) { socket.emit('fatal', 'Missing player id'); socket.disconnect(true); return; }
   S.playerSeen(pid, false);
+  socket.data.app = !!(socket.handshake.auth && socket.handshake.auth.app); // opened in the Android app
+  if (socket.data.app) S.appSeen(pid, null);
 
   const reply = (cb, err, data) => { if (typeof cb === 'function') cb(err ? { error: err } : { ok: true, ...data }); };
   const leave = () => { socket.data.tableCode = null; if (table) { table.removeClient(socket.id); socket.leave(table.code); table = null; } };
@@ -222,6 +224,7 @@ io.on('connection', socket => {
     socket.data.uid = profile.id; goOnline(profile.id, socket);
     F.links(profile.id).then(l => socket.emit('friend:count', [...l.values()].filter(x => x.status === 'pending' && !x.mine).length)).catch(() => {});
     S.playerSeen(pid, true);
+    if (socket.data.app) S.appSeen(pid, profile.id);
     const daily = A.claimDaily(profile);
     if (table) table.broadcast();
     reply(cb, null, { profile: A.view(profile), daily });
@@ -410,7 +413,8 @@ app.get('/admin/data', async (req, res) => {
   const ok = adminOk(req);
   if (ok === 'locked') return res.status(429).json({ error: 'Too many wrong tries. Wait 15 minutes.' });
   if (ok !== 'ok') return res.status(401).json({ error: 'Wrong password' });
-  const live = { online: io.engine.clientsCount, tables: tables.size, playing: 0, waiting: 0, people: 0, modes: { 4: 0, 6: 0, 8: 0, joker: 0 } };
+  let inApp = 0; for (const s of io.of('/').sockets.values()) if (s.data.app) inApp++;
+  const live = { inApp, online: io.engine.clientsCount, tables: tables.size, playing: 0, waiting: 0, people: 0, modes: { 4: 0, 6: 0, 8: 0, joker: 0 } };
   for (const t of tables.values()) {
     const humans = t.seats.filter(s => !s.bot && s.pid).length;
     if (t.phase === 'game') { live.playing++; live.people += humans; live.modes[t.n]++; if (t.joker) live.modes.joker++; } else if (t.phase === 'lobby') live.waiting++;
