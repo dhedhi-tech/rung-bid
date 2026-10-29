@@ -37,6 +37,7 @@ button{width:100%;padding:12px;border:0;border-radius:10px;background:var(--acc)
 .rep-why{font-weight:800;color:#f4a93a}
 .rep-chat{background:rgba(255,255,255,.05);border-radius:8px;padding:6px 8px;font-size:13px;max-height:140px;overflow:auto}
 .apptag{display:inline-block;font-size:11px;font-weight:800;background:#2e7d5b;color:#fff;border-radius:6px;padding:1px 6px;margin-left:4px;vertical-align:middle}
+td.away3{color:#f4a93a;font-weight:700}td.away7{color:#ff6b6b;font-weight:800}td.today{color:#5fd39a;font-weight:700}
 </style></head><body><main id="app"></main><main id="repAdmin" hidden></main><main id="stkAdmin" hidden></main>
 <script>
 const app = document.getElementById('app');
@@ -70,6 +71,8 @@ function show(j, warn) {
   const max = Math.max(1, ...chartDays.map(d => num(d.players)));
   const started30 = sum(d30, 'games_started');
   const pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '–';
+  const R = j.retention || null;
+  const daysAgo = d => Math.round((new Date(j.today + 'T00:00:00') - new Date(String(d).slice(0, 10) + 'T00:00:00')) / 86400000);
   // Android app players: per day, and which accounts have used the app
   const A = j.app || [], appDay = {}, appUids = new Set();
   for (const r of A) { const d = String(r.day).slice(0, 10); appDay[d] = (appDay[d] || 0) + 1; if (r.uid) appUids.add(r.uid); }
@@ -121,6 +124,17 @@ function show(j, warn) {
   <h2>Top players (${num(j.accounts)} accounts)</h2>
   <div class="tw"><table><tr><th>Name</th><th>XP</th><th>Games</th><th>Wins</th><th>Coins</th><th>Joined</th></tr>
     ${(j.top || []).map(p => `<tr><td>${esc(p.name)}</td><td>${num(p.xp)}</td><td>${num(p.games)}</td><td>${num(p.wins)}</td><td>${num(p.coins)}</td><td>${p.created_at ? dd(String(p.created_at).slice(0, 10)) : ''}</td></tr>`).join('') || '<tr><td colspan="6">No signed-in players yet</td></tr>'}
+  </table></div>
+  <h2>Return rate</h2>
+  ${j.people === null ? '<div class="note">Players list could not load. Run supabase-stats.sql in Supabase again.</div>' : ''}
+  <div class="grid">
+    <div class="tile"><b>${R && num(R.new_30) ? pct(num(R.back_30), num(R.new_30)) : '–'}</b><span>came back another day${R ? ` (${num(R.back_30)} of ${num(R.new_30)} new players, last 30 days)` : ''}</span></div>
+    <div class="tile"><b>${R && num(R.new_week) ? pct(num(R.kept_week), num(R.new_week)) : '–'}</b><span>still playing a week later${R ? ` (${num(R.kept_week)} of ${num(R.new_week)})` : ''}</span></div>
+  </div>
+  <h2>Players (last 30 days)</h2>
+  <div class="sub">Longest absent first. People who typed a name or signed in.</div>
+  <div class="tw"><table><tr><th>Name</th><th>First played</th><th>Last played</th><th>Days</th></tr>
+    ${(j.people || []).map(p => { const ago = daysAgo(p.last_day); return `<tr><td>${esc(p.name || '?')}${p.app ? ' <span class="apptag">App</span>' : ''}${p.signed ? ' <small>✔ Google</small>' : ''}</td><td>${dd(String(p.first_day).slice(0, 10))}</td><td class="${ago >= 7 ? 'away7' : ago >= 3 ? 'away3' : ago === 0 ? 'today' : ''}">${ago === 0 ? 'today' : ago === 1 ? 'yesterday' : ago + ' days ago'}</td><td>${num(p.days)}</td></tr>`; }).join('') || '<tr><td colspan="4">No named players yet</td></tr>'}
   </table></div>
   <h2>Recent sign-ups</h2>${j.app === null ? '<div class="note">App usage could not load. Did you run supabase-app.sql in Supabase?</div>' : '<div class="sub">The App tag shows players who have signed in inside the Android app (last 30 days).</div>'}
   <div class="tw"><table><tr><th>Name</th><th>Signed up</th><th>Games</th><th>XP</th></tr>

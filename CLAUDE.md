@@ -59,6 +59,10 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - App usage tracking: client sends `auth.app` = NATIVE_APP; server `socket.data.app` -> `S.appSeen(pid, uid)` into Supabase `app_days` (from `supabase-app.sql`). Admin shows "using the app now", "played in the app" today, an App column per day, and an App tag on Recent sign-ups for accounts that signed in inside the app.
 - Android back button (`appBack` at the end of app.js, App plugin `backButton`): closes sticker tray / help / tutorial / rules / chat / closable sheets; otherwise press twice: leave the table, or exit the app on the home screen. Added Oct 28 after tester feedback.
 
+## Admin stats: people
+- `player_days` has `name` (typed name) and `uid`. A person = typed name, else account, else player id (views `admin_daily`, `admin_people`, `admin_retention` in supabase-stats.sql; Ansa re-runs that file after changes). Same name = same person (accepted trade-off while small).
+- Admin page: Return rate (came back another day, last 30 days; still playing a week later) and Players list (named or signed-in, last 30 days, longest absent first, orange 3+ days, red 7+ days, App tag).
+
 ## Render environment (names only)
 SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TURN_USER, TURN_PASS, optional CONTACT_EMAIL. Never print or store their values.
 

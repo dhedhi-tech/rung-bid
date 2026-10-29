@@ -71,3 +71,34 @@ select d.day,
        coalesce(g.bot_games, 0) as bot_games
 from d left join p using (day) left join g using (day) left join s using (day);
 revoke all on public.admin_daily from anon, authenticated;
+
+-- App usage table (also in supabase-app.sql), needed by the players list below
+create table if not exists public.app_days (day date not null, pid text not null, uid text, primary key (day, pid));
+alter table public.app_days enable row level security;
+
+-- One row per person: name, first and last day played, how many days, signed in, used the app
+create or replace view public.admin_people with (security_invoker = true) as
+with k as (
+  select day, pid, signed, name,
+         case when coalesce(lower(trim(name)), '') not in ('', 'player') then 'n:' || lower(trim(name))
+              when uid is not null then 'u:' || uid
+              else 'p:' || pid end as who
+  from public.player_days
+)
+select who,
+       (array_agg(name order by day desc) filter (where coalesce(trim(name), '') <> ''))[1] as name,
+       min(day) as first_day, max(day) as last_day, count(distinct day) as days,
+       bool_or(signed) as signed,
+       bool_or(exists (select 1 from public.app_days a where a.pid = k.pid)) as app
+from k group by who;
+revoke all on public.admin_people from anon, authenticated;
+
+-- Return rate: of new players, how many came back on another day, and how many still played a week later
+create or replace view public.admin_retention with (security_invoker = true) as
+with t as (select (now() at time zone 'Asia/Karachi')::date as today)
+select count(*) filter (where first_day >= today - 30 and first_day < today) as new_30,
+       count(*) filter (where first_day >= today - 30 and first_day < today and days >= 2) as back_30,
+       count(*) filter (where first_day >= today - 37 and first_day <= today - 7) as new_week,
+       count(*) filter (where first_day >= today - 37 and first_day <= today - 7 and last_day >= first_day + 7) as kept_week
+from public.admin_people, t;
+revoke all on public.admin_retention from anon, authenticated;

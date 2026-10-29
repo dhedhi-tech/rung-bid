@@ -72,9 +72,19 @@ async function report() {
     sb('/rest/v1/profiles?select=id,name,created_at,games,xp&order=created_at.desc&limit=30'),
   ]);
   const total = count.range ? Number(count.range.split('/')[1]) || 0 : 0;
+  // Players list (named or signed-in people seen in the last 30 days, longest absent first) and return rate
+  let people = null, retention = null;
+  try {
+    const since = dayOf(Date.now() - 30 * 86400000);
+    const [pp, rr] = await Promise.all([
+      sb(`/rest/v1/admin_people?select=name,first_day,last_day,days,signed,app&who=not.like.p:*&last_day=gte.${since}&order=last_day.asc,days.desc&limit=300`),
+      sb('/rest/v1/admin_retention?select=*'),
+    ]);
+    people = pp.data || []; retention = (rr.data || [])[0] || null;
+  } catch (e) { people = null; }
   let app = [];
   try { const since = dayOf(Date.now() - 30 * 86400000); app = (await sb(`/rest/v1/app_days?select=day,pid,uid&day=gte.${since}&limit=20000`)).data || []; } catch (e) { app = null; }
-  return { daily: daily.data || [], top: top.data || [], accounts: total, recent: recent.data || [], app };
+  return { daily: daily.data || [], top: top.data || [], accounts: total, recent: recent.data || [], app, people, retention };
 }
 function memReport() {
   const days = new Set([...mem.days.keys(), ...mem.log.map(l => dayOf(l.at))]);
