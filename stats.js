@@ -22,17 +22,23 @@ const quiet = e => { if (!warned) { warned = true; console.error('stats:', e.mes
 const mem = { days: new Map(), log: [], app: new Map() }; // days: day -> Map(pid -> signed)
 
 // Each player is recorded once per day; again only if they sign in later that day
-const seen = new Map(); // pid -> 'day|signed'
-function playerSeen(pid, signed) {
-  const day = dayOf(), key = day + '|' + (signed ? 1 : 0), prev = seen.get(pid);
-  if (prev === key || (prev === day + '|1' && !signed)) return;
+// The typed name is saved too, so one person on a new browser or phone counts once (see the admin_daily view)
+const seen = new Map(); // pid -> 'day|signed|name'
+let noNameCols = false; // supabase-stats.sql not re-run yet: save without name and uid
+function playerSeen(pid, signed, name, uid) {
+  const nm = String(name || '').trim().slice(0, 20), day = dayOf(), key = day + '|' + (signed ? 1 : 0) + '|' + nm, prev = seen.get(pid);
+  if (prev === key || (!signed && prev && prev.startsWith(day + '|1|') && prev.endsWith('|' + nm))) return;
   seen.set(pid, key);
   if (seen.size > 50000) seen.clear();
   if (!enabled) { if (!mem.days.has(day)) mem.days.set(day, new Map()); const m = mem.days.get(day); m.set(pid, m.get(pid) || !!signed); return; }
-  sb('/rest/v1/player_days?on_conflict=day,pid', {
-    method: 'POST', headers: { Prefer: (signed ? 'resolution=merge-duplicates' : 'resolution=ignore-duplicates') + ',return=minimal' },
-    body: JSON.stringify({ day, pid, signed: !!signed }),
-  }).catch(quiet);
+  const body = { day, pid };
+  if (signed) body.signed = true;
+  if (!noNameCols) { if (nm && nm.toLowerCase() !== 'player') body.name = nm; if (uid) body.uid = String(uid); }
+  const send = b => sb('/rest/v1/player_days?on_conflict=day,pid', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(b) });
+  send(body).catch(e => {
+    if (!noNameCols && /name|uid|column/i.test(e.message)) { noNameCols = true; console.error('stats: run supabase-stats.sql again to save player names'); const { name: _n, uid: _u, ...old } = body; return send(old).catch(quiet); }
+    quiet(e);
+  });
 }
 
 // Players using the Android app: one row per player per day (account id added once they sign in)

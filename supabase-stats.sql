@@ -8,6 +8,9 @@ create table if not exists public.player_days (
   primary key (day, pid)
 );
 create index if not exists player_days_pid on public.player_days (pid, day);
+-- The name they typed (so one person on a new browser or phone still counts once) and their account id if signed in
+alter table public.player_days add column if not exists name text;
+alter table public.player_days add column if not exists uid text;
 
 -- One row when a game starts and one when it finishes
 create table if not exists public.game_log (
@@ -30,12 +33,21 @@ alter table public.game_log enable row level security;
 
 -- Daily summary (Pakistan time)
 create or replace view public.admin_daily with (security_invoker = true) as
-with p as (
-  select pd.day,
-         count(*) as players,
-         count(*) filter (where pd.signed) as signed_players,
-         count(*) filter (where not exists (select 1 from public.player_days o where o.pid = pd.pid and o.day < pd.day)) as new_players
-  from public.player_days pd group by pd.day
+-- A person is counted by the name they typed, else their account, else their player id
+with k as (
+  select day, signed,
+         case when coalesce(lower(trim(name)), '') not in ('', 'player') then 'n:' || lower(trim(name))
+              when uid is not null then 'u:' || uid
+              else 'p:' || pid end as who
+  from public.player_days
+), f as (
+  select who, min(day) as first_day from k group by who
+), p as (
+  select k.day,
+         count(distinct k.who) as players,
+         count(distinct k.who) filter (where k.signed) as signed_players,
+         count(distinct k.who) filter (where f.first_day = k.day) as new_players
+  from k join f using (who) group by k.day
 ), g as (
   select (at at time zone 'Asia/Karachi')::date as day,
          count(*) filter (where kind = 'start') as games_started,

@@ -123,7 +123,7 @@ io.on('connection', socket => {
   let name = cleanName(socket.handshake.auth && socket.handshake.auth.name);
   let table = null;
   if (!pid) { socket.emit('fatal', 'Missing player id'); socket.disconnect(true); return; }
-  S.playerSeen(pid, false);
+  S.playerSeen(pid, false, name);
   socket.data.app = !!(socket.handshake.auth && socket.handshake.auth.app); // opened in the Android app
   if (socket.data.app) S.appSeen(pid, null);
 
@@ -191,6 +191,7 @@ io.on('connection', socket => {
 
   socket.on('rename', (nm, cb) => {
     name = cleanName(nm);
+    S.playerSeen(pid, !!socket.data.uid, name, socket.data.uid);
     if (table) { const p = table.players.get(pid); if (p) { p.name = name; if (p.seat != null && !table.seats[p.seat].bot) table.seats[p.seat].name = name; } table.broadcast(); }
     reply(cb);
   });
@@ -223,7 +224,7 @@ io.on('connection', socket => {
     pidAuth.set(pid, { profile });
     socket.data.uid = profile.id; goOnline(profile.id, socket);
     F.links(profile.id).then(l => socket.emit('friend:count', [...l.values()].filter(x => x.status === 'pending' && !x.mine).length)).catch(() => {});
-    S.playerSeen(pid, true);
+    S.playerSeen(pid, true, name, profile.id);
     if (socket.data.app) S.appSeen(pid, profile.id);
     const daily = A.claimDaily(profile);
     if (table) table.broadcast();
