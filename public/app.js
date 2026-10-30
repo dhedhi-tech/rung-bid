@@ -1458,5 +1458,19 @@ function appBack() {
   else { const A = capPlugin('App'); if (A && A.exitApp) A.exitApp(); }
 }
 if (NATIVE_APP) { const A = capPlugin('App'); if (A) A.addListener('backButton', appBack); }
+// Game links (e.g. a WhatsApp table invite) that open the app: load that page inside the app
+function appGameLink(url) {
+  let u; try { u = new URL(url); } catch (e) { return; }
+  if (u.protocol !== 'https:' || !/^(www\.)?pattaparty\.com$/.test(u.hostname)) return;
+  const to = 'https://' + location.host + u.pathname + u.search;
+  if (to !== location.href) location.href = to;
+}
+if (NATIVE_APP) {
+  const A = capPlugin('App');
+  if (A) {
+    A.addListener('appUrlOpen', e => appGameLink(e && e.url));
+    if (A.getLaunchUrl) A.getLaunchUrl().then(r => { if (r && r.url && !sessionStorage.getItem('rb-launch')) { try { sessionStorage.setItem('rb-launch', '1'); } catch (e) {} appGameLink(r.url); } }).catch(() => {});
+  }
+}
 sock.connect();
 initAuth();

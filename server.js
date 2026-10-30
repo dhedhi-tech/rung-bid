@@ -26,6 +26,12 @@ const indexHtml = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 
   .replace('src="/app.js"', `src="/app.js?v=${VERSION}"`).replace('src="/tutorial.js"', `src="/tutorial.js?v=${VERSION}"`);
 const sendIndex = (_req, res) => { res.set('Cache-Control', 'no-cache, no-store, must-revalidate'); res.type('html').send(indexHtml); };
 app.get(['/', '/index.html'], sendIndex);
+// Android App Links: lets www.pattaparty.com links open the Patta Party app. Fingerprints are public certificate hashes:
+// the upload key, plus the Play app signing key (Play Console > Test and release > App integrity), or set APP_SHA256 on Render.
+const APP_CERTS = ['4C:B7:89:8A:6A:CE:2E:50:F6:D9:16:82:6F:48:E8:99:37:F6:F2:34:A1:AD:07:A3:EF:DC:4D:48:26:BA:1A:F1',
+  ...String(process.env.APP_SHA256 || '').split(',').map(s => s.trim().toUpperCase()).filter(s => /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/.test(s))];
+app.get('/.well-known/assetlinks.json', (_req, res) => res.json([{ relation: ['delegate_permission/common.handle_all_urls'],
+  target: { namespace: 'android_app', package_name: 'com.dhedhitech.pattaparty', sha256_cert_fingerprints: APP_CERTS } }]));
 app.use(express.static(path.join(__dirname, 'public'), {
   extensions: ['html'], index: false,
   setHeaders: (res, file) => { if (/\.(js|css)$/.test(file)) res.set('Cache-Control', 'no-cache'); },

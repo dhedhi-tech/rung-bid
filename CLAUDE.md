@@ -57,6 +57,7 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Upload key: `android-app/upload-key.jks.enc` (AES-256, openssl pbkdf2 200000), alias `upload`. Password is the GitHub secret UPLOAD_KEY_PASSWORD (Ansa keeps a copy). Never print it. No secret = unsigned test build.
 - This session's proxy blocks the GitHub Actions API; check results via the Releases API.
 - App usage tracking: client sends `auth.app` = NATIVE_APP; server `socket.data.app` -> `S.appSeen(pid, uid)` into Supabase `app_days` (from `supabase-app.sql`). Admin shows "using the app now", "played in the app" today, an App column per day, and an App tag on Recent sign-ups for accounts that signed in inside the app.
+- App Links (invites open the app): manifest intent-filter autoVerify for https://www.pattaparty.com only (apex redirects, so it can't verify); server serves /.well-known/assetlinks.json with the upload key SHA-256 + `APP_SHA256` env (Play app signing key, comma separated). In the app, `appGameLink` loads the opened link inside the webview.
 - Android back button (`appBack` at the end of app.js, App plugin `backButton`): closes sticker tray / help / tutorial / rules / chat / closable sheets; otherwise press twice: leave the table, or exit the app on the home screen. Added Oct 28 after tester feedback.
 
 ## Admin stats: people
