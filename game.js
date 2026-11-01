@@ -10,7 +10,7 @@ const BOT_NAMES = ['Sana', 'Bilal', 'Hira', 'Usman', 'Zara', 'Hamza', 'Maham', '
 const TARGET = 52;
 const SPEED = Number(process.env.RB_SPEED) || 1; // test hook: 0.1 runs ten times faster
 const PACE = { bot: 800 * SPEED, trick: 1300 * SPEED, trump: 1800 * SPEED, deal: 700 * SPEED };
-const TURN_MS = { bid: 20000, trump: 20000, play: 30000 };
+const TURN_MS = { bid: 20000, trump: 20000, play: 8000 };
 const HAND_END_MS = 9000 * SPEED;
 
 const isJ = c => c.s === 'J';

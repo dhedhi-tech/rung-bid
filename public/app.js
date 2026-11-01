@@ -948,7 +948,7 @@ function render() {
   const added = [...handIds].filter(id => !prevHandIds.has(id));
   if (added.length && added.length < handIds.size + 1) newIds = new Set(added);
   prevHandIds = handIds;
-  if (S.deadline) { deadlineAt = Date.now() + S.deadline; deadlineTotal = S.gphase === 'play' ? 30000 : 20000; } else deadlineAt = 0;
+  if (S.deadline) { deadlineAt = Date.now() + S.deadline; deadlineTotal = S.gphase === 'play' ? 8000 : 20000; } else deadlineAt = 0;
   if (!S.ask || S.ask.kind !== 'play') selected = null;
 
   renderTricks(); renderHeader(); renderSeats(); renderHand(); renderStatus(); renderTrickCards();
