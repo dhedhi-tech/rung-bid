@@ -52,4 +52,6 @@
     <!-- Voice chat -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Short buzz on your turn -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 </manifest>

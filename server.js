@@ -246,6 +246,15 @@ io.on('connection', socket => {
     await signedIn({ id: 'dev-' + pid, name: cleanName(nm), avatar: '' }, cb);
   });
   socket.on('signout', cb => { if (socket.data.uid) { goOffline(socket.data.uid, socket); socket.data.uid = null; } pidAuth.delete(pid); if (table) table.broadcast(); reply(cb); });
+  socket.on('deleteAccount', async cb => {
+    const id = socket.data.uid; if (!id) return reply(cb, 'Not signed in');
+    const err = await A.deleteAccount(id); if (err) return reply(cb, err);
+    const m = online.get(id); if (m) for (const sk of m.values()) sk.data.uid = null;
+    online.delete(id);
+    for (const [k, v] of pidAuth) if (v.profile && v.profile.id === id) pidAuth.delete(k);
+    if (table) table.broadcast();
+    reply(cb);
+  });
   socket.on('buy', (item, cb) => {
     const a = pidAuth.get(pid); if (!a) return reply(cb, 'Sign in to collect coins');
     const err = A.buy(a.profile, String(item)); reply(cb, err, { profile: A.view(a.profile) });

@@ -320,7 +320,7 @@ function bidHistoryHTML() {
 function renderAsk() {
   const a = S.ask;
   const key = a ? a.kind + ':' + (S.round || 0) + ':' + (S.hist ? S.hist.length : 0) + ':' + (S.trick ? S.trick.length : 0) : '';
-  if (key && key !== lastAskKey) sfx('turn');
+  if (key && key !== lastAskKey) { sfx('turn'); if (!document.hidden && navigator.vibrate) try { navigator.vibrate(150); } catch (e) {} }
   lastAskKey = key;
   if (!a || a.kind === 'play') { hidePanel(); return; }
   const timer = `<div class="ptimer" data-tmr><i></i></div>`;
@@ -608,15 +608,30 @@ function profileSheet() {
     <p class="hint">Earn XP every hand and coins for every game. Bigger wins earn more.</p>
     <button class="secondary fr-open" id="frOpen">👥 Friends${FRQ ? ` <span class="fr-badge in">${FRQ} new</span>` : ''}</button>
     <button class="primary" id="profClose">Done</button>
-    <button class="linkbtn" id="signOutBtn">Sign out</button>`);
+    <button class="linkbtn" id="signOutBtn">Sign out</button>
+    <button class="linkbtn del-acc" id="delAccBtn">Delete my account</button>`);
   $('profClose').onclick = closeModal;
   $('signOutBtn').onclick = signOut;
+  $('delAccBtn').onclick = deleteAccountSheet;
   $('avEdit').onclick = picSheet;
   $('frOpen').onclick = () => friendsSheet('profile');
   $('storeList').onclick = async e => {
     const b = e.target.closest('button'); if (!b) return;
     const r = b.dataset.buy ? await send('buy', b.dataset.buy) : await send('equip', b.dataset.equip);
     if (r && r.ok) { PROFILE = r.profile; applyFelt(); renderChip(); profileSheet(); if (b.dataset.buy) sfx('win'); }
+  };
+}
+function deleteAccountSheet() {
+  openModal('delacc', `<div class="eyebrow">Delete account</div><h2>Delete your account?</h2>
+    <p class="hint">Your level, XP, coins, table themes, picture and friends will be deleted for good. This cannot be undone.</p>
+    <button class="primary danger" id="delYes">Delete my account</button>
+    <button class="secondary del-no" id="delNo">Cancel</button><div class="err" id="delErr"></div>`);
+  $('delNo').onclick = profileSheet;
+  $('delYes').onclick = async () => {
+    $('delYes').disabled = true;
+    const r = await send('deleteAccount');
+    if (!r || !r.ok) { $('delYes').disabled = false; $('delErr').textContent = (r && r.error) || 'Could not delete your account. Please try again.'; return; }
+    await signOut(); flash('Your account has been deleted.');
   };
 }
 // Choose a profile picture: Google photo, a ready-made avatar, or an uploaded photo

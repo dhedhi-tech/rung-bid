@@ -110,6 +110,20 @@ async function picData(id) {
   return pic && String(pic).startsWith('data:image/') ? pic : null;
 }
 
+// Delete an account for good: the Supabase user (profile and friends go with it), and the account link in daily stats
+async function deleteAccount(id) {
+  clearTimeout(saveTimers.get(id)); saveTimers.delete(id);
+  cache.delete(id);
+  for (const [k, v] of tokenCache) if (v.user.id === id) tokenCache.delete(k);
+  if (!enabled) return null;
+  if (!/^[0-9a-f-]{36}$/.test(id)) return 'Could not delete this account';
+  try { await sb(`/auth/v1/admin/users/${id}`, { method: 'DELETE' }); }
+  catch (e) { console.error('delete account', e.message); return 'Could not delete your account. Please try again later.'; }
+  for (const t of ['profiles', 'friends']) await sb(`/rest/v1/${t}?${t === 'friends' ? `or=(a.eq.${id},b.eq.${id})` : `id=eq.${id}`}`, { method: 'DELETE' }).catch(() => {});
+  for (const t of ['player_days', 'app_days']) await sb(`/rest/v1/${t}?uid=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ uid: null }) }).catch(() => {});
+  return null;
+}
+
 // Leaderboard of signed-in players (top 50), refreshed at most once a minute
 const lbCache = {};
 async function leaderboard(sort, me) {
@@ -217,5 +231,5 @@ function handGains(info, seatIdx) {
 
 module.exports = {
   enabled, DEV, config: () => ({ auth: enabled || DEV, supabaseUrl: enabled ? SB_URL : '', anonKey: enabled ? ANON : '', dev: DEV && !enabled }),
-  verify, load, view, avOf, leaderboard, people, setPic, picData, AVATARS, award, claimDaily, buy, equip, handGains, levelOf, STORE, XP, COINS,
+  verify, load, view, deleteAccount, avOf, leaderboard, people, setPic, picData, AVATARS, award, claimDaily, buy, equip, handGains, levelOf, STORE, XP, COINS,
 };
