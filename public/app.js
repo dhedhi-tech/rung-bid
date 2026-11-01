@@ -147,11 +147,18 @@ function sizeCards() {
 }
 const sv = (t, one, many) => (teamName(t) === 'Opponents' ? many : one);
 function scoreText() { const s = S.score || 0; return s > 0 ? `${teamName(0)} ${sv(0, 'leads', 'lead')} by ${s}` : s < 0 ? `${teamName(1)} ${sv(1, 'leads', 'lead')} by ${-s}` : 'Level'; }
+function watchersSheet() {
+  openModal('watchers', `<div class="eyebrow">Watching</div><div class="watch-list">${S.lobbyNames.map(x => `<div>👀 ${esc(x)}</div>`).join('')}</div>
+    <button class="primary" id="watchClose">Done</button>`);
+  $('watchClose').onclick = closeModal;
+}
 function renderHeader() {
-  const watching = S.phase !== 'lobby' && S.lobbyNames && S.lobbyNames.length ? `<span class="watchn"> · 👀 ${S.lobbyNames.length}<span class="wl"> watching</span></span>` : '';
+  const watching = S.phase !== 'lobby' && S.lobbyNames && S.lobbyNames.length ? `<button class="watchn" id="watchBtn"> · 👀 ${S.lobbyNames.length}<span class="wl"> watching</span></button>` : '';
   const hn = !S.handNo ? '' : S.decider ? 'Decider hand' : S.limit ? `Hand ${S.handNo} of ${S.limit}` : `Hand ${S.handNo}`;
   $('handNo').innerHTML = esc(S.handNo ? `${hn} · ${S.n} players` : `Table ${S.code} · ${S.n} players`) + watching;
   $('handNo').title = watching ? 'Watching: ' + S.lobbyNames.join(', ') : '';
+  if ($('watchBtn')) $('watchBtn').onclick = watchersSheet;
+  if (modalKind === 'watchers') { if (watching) watchersSheet(); else closeModal(); }
   document.querySelector('.sbox.ta .sname').textContent = teamName(0);
   document.querySelector('.sbox.tb .sname').textContent = teamName(1);
   const score = S.score || 0, s = Math.max(-TARGET, Math.min(TARGET, score)), pos = 50 - s / TARGET * 50;
