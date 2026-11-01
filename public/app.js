@@ -232,7 +232,7 @@ function renderHand() {
     if (S.phase === 'game' || S.phase === 'over') {
       const open = S.seats.map((p, i) => ({ p, i })).filter(x => x.p.bot);
       if (S.dup) { el.innerHTML = `<div class="watchbar"><b>${esc(S.dup.name)}</b> is away. Is that you? <button id="dupClaim">Yes, play here</button></div>`; $('dupClaim').onclick = () => send('claim'); return; }
-      const wl = S.phase === 'game' && !open.length ? (S.myWait ? ` Waiting list: you are #${S.myWait}. <button id="waitBtn" data-w="0">Leave list</button>` : ` <button id="waitBtn" data-w="1">Join waiting list</button>`) : '';
+      const wl = S.phase === 'game' && !open.length ? (S.myWait ? ` You sit on the first free seat (#${S.myWait} in line). <button id="waitBtn" data-w="0">Cancel</button>` : ` <button id="waitBtn" data-w="1">Sit on first available seat</button>`) : '';
       el.innerHTML = `<div class="watchbar">You're watching.${open.length ? ' Take a bot seat:' : ''} ${open.map(x => `<button data-take="${x.p.real}"><span class="pn ${tcls(x.i)}">${esc(x.p.name)}</span></button>`).join('')}${wl}</div>`;
       if ($('waitBtn')) $('waitBtn').onclick = e => send('wait', e.currentTarget.dataset.w === '1');
     }
