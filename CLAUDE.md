@@ -64,6 +64,14 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - `player_days` has `name` (typed name) and `uid`. A person = typed name, else account, else player id (views `admin_daily`, `admin_people`, `admin_retention` in supabase-stats.sql; Ansa re-runs that file after changes). Same name = same person (accepted trade-off while small).
 - Admin page: Return rate (came back another day, last 30 days; still playing a week later) and Players list (named or signed-in, last 30 days, longest absent first, orange 3+ days, red 7+ days, App tag).
 
+## Marketing (Nov 2026)
+- Strategy: build the "line" before launch. Audience: desi friends/families who love Rung (PK, IN, BD, overseas). Pain: can't play together when apart; rival apps full of ads, fake/bot "online" players, no private tables, wrong house rules.
+- Plan: daily short videos (Urdu/English) from rival-review complaints, WhatsApp Channel as own list, Play Store pre-registration + Founder badge/coins, launch-day reviews, then Google Ads ($400 credit) in Pakistan at $5-10/day.
+- Ads rule: no ads during a game; rewarded ads only (+ maybe one between full games). Ads are the #1 complaint about rivals.
+- Rival: rung.gg (4 players, invite links, bots, voice, Google sign-in, WhatsApp). Our edge: 6 and 8 players, bidding Rung, Joker mode, guided first game.
+- Logo: in progress. Ansa wants bold modern flat, adult (not childish): grinning joker (original, not DC), friends, cards, PATTA PARTY wordmark. Latest drafts: teal+gold (A) or crimson+gold (B); then a simple icon version and a WhatsApp link preview image (og:image).
+- Play App Access: Google asked for login credentials; Ansa to add a review test Gmail (no 2FA) under App access.
+
 ## Render environment (names only)
 SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TURN_USER, TURN_PASS, optional CONTACT_EMAIL. Never print or store their values.
 
