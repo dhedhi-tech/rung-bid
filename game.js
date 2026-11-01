@@ -52,8 +52,10 @@ function perms(a) { if (a.length < 2) return [a]; return a.flatMap((x, i) => per
 class Abort extends Error {}
 
 class Table {
-  constructor(code, { n, joker, hostId, limit, pub }, io) {
+  constructor(code, { n, joker, hostId, limit, pub, swap }, io) {
     this.code = code; this.io = io; this.pub = !!pub; // pub: listed in Open tables on the home screen
+    this.swap = !!swap && !pub; // link-only tables: a human bidder who fails swaps out for the first person on the waiting list
+    this.waitList = [];        // audience waiting for a seat (player ids, first in line first)
     this.n = n; this.joker = !!joker; this.hostId = hostId;
     this.limit = [0, 6, 10].includes(limit) ? limit : 10; // hand limit: 6 quick, 10 normal, 0 = no limit
     this.alive = true; this.running = false; this.phase = 'lobby';
@@ -126,12 +128,14 @@ class Table {
     if (s.pid && s.pid !== pid) { const other = this.players.get(s.pid); if (other) other.seat = null; }
     const tookFrom = this.phase !== 'lobby' && s.bot ? s.name : null;
     s.pid = pid; s.bot = false; s.name = p.name; p.seat = seat;
+    this.waitList = this.waitList.filter(x => x !== pid);
     this.checkResume();
-    if (tookFrom) this.fx('watch', { text: `${p.name} took over ${tookFrom}'s seat`, except: pid });
+    if (tookFrom && !this.quietSit) this.fx('watch', { text: `${p.name} took over ${tookFrom}'s seat`, except: pid });
     this.touch(); this.broadcast();
     return null;
   }
   forget(pid) {
+    this.waitList = this.waitList.filter(x => x !== pid);
     if ([...this.clients.values()].some(c => c.pid === pid)) return;
     const p = this.players.get(pid); if (p && p.seat == null) this.players.delete(pid);
     this.broadcast();
@@ -191,6 +195,35 @@ class Table {
     const seat = p.seat; p.lastSeat = seat; this.freeSeat(seat);
     if (this.pending && this.pending.seat === seat) this.pending.timeoutSoon();
     if (pid === this.hostId) this.passHost();
+    if (this.phase === 'game') this.fillFromWait(seat, p.name);
+    this.broadcast();
+  }
+  // ---------- waiting list (full tables) ----------
+  waitingNow() { return this.waitList.filter(id => { const w = this.players.get(id); return w && w.connected && w.seat == null; }); }
+  joinWait(pid) {
+    const p = this.players.get(pid); if (!p || p.seat != null) return 'You already have a seat';
+    if (this.phase === 'game') { const free = this.seats.findIndex(s => s.bot); if (free >= 0) return this.sit(pid, free); }
+    if (!this.waitList.includes(pid)) this.waitList.push(pid);
+    this.broadcast(); return null;
+  }
+  leaveWait(pid) { this.waitList = this.waitList.filter(x => x !== pid); this.broadcast(); return null; }
+  // A seat became a bot seat during a game: the first connected person in line takes it
+  fillFromWait(seat, leftName) {
+    if (!this.seats[seat].bot) return false;
+    const next = this.waitingNow()[0]; if (!next) return false;
+    this.quietSit = true; const err = this.sit(next, seat); this.quietSit = false;
+    if (!err) this.fx('watch', { text: `${this.players.get(next).name} takes ${leftName}'s seat` });
+    return !err;
+  }
+  // Swap option: the human bidder whose bid failed goes to the end of the line, the first person in line takes the seat
+  swapFailedBidder(seat) {
+    const s = this.seats[seat]; if (!this.swap || s.bot || !s.pid) return;
+    const next = this.waitingNow()[0]; if (!next) return;
+    const out = s.pid, op = this.players.get(out), np = this.players.get(next); if (!op || !np) return;
+    this.waitList = this.waitList.filter(x => x !== next); this.waitList.push(out);
+    op.seat = null; op.lastSeat = seat;
+    s.pid = next; s.name = np.name; np.seat = seat;
+    this.fx('watch', { text: `${np.name} takes ${op.name}'s seat. ${op.name} joins the waiting list` });
     this.broadcast();
   }
   botName(seat) {
@@ -294,6 +327,7 @@ class Table {
           voice: vc ? { sid: vc[0], muted: vc[1].muted } : null, lvl: !s.bot && s.pid && this.levelOf ? this.levelOf(s.pid) : null, av: !s.bot && s.pid && this.avOf ? this.avOf(s.pid) : null };
       }),
       lobbyNames: [...this.players.values()].filter(x => x.connected && x.seat == null).map(x => x.name),
+      waiting: this.waitingNow().map(id => this.players.get(id).name), myWait: this.waitingNow().indexOf(pid) + 1, swap: this.swap,
       dup: me < 0 ? (k => (k < 0 ? null : { real: k, name: this.seats[k].name }))(this.sameNameSeat(pid)) : null,
     };
     const G = this.G;
@@ -775,6 +809,7 @@ class Table {
     this.waitNext = null;
     await this.coachWait();
     if (!this.alive) throw new Abort();
+    if (winner !== bt) this.swapFailedBidder(G.bid.seat);
     G.result = null; G.handNo++;
     return false;
   }

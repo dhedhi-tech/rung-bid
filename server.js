@@ -143,7 +143,7 @@ io.on('connection', socket => {
     if (tables.size > 500) return reply(cb, 'Server is busy. Try again in a minute.');
     const code = newCode();
     const guided = !!(opts && opts.guided);
-    const t = new Table(code, { n, joker: !!(opts && opts.joker), hostId: pid, limit: opts && Number(opts.limit), pub: !!(opts && opts.pub) && !guided }, io);
+    const t = new Table(code, { n, joker: !!(opts && opts.joker), hostId: pid, limit: opts && Number(opts.limit), pub: !!(opts && opts.pub) && !guided, swap: !!(opts && opts.swap) && !guided }, io);
     t.guided = guided;
     wireProgress(t);
     tables.set(code, t);
@@ -186,7 +186,7 @@ io.on('connection', socket => {
         continue;
       }
       if (!t.pub || t.phase === 'over' || !t.humansConnected()) continue;
-      const free = t.seats.filter(s => s.bot).length; if (!free) continue;
+      const free = t.seats.filter(s => s.bot).length;
       const host = t.players.get(t.hostId);
       list.push({ code: t.code, host: host ? host.name : 'Player', n: t.n, joker: t.joker, limit: t.limit, free,
         names: t.seats.filter(s => !s.bot && s.pid !== t.hostId).map(s => s.name).slice(0, 3),
@@ -208,6 +208,7 @@ io.on('connection', socket => {
     reply(cb, table.takeOver(pid, k));
   });
   socket.on('sit', (realSeat, cb) => { if (!table) return reply(cb, 'Not at a table'); reply(cb, table.sit(pid, realSeat)); });
+  socket.on('wait', (on, cb) => { if (!table) return reply(cb, 'Not at a table'); reply(cb, on ? table.joinWait(pid) : table.leaveWait(pid)); });
   socket.on('stand', cb => { if (table) table.stand(pid); reply(cb); });
   socket.on('start', cb => { if (!table) return reply(cb, 'Not at a table'); reply(cb, table.start(pid)); });
   socket.on('act', (msg, cb) => {

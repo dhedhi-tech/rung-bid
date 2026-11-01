@@ -24,7 +24,7 @@ let pid = store.get('rb-pid');
 if (!pid) { pid = 'p' + Math.random().toString(36).slice(2) + Date.now().toString(36); store.set('rb-pid', pid); }
 let myName = store.get('rb-name') || '';
 let tableCode = (new URLSearchParams(location.search).get('t') || '').toUpperCase() || null;
-let homeN = 4, homeJ = false, homeL = 10, homePub = true, homeCoach = true;
+let homeN = 4, homeJ = false, homeL = 10, homePub = true, homeCoach = true, homeSwap = false;
 const limitName = l => (l === 6 ? 'Quick · 6 hands' : l === 10 ? 'Normal · 10 hands' : 'Full · no hand limit');
 
 /* ---------- sound ---------- */
@@ -148,7 +148,7 @@ function sizeCards() {
 const sv = (t, one, many) => (teamName(t) === 'Opponents' ? many : one);
 function scoreText() { const s = S.score || 0; return s > 0 ? `${teamName(0)} ${sv(0, 'leads', 'lead')} by ${s}` : s < 0 ? `${teamName(1)} ${sv(1, 'leads', 'lead')} by ${-s}` : 'Level'; }
 function watchersSheet() {
-  openModal('watchers', `<div class="eyebrow">Watching</div><div class="watch-list">${S.lobbyNames.map(x => `<div>👀 ${esc(x)}</div>`).join('')}</div>
+  openModal('watchers', `<div class="eyebrow">Watching</div><div class="watch-list">${S.lobbyNames.map(x => `<div>👀 ${esc(x)}${(S.waiting || []).includes(x) ? ` <small class="wl-pos">waiting #${S.waiting.indexOf(x) + 1}</small>` : ''}</div>`).join('')}</div>
     <button class="primary" id="watchClose">Done</button>`);
   $('watchClose').onclick = closeModal;
 }
@@ -232,7 +232,9 @@ function renderHand() {
     if (S.phase === 'game' || S.phase === 'over') {
       const open = S.seats.map((p, i) => ({ p, i })).filter(x => x.p.bot);
       if (S.dup) { el.innerHTML = `<div class="watchbar"><b>${esc(S.dup.name)}</b> is away. Is that you? <button id="dupClaim">Yes, play here</button></div>`; $('dupClaim').onclick = () => send('claim'); return; }
-      el.innerHTML = `<div class="watchbar">You're watching.${open.length ? ' Take a bot seat:' : ''} ${open.map(x => `<button data-take="${x.p.real}"><span class="pn ${tcls(x.i)}">${esc(x.p.name)}</span></button>`).join('')}</div>`;
+      const wl = S.phase === 'game' && !open.length ? (S.myWait ? ` Waiting list: you are #${S.myWait}. <button id="waitBtn" data-w="0">Leave list</button>` : ` <button id="waitBtn" data-w="1">Join waiting list</button>`) : '';
+      el.innerHTML = `<div class="watchbar">You're watching.${open.length ? ' Take a bot seat:' : ''} ${open.map(x => `<button data-take="${x.p.real}"><span class="pn ${tcls(x.i)}">${esc(x.p.name)}</span></button>`).join('')}${wl}</div>`;
+      if ($('waitBtn')) $('waitBtn').onclick = e => send('wait', e.currentTarget.dataset.w === '1');
     }
     return;
   }
@@ -430,7 +432,7 @@ function renderRooms(list) {
       <span class="wr-main"><b>${esc(r.host)}'s table</b>
         <span class="wr-tags"><i class="${r.joker ? 'jk' : ''}">${r.joker ? '🃏 Joker' : 'No Joker'}</i><i>${r.n} players</i><i>${r.limit === 6 ? 'Quick · 6 hands' : r.limit === 10 ? 'Normal · 10 hands' : 'Full game'}</i></span>
         <span>${r.playing ? `Playing, hand ${r.hand}${r.limit ? ' of ' + r.limit : ''}` : 'Waiting to start'}${r.names && r.names.length ? ` · with ${r.names.map(esc).join(', ')}` : ''}</span></span>
-      ${r.mine ? '' : `<span class="wr-free">${r.free} seat${r.free > 1 ? 's' : ''} free</span>`}<span class="wr-go">${r.mine ? 'Continue' : 'Join'}</span></button>`;
+      ${r.mine ? '' : `<span class="wr-free">${r.free ? `${r.free} seat${r.free > 1 ? 's' : ''} free` : 'Full'}</span>`}<span class="wr-go">${r.mine ? 'Continue' : r.free ? 'Join' : 'Watch'}</span></button>`;
   box.innerHTML = (mine.length ? `<div class="wr-head">Your game</div>` + mine.map(item).join('') : '') + (open.length ? `<div class="wr-head">Open tables</div>` + open.map(item).join('') : '');
   box.querySelectorAll('.wroom').forEach(b => b.onclick = () => joinRoom(b.dataset.code, b.classList.contains('mine') ? 'auto' : 'watch'));
 }
@@ -457,6 +459,7 @@ function createSheet(practice) {
       <button data-l="6">Quick<small>6 hands</small></button><button data-l="10">Normal<small>10 hands</small></button><button data-l="0">Full<small>no limit</small></button></div></div>
     ${practice ? '<div class="field"><span>Coach tips</span><div class="seg text" id="segC"><button data-c="1">On</button><button data-c="0">Off</button></div></div>' : ''}
     <div class="field"><span>Who can join</span><div class="seg text" id="segP"><button data-p="1">Anyone</button><button data-p="0">Only with link</button></div></div>
+    ${practice ? '' : '<div class="field" id="swapField"><span>If the bidder fails</span><div class="seg text" id="segS"><button data-s="0">Keeps the seat</button><button data-s="1">Swaps with waiting list</button></div></div>'}
     <button class="primary" id="goCreate">${practice ? 'Start practice' : 'Create table'}</button>
     <div class="err" id="homeErr"></div>
     <button class="linkbtn" id="backHome">Back</button>`);
@@ -466,9 +469,12 @@ function createSheet(practice) {
     document.querySelectorAll('#segL button').forEach(b => b.classList.toggle('on', +b.dataset.l === homeL));
     document.querySelectorAll('#segP button').forEach(b => b.classList.toggle('on', (b.dataset.p === '1') === homePub));
     document.querySelectorAll('#segC button').forEach(b => b.classList.toggle('on', (b.dataset.c === '1') === homeCoach));
+    document.querySelectorAll('#segS button').forEach(b => b.classList.toggle('on', (b.dataset.s === '1') === homeSwap));
+    if ($('swapField')) $('swapField').hidden = homePub;
   };
   homePub = !practice;
   homeCoach = !store.get('rb-coached'); // on until the player has finished one guided hand
+  if ($('segS')) $('segS').onclick = e => { const b = e.target.closest('button'); if (b) { homeSwap = b.dataset.s === '1'; sync(); } };
   if ($('segC')) $('segC').onclick = e => { const b = e.target.closest('button'); if (b) { homeCoach = b.dataset.c === '1'; sync(); } };
   sync();
   $('segP').onclick = e => { const b = e.target.closest('button'); if (b) { homePub = b.dataset.p === '1'; sync(); } };
@@ -1384,7 +1390,7 @@ function connecting() {
 let awaitingCreate = false;
 async function createTable(practice) {
   awaitingCreate = true;
-  const r = await send('create', { n: homeN, joker: homeJ, limit: homeL, pub: homePub, guided: !!(practice && homeCoach) });
+  const r = await send('create', { n: homeN, joker: homeJ, limit: homeL, pub: homePub, swap: !practice && !homePub && homeSwap, guided: !!(practice && homeCoach) });
   awaitingCreate = false;
   if (!r || !r.ok) return;
   tableCode = r.code; history.replaceState(null, '', '/?t=' + r.code); store.set('rb-table', r.code);
