@@ -44,10 +44,10 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Mute is per phone (localStorage `rb-mutes`): hides their chat, chat bubbles, stickers, reactions and silences their voice (`applyVoiceMutes`).
 - Report: reasons list, server `report` event saves reason, both names/pids/account ids and the reported player's last 20 chat lines at that table (`reports.js`, Supabase table from `supabase-reports.sql`), one report per player per table, max 10 per connection. Reporting also mutes. Admin page shows Player reports.
 
-## Watchers, waiting list, swap (Nov 1, on pending-updates)
+## Watchers, waiting list, swap (deployed Nov 1)
 - Tap the 👀 count in the header to see watcher names (and waiting #).
 - Open tables list now shows full public tables too ("Full", "Watch").
-- Waiting list: `table.waitList` (pids). Watchers join from the watch bar when no bot seat is free. When a player leaves mid-game (`stand`), the first connected person in line takes the seat (`fillFromWait`).
+- Waiting list: `table.waitList` (pids). Watchers tap "Sit on first available seat" (no bot seat free) to join the line; no one is added without tapping. When a player leaves mid-game (`stand`), the first connected person in line takes the seat (`fillFromWait`).
 - Swap option (`table.swap`, create sheet "If the bidder fails", link-only tables, not practice): after a failed bid, a human bidder goes to the end of the line and the first in line takes the seat before the next hand (`swapFailedBidder`).
 - Card play timer 8s (bid/trump 20s). Delete my account (profile sheet, `A.deleteAccount`). Vibration on your turn (needs app 1.0.10, VIBRATE permission).
 
