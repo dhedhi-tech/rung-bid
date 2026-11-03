@@ -118,11 +118,12 @@ function show(j, warn) {
     <div class="tile"><b>${pct(sum(d30, 'bot_games'), started30)}</b><span>solo vs bots</span></div>
   </div>
   ${j.modes ? (() => { const M = j.modes, all = [4, 6, 8].reduce((a, n) => a + M[n].joker + M[n].plain, 0);
-    const cell = v => `${pct(v, all)} <small class="sub">(${v})</small>`;
+    const tj = [4, 6, 8].reduce((a, n) => a + M[n].joker, 0), tp = [4, 6, 8].reduce((a, n) => a + M[n].plain, 0);
+    const cell = (v, base) => `${pct(v, base)} <small class="sub">(${v})</small>`;
     return `<div class="tw" style="margin-top:10px"><table><tr><th>Table size</th><th>Joker</th><th>No Joker</th><th>Total</th></tr>
-      ${[4, 6, 8].map(n => `<tr><td>${n} players</td><td>${cell(M[n].joker)}</td><td>${cell(M[n].plain)}</td><td>${cell(M[n].joker + M[n].plain)}</td></tr>`).join('')}
-      <tr><td><b>All</b></td><td>${cell([4, 6, 8].reduce((a, n) => a + M[n].joker, 0))}</td><td>${cell([4, 6, 8].reduce((a, n) => a + M[n].plain, 0))}</td><td>${cell(all)}</td></tr></table></div>
-      <div class="sub" style="margin-top:6px">Share of all games started in the last 30 days (number of games in brackets).</div>
+      ${[4, 6, 8].map(n => `<tr><td>${n} players</td><td>${cell(M[n].joker, tj)}</td><td>${cell(M[n].plain, tp)}</td><td>${cell(M[n].joker + M[n].plain, all)}</td></tr>`).join('')}
+      <tr><td><b>All</b></td><td>${cell(tj, tj)}</td><td>${cell(tp, tp)}</td><td>${cell(all, all)}</td></tr></table></div>
+      <div class="sub" style="margin-top:6px">Each column adds up to 100%: of all Joker games, of all games without Joker, and of all games (last 30 days, number of games in brackets).</div>
       ${M.lim ? (() => { const L = M.lim, tot = L[6] + L[10] + L[0];
         return `<h2>Game length chosen (last 30 days)</h2><div class="tw"><table><tr><th>Game length</th><th>Games</th><th>Share</th></tr>
           ${[[6, 'Quick · 6 hands'], [10, 'Normal · 10 hands'], [0, 'Full · no limit']].map(([k, t]) => `<tr><td>${t}</td><td>${L[k]}</td><td>${pct(L[k], tot)}</td></tr>`).join('')}
