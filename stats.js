@@ -84,7 +84,18 @@ async function report() {
   } catch (e) { people = null; }
   let app = [];
   try { const since = dayOf(Date.now() - 30 * 86400000); app = (await sb(`/rest/v1/app_days?select=day,pid,uid&day=gte.${since}&limit=20000`)).data || []; } catch (e) { app = null; }
-  return { daily: daily.data || [], top: top.data || [], accounts: total, recent: recent.data || [], app, people, retention };
+  // Table size x Joker, games started in the last 30 days
+  let modes = null;
+  try {
+    const since = new Date(Date.now() - 30 * 86400000).toISOString();
+    modes = countModes((await sb(`/rest/v1/game_log?select=n,joker&kind=eq.start&at=gte.${since}&limit=50000`)).data || []);
+  } catch (e) { modes = null; }
+  return { daily: daily.data || [], top: top.data || [], accounts: total, recent: recent.data || [], app, people, retention, modes };
+}
+function countModes(rows) {
+  const m = {}; for (const n of [4, 6, 8]) m[n] = { joker: 0, plain: 0 };
+  for (const r of rows) if (m[r.n]) m[r.n][r.joker ? 'joker' : 'plain']++;
+  return m;
 }
 function memReport() {
   const days = new Set([...mem.days.keys(), ...mem.log.map(l => dayOf(l.at))]);
@@ -100,7 +111,8 @@ function memReport() {
     };
   });
   const app = [...mem.app.entries()].map(([k, uid]) => ({ day: k.split('|')[0], pid: k.split('|')[1], uid }));
-  return { daily, top: [], accounts: 0, memory: true, app };
+  const modes = countModes(mem.log.filter(l => l.kind === 'start' && Date.now() - l.at < 30 * 86400000));
+  return { daily, top: [], accounts: 0, memory: true, app, modes };
 }
 
 module.exports = { enabled, playerSeen, appSeen, logGame, report, dayOf, sb };
