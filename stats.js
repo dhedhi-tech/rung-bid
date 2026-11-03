@@ -88,13 +88,16 @@ async function report() {
   let modes = null;
   try {
     const since = new Date(Date.now() - 30 * 86400000).toISOString();
-    modes = countModes((await sb(`/rest/v1/game_log?select=n,joker&kind=eq.start&at=gte.${since}&limit=50000`)).data || []);
+    modes = countModes((await sb(`/rest/v1/game_log?select=n,joker,lim&kind=eq.start&at=gte.${since}&limit=50000`)).data || []);
   } catch (e) { modes = null; }
   return { daily: daily.data || [], top: top.data || [], accounts: total, recent: recent.data || [], app, people, retention, modes };
 }
 function countModes(rows) {
   const m = {}; for (const n of [4, 6, 8]) m[n] = { joker: 0, plain: 0 };
   for (const r of rows) if (m[r.n]) m[r.n][r.joker ? 'joker' : 'plain']++;
+  // Game length chosen: 6 hands (Quick), 10 (Normal), 0 = no limit (Full)
+  m.lim = { 6: 0, 10: 0, 0: 0 };
+  for (const r of rows) if (r.lim in m.lim) m.lim[r.lim]++;
   return m;
 }
 function memReport() {
