@@ -1382,6 +1382,9 @@ function toast(msg) {
 }
 function flash(msg) { const c = $('conn'); c.innerHTML = esc(msg); c.hidden = false; clearTimeout(flash.t); flash.t = setTimeout(() => { if (sock.connected) c.hidden = true; }, 2600 + msg.length * 35); }
 let waking = null;
+// Render's free plan puts the server to sleep after 15 minutes without normal web requests (game moves don't count),
+// which ends games in progress. While at a table, send a tiny request every 4 minutes to keep it awake.
+setInterval(() => { if (S && S.code) fetch('/health', { cache: 'no-store' }).catch(() => {}); }, 4 * 60 * 1000);
 function connecting() {
   const c = $('conn'); c.hidden = false;
   c.innerHTML = '<span class="spin"></span>Connecting…';
