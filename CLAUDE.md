@@ -51,7 +51,7 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Swap option (`table.swap`, create sheet "If the bidder fails", link-only tables, not practice): after a failed bid, a human bidder goes to the end of the line and the first in line takes the seat before the next hand (`swapFailedBidder`).
 - Card play timer 8s (bid/trump 20s). Delete my account (profile sheet, `A.deleteAccount`). Vibration on your turn (needs app 1.0.10, VIBRATE permission).
 
-## Away (Nov 5, on pending-updates)
+## Away (deployed Nov 5)
 - Header 💤 button (`awayBtn`; "Away" text on wide screens) -> `away` event -> `table.setAway(pid, on, why)`. Away bar above the hand with "I'm back". `isHuman` is false for away players, so bots play their turns instantly and the game pauses (`untilHumans`) when no seated human is active (solo: pauses at once).
 - Auto away: app hidden 10s (`hidden` event, `appHidden`, server timer; back automatically on return or reconnect), or 2 timed-out turns in a row (`p.missed`; must tap I'm back).
 - Swap rule on + someone waiting: only at the start of a new game (never mid hand), a player away 3+ min gives the seat to the first in line and becomes a watcher (`checkAwaySwap` in `newGame`; `RB_AWAY_SWAP_MS` for tests).
