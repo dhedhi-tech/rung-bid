@@ -152,7 +152,15 @@ function watchersSheet() {
     <button class="primary" id="watchClose">Done</button>`);
   $('watchClose').onclick = closeModal;
 }
+function renderAway() {
+  const seated = !!(S && me0() && S.phase === 'game');
+  $('awayBtn').hidden = !seated || !!S.away;
+  $('awayBar').hidden = !seated || !S.away;
+  if (seated && S.away) $('awayBar').innerHTML = `💤 You're away. ${S.paused ? 'The game is paused.' : 'A bot plays your turns.'} <button id="backBtn">I'm back</button>`;
+  if ($('backBtn')) $('backBtn').onclick = () => send('away', false);
+}
 function renderHeader() {
+  renderAway();
   const watching = S.phase !== 'lobby' && S.lobbyNames && S.lobbyNames.length ? `<button class="watchn" id="watchBtn"> · 👀 ${S.lobbyNames.length}<span class="wl"> watching</span></button>` : '';
   const hn = !S.handNo ? '' : S.decider ? 'Decider hand' : S.limit ? `Hand ${S.handNo} of ${S.limit}` : `Hand ${S.handNo}`;
   $('handNo').innerHTML = esc(S.handNo ? `${hn} · ${S.n} players` : `Table ${S.code} · ${S.n} players`) + watching;
@@ -1443,6 +1451,9 @@ function syncSound() { $('soundBtn').classList.toggle('muted', muted); $('soundB
 $('soundBtn').onclick = () => { muted = !muted; store.set('rb-muted', muted ? '1' : '0'); syncSound(); if (!muted) sfx('turn'); };
 syncSound();
 $('rulesBtn').onclick = () => { $('rules').hidden = false; };
+$('awayBtn').onclick = () => send('away', true);
+// Leaving the app (call, WhatsApp, home screen): the server marks you away after 10 seconds, and back when you return
+document.addEventListener('visibilitychange', () => { if (S && me0() && sock.connected) sock.emit('hidden', document.hidden); });
 $('rulesClose').onclick = () => { $('rules').hidden = true; };
 $('rulesTut').onclick = () => { $('rules').hidden = true; openTutorial(S ? 'game' : 'home'); };
 window.tutorialPractice = () => { homeCoach = true; if (myName) { ac(); createTable(true); } else createSheet(true); };

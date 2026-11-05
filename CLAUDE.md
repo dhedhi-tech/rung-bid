@@ -51,6 +51,11 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Swap option (`table.swap`, create sheet "If the bidder fails", link-only tables, not practice): after a failed bid, a human bidder goes to the end of the line and the first in line takes the seat before the next hand (`swapFailedBidder`).
 - Card play timer 8s (bid/trump 20s). Delete my account (profile sheet, `A.deleteAccount`). Vibration on your turn (needs app 1.0.10, VIBRATE permission).
 
+## Away (Nov 5, on pending-updates)
+- Header 💤 button (`awayBtn`; "Away" text on wide screens) -> `away` event -> `table.setAway(pid, on, why)`. Away bar above the hand with "I'm back". `isHuman` is false for away players, so bots play their turns instantly and the game pauses (`untilHumans`) when no seated human is active (solo: pauses at once).
+- Auto away: app hidden 10s (`hidden` event, `appHidden`, server timer; back automatically on return or reconnect), or 2 timed-out turns in a row (`p.missed`; must tap I'm back).
+- Swap rule on + someone waiting: away 3 min -> first in line takes the seat, the away player becomes a watcher (`checkAwaySwap`; `RB_AWAY_SWAP_MS` for tests).
+
 ## Guided practice (coach)
 - Practice sheet has "Coach tips" On/Off (on until `rb-coached` is set; the tutorial's last button always turns it on). Create sends `guided: true`; server sets `table.guided` (forces private).
 - Server (game.js): `guidedOn()` = guided + hand 1 + exactly one seated human. Then no turn timer, `ask.hint` from the bots' own logic (`coachHint`: bid value/suit, trump, card id + reason code), and `coach` socket event: `{hold}` pauses the game at the next sleep while a tip is open (auto-release 120s), `{off}` = Skip tips. Hand 1 is rigged (`rigDeck`, `G.rigged`): the player gets top trump-suit cards + aces (+ a joker in the first 5 cards in Joker mode), teammates get ~3 of 4 good cards, and the coach bids safely (never over a teammate, max 8). Player's team wins ~98% when following the coach (4/6/8p tested). 6/8p: tips about 2 decks and identical cards (last played wins).

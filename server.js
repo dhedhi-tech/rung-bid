@@ -208,6 +208,8 @@ io.on('connection', socket => {
     reply(cb, table.takeOver(pid, k));
   });
   socket.on('sit', (realSeat, cb) => { if (!table) return reply(cb, 'Not at a table'); reply(cb, table.sit(pid, realSeat)); });
+  socket.on('away', (on, cb) => { if (!table) return reply(cb, 'Not at a table'); reply(cb, table.setAway(pid, !!on)); });
+  socket.on('hidden', hidden => { if (table) table.appHidden(pid, !!hidden); });
   socket.on('wait', (on, cb) => { if (!table) return reply(cb, 'Not at a table'); reply(cb, on ? table.joinWait(pid) : table.leaveWait(pid)); });
   socket.on('stand', cb => { if (table) table.stand(pid); reply(cb); });
   socket.on('start', cb => { if (!table) return reply(cb, 'Not at a table'); reply(cb, table.start(pid)); });
