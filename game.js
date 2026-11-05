@@ -83,7 +83,7 @@ class Table {
     else { p = { name, seat: null, connected: true }; this.players.set(pid, p); }
     socket.join(this.code);
     this.touch();
-    if (p.away === 'hidden') { p.away = null; p.missed = 0; clearTimeout(p.awaySwapTimer); } // back in the app after a reconnect
+    if (p.away === 'hidden') { p.away = null; p.missed = 0; } // back in the app after a reconnect
     this.checkResume();
     if (p.seat == null && this.phase === 'lobby' && !opts.noAutoSeat) {
       // Joining before the game starts: take the first empty seat (they can still move)
@@ -195,7 +195,7 @@ class Table {
   stand(pid) {
     const p = this.players.get(pid); if (!p || p.seat == null) return;
     const seat = p.seat; p.lastSeat = seat; this.freeSeat(seat);
-    p.away = null; p.missed = 0; clearTimeout(p.hideTimer); clearTimeout(p.awaySwapTimer);
+    p.away = null; p.missed = 0; clearTimeout(p.hideTimer);
     if (this.pending && this.pending.seat === seat) this.pending.timeoutSoon();
     if (pid === this.hostId) this.passHost();
     if (this.phase === 'game') this.fillFromWait(seat, p.name);
@@ -207,7 +207,6 @@ class Table {
     const p = this.players.get(pid); if (!p || p.seat != null) return 'You already have a seat';
     if (this.phase === 'game') { const free = this.seats.findIndex(s => s.bot); if (free >= 0) return this.sit(pid, free); }
     if (!this.waitList.includes(pid)) this.waitList.push(pid);
-    this.checkAwaySwap();
     this.broadcast(); return null;
   }
   leaveWait(pid) { this.waitList = this.waitList.filter(x => x !== pid); this.broadcast(); return null; }
@@ -247,10 +246,9 @@ class Table {
       if (p.away) return null;
       p.away = why; p.awaySince = Date.now(); p.missed = 0;
       if (this.pending && this.pending.seat === p.seat) this.pending.timeoutSoon();
-      clearTimeout(p.awaySwapTimer); p.awaySwapTimer = setTimeout(() => this.checkAwaySwap(), AWAY_SWAP_MS + 500);
     } else {
       if (!p.away) return null;
-      p.away = null; p.missed = 0; clearTimeout(p.awaySwapTimer);
+      p.away = null; p.missed = 0;
       this.checkResume();
     }
     this.broadcast(); return null;
@@ -262,16 +260,16 @@ class Table {
     if (hidden) { if (!p.away) p.hideTimer = setTimeout(() => this.setAway(pid, true, 'hidden'), HIDE_AWAY_MS); }
     else if (p.away === 'hidden') this.setAway(pid, false);
   }
-  // Swap rule on + someone waiting: a player away for 3 minutes gives the seat to the first in line (they become a watcher)
+  // Swap rule on + someone waiting: at the start of a new game, a player away for 3+ minutes gives the seat to the first in line (they become a watcher)
   checkAwaySwap() {
     if (!this.swap || this.phase !== 'game') return;
     this.seats.forEach((s, seat) => {
       const p = !s.bot && s.pid && this.players.get(s.pid);
-      if (!p || !p.away || Date.now() - p.awaySince < AWAY_SWAP_MS) return;
+      if (!p || !p.away || !p.awaySince || Date.now() - p.awaySince < AWAY_SWAP_MS) return;
       const next = this.waitingNow()[0]; if (!next) return;
       const np = this.players.get(next);
       this.waitList = this.waitList.filter(x => x !== next);
-      p.seat = null; p.lastSeat = seat; p.away = null; clearTimeout(p.awaySwapTimer);
+      p.seat = null; p.lastSeat = seat; p.away = null;
       s.pid = next; s.name = np.name; np.seat = seat;
       this.fx('watch', { text: `${np.name} takes ${p.name}'s seat (away for 3 minutes)` });
     });
@@ -494,6 +492,7 @@ class Table {
       hist: [], roundTrump: {}, main: '', deadline: 0, over: null, result: null,
     };
     this.phase = 'game'; this.running = true;
+    this.checkAwaySwap();
     if (this.onGameStart) { try { this.onGameStart(); } catch (e) { console.error('stats', e); } }
     this.run();
   }
