@@ -260,7 +260,7 @@ class Table {
     if (hidden) { if (!p.away) p.hideTimer = setTimeout(() => this.setAway(pid, true, 'hidden'), HIDE_AWAY_MS); }
     else if (p.away === 'hidden') this.setAway(pid, false);
   }
-  // Swap rule on + someone waiting: at the start of a new game, a player away for 3+ minutes gives the seat to the first in line (they become a watcher)
+  // Swap rule on + someone waiting: between hands (and at a new game), a player away for 3+ minutes gives the seat to the first in line (they become a watcher)
   checkAwaySwap() {
     if (!this.swap || this.phase !== 'game') return;
     this.seats.forEach((s, seat) => {
@@ -858,6 +858,7 @@ class Table {
     await this.coachWait();
     if (!this.alive) throw new Abort();
     if (winner !== bt) this.swapFailedBidder(G.bid.seat);
+    this.checkAwaySwap();
     G.result = null; G.handNo++;
     return false;
   }
