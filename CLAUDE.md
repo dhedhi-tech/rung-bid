@@ -54,7 +54,7 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 ## Away (Nov 5, on pending-updates)
 - Header 💤 button (`awayBtn`; "Away" text on wide screens) -> `away` event -> `table.setAway(pid, on, why)`. Away bar above the hand with "I'm back". `isHuman` is false for away players, so bots play their turns instantly and the game pauses (`untilHumans`) when no seated human is active (solo: pauses at once).
 - Auto away: app hidden 10s (`hidden` event, `appHidden`, server timer; back automatically on return or reconnect), or 2 timed-out turns in a row (`p.missed`; must tap I'm back).
-- Swap rule on + someone waiting: away 3 min -> first in line takes the seat, the away player becomes a watcher (`checkAwaySwap`; `RB_AWAY_SWAP_MS` for tests).
+- Swap rule on + someone waiting: only at the start of a new game (never mid hand), a player away 3+ min gives the seat to the first in line and becomes a watcher (`checkAwaySwap` in `newGame`; `RB_AWAY_SWAP_MS` for tests).
 
 ## Guided practice (coach)
 - Practice sheet has "Coach tips" On/Off (on until `rb-coached` is set; the tutorial's last button always turns it on). Create sends `guided: true`; server sets `table.guided` (forces private).
