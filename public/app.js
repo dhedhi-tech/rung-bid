@@ -1047,8 +1047,7 @@ function showCut(seat, s, over) {
   const fx = document.createElement('div');
   fx.className = `cut-fx ${t}`; fx.style.left = to.x + '%'; fx.style.top = to.y + '%';
   fx.innerHTML = `<span class="cut-ring"></span><span class="cut-slash"></span><span class="cut-label ${RED(s) ? 'red' : ''}">${over ? 'OVER CUT' : 'CUT'} <b>${SYM[s]}</b></span>`;
-  $('trick').appendChild(fx);
-  const felt = document.querySelector('.felt'); felt.classList.remove('jolt'); void felt.offsetWidth; felt.classList.add('jolt');
+  $('trick').appendChild(fx); // (table shake removed: it made slower phones pause)
   setTimeout(() => fx.remove(), 1400);
 }
 function showJoker(seat, second) {
