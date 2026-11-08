@@ -140,9 +140,10 @@ function cardHTML(c, extra = '') {
 /* ---------- rendering ---------- */
 function sizeCards() {
   const w = Math.min(window.innerWidth, 1120);
-  const cw = Math.round(Math.max(46, Math.min(78, w * 0.11, window.innerHeight * 0.12)));
+  const base = Math.round(Math.max(46, Math.min(78, w * 0.11, window.innerHeight * 0.12)));
+  const cw = Math.round(Math.max(base, Math.min(84, w * 0.14, window.innerHeight * 0.13))); // hand cards a bit bigger (fan)
   document.documentElement.style.setProperty('--cw', cw + 'px');
-  document.documentElement.style.setProperty('--tw', Math.round(cw * (S && S.n === 8 ? 0.74 : 0.82)) + 'px');
+  document.documentElement.style.setProperty('--tw', Math.round(base * (S && S.n === 8 ? 0.74 : 0.82)) + 'px'); // table cards keep their size
   return cw;
 }
 const sv = (t, one, many) => (teamName(t) === 'Opponents' ? many : one);
@@ -250,14 +251,18 @@ function renderHand() {
   el.style.height = '';
   const hand = sortHand(S.hand || []), cw = sizeCards();
   const W = el.clientWidth, k = hand.length;
-  const step = k > 1 ? Math.min(cw + 6, (W - cw) / (k - 1)) : 0;
+  // Fan: cards tilt out from the middle and the outer ones sit a little lower, like cards held in a hand
+  const mid = (k - 1) / 2, tilt = k > 1 ? Math.min(3, 26 / (k - 1)) : 0, drop = Math.min(12, cw * 0.2);
+  const pad = Math.ceil(cw * 1.4 * Math.sin(mid * tilt * Math.PI / 180)) + 2; // room for the tilted outer cards
+  const step = k > 1 ? Math.min(cw + 6, (W - 2 * pad - cw) / (k - 1)) : 0;
   const start = (W - (cw + step * (k - 1))) / 2;
+  const fan = i => { const t = mid ? (i - mid) / mid : 0; return `rotate:${((i - mid) * tilt).toFixed(1)}deg;translate:0 ${(t * t * drop).toFixed(1)}px;`; };
   const legal = S.ask && S.ask.kind === 'play' ? new Set(S.ask.legal) : null;
   el.classList.toggle('playing', !!legal);
   el.innerHTML = hand.map((c, i) => {
     const isNew = newIds && newIds.has(c.id);
     const cls = [legal && legal.has(c.id) ? 'legal' : '', selected === c.id ? 'sel' : '', isNew ? 'in' : ''].join(' ');
-    return cardHTML(c, cls).replace('class="card', 'style="left:' + (start + i * step) + 'px;animation-delay:' + (isNew ? i * 25 : 0) + 'ms;z-index:' + i + '" class="card');
+    return cardHTML(c, cls).replace('class="card', 'style="' + fan(i) + 'left:' + (start + i * step) + 'px;animation-delay:' + (isNew ? i * 25 : 0) + 'ms;z-index:' + i + '" class="card');
   }).join('');
   newIds = null;
 }

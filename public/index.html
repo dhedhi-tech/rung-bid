@@ -189,8 +189,8 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
 #stLog{font-size:13px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
 
 /* Hand */
-.hand{position:relative;height:calc(var(--cw)*1.4 + 18px)}
-.hand .card{bottom:0;transition:transform .15s,opacity .2s,filter .2s;cursor:default}
+.hand{position:relative;height:calc(var(--cw)*1.4 + 40px)}
+.hand .card{bottom:26px;transform-origin:50% 100%;transition:transform .15s,opacity .2s,filter .2s;cursor:default}
 .hand .card.legal{cursor:pointer}
 .hand.playing .card:not(.legal){filter:brightness(.55) saturate(.6)}
 @media (hover:hover){.hand .card.legal:hover{transform:translateY(-12px)}}
@@ -266,7 +266,7 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
   .tools{gap:4px} .ghost{padding:6px 8px;font-size:12px}
   .contract{overflow:hidden} .contract .c2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .tpill{font-size:12px}
-  .hand{overflow:hidden}
+  .hand{overflow:hidden;margin-left:-12px;margin-right:-12px}
   .seat{max-width:120px}
   .seat .s-row{gap:3px}
   .s-role{font-size:8.5px}
