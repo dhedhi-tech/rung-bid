@@ -78,6 +78,7 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
 
 /* Table */
 .table{position:relative;min-height:0}
+.tbl-invite{position:absolute;top:2px;left:0;z-index:3;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700}
 .felt{position:absolute;inset:7% 5%;border-radius:50%;
   background:radial-gradient(ellipse at 50% 40%, var(--felt) 0%, var(--felt-dark) 100%);
   box-shadow:0 0 0 10px var(--rim),0 0 0 12px var(--rim-light),0 18px 40px rgba(0,0,0,.55), inset 0 0 60px rgba(0,0,0,.45)}
@@ -365,7 +366,7 @@ button.watchn{background:none;border:0;padding:0;font:inherit;color:inherit;lett
 .chat-form input{min-width:0;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:16px;color:var(--fg)}
 .chat-form input:focus{outline:2px solid var(--team-a);outline-offset:1px}
 .chat-form .primary{width:auto;margin:0;padding:10px 16px}
-.chat-bubble{position:absolute;z-index:4;transform:translate(-50%,-140%);max-width:180px;background:var(--paper);color:var(--suit-black);font-size:12.5px;font-weight:650;line-height:1.3;
+.chat-bubble{position:absolute;z-index:4;transform:translate(-50%,-140%);width:max-content;max-width:180px;background:var(--paper);color:var(--suit-black);font-size:12.5px;font-weight:650;line-height:1.3;
   padding:6px 10px;border-radius:12px;box-shadow:0 0 0 2px var(--team-a),0 8px 20px rgba(0,0,0,.45);pointer-events:none;animation:cbub 3.6s ease both;word-wrap:break-word}
 .chat-bubble.tb{box-shadow:0 0 0 2px var(--team-b),0 8px 20px rgba(0,0,0,.45)}
 @keyframes cbub{0%{opacity:0;transform:translate(-50%,-110%) scale(.8)}8%{opacity:1;transform:translate(-50%,-140%) scale(1)}85%{opacity:1}100%{opacity:0}}
@@ -592,6 +593,7 @@ button.watchn{background:none;border:0;padding:0;font:inherit;color:inherit;lett
     <div class="watermark" id="watermark"></div>
     <div id="trick"></div>
     <div id="seats"></div>
+    <button class="tbl-invite" id="tblInvite" hidden>➕ Invite</button>
     <div class="announce" id="announce" hidden></div>
     <div class="panel" id="panel" hidden><div class="panel-title" id="panelTitle"></div><div id="panelBody"></div></div>
   </main>

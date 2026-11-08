@@ -153,6 +153,7 @@ function watchersSheet() {
   $('watchClose').onclick = closeModal;
 }
 function renderAway() {
+  $('tblInvite').hidden = !(S && S.code && S.phase !== 'lobby');
   const seated = !!(S && me0() && S.phase === 'game');
   $('awayBtn').hidden = !seated || !!S.away;
   $('awayBar').hidden = !seated || !S.away;
@@ -926,6 +927,22 @@ function lobbyScreen() {
   if ($('invFriends')) $('invFriends').onclick = inviteSheet;
   if ($('dupYes')) { $('dupYes').onclick = () => send('claim'); $('dupNo').onclick = () => { dupNo = S.code + S.dup.real; lobbyScreen(); }; }
 }
+// Invite from the table during a game: same link, WhatsApp and friends options as the waiting screen
+function tableInviteSheet() {
+  const link = shareLink();
+  const wa = 'https://wa.me/?text=' + encodeURIComponent(`Join my Patta Party table (${S.n} players${S.joker ? ', Joker mode' : ''}): ${link}`);
+  openModal('tinvite', `<div class="eyebrow">Table code</div><div class="codebig">${esc(S.code)}</div>
+    <div class="share"><span class="link" id="linkTxt">${esc(link)}</span>
+      <div class="btns"><button class="secondary" id="copyBtn">Copy link</button><a class="secondary" href="${wa}" target="_blank" rel="noopener">WhatsApp</a></div></div>
+    ${PROFILE ? `<button class="secondary inv-friends" id="invFriends">👥 Invite friends</button>` : ''}
+    <button class="primary" id="tinvClose">Back to table</button>`);
+  $('copyBtn').onclick = () => {
+    const done = () => { $('copyBtn').textContent = 'Copied'; setTimeout(() => { const b = $('copyBtn'); if (b) b.textContent = 'Copy link'; }, 1500); };
+    try { navigator.clipboard.writeText(link).then(done, () => selectLink()); } catch (e) { selectLink(); }
+  };
+  if ($('invFriends')) $('invFriends').onclick = inviteSheet;
+  $('tinvClose').onclick = closeModal;
+}
 function selectLink() { const r = document.createRange(); r.selectNodeContents($('linkTxt')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
 function resultScreen() {
   const R = S.result;
@@ -1367,6 +1384,11 @@ function chatBubble(m) {
   d.className = 'chat-bubble ' + tcls(m.seat); d.textContent = m.text.length > 60 ? m.text.slice(0, 57) + '…' : m.text;
   d.style.left = pos.x + '%'; d.style.top = pos.y + '%';
   $('table').appendChild(d); setTimeout(() => d.remove(), 3600);
+  // Keep the bubble on screen for side seats (it is centred on the seat)
+  const t = $('table').getBoundingClientRect(), pad = 6, W = document.documentElement.clientWidth;
+  const cx = t.left + t.width * pos.x / 100, left = cx - d.offsetWidth / 2, right = cx + d.offsetWidth / 2;
+  if (left < pad) d.style.marginLeft = (pad - left) + 'px';
+  else if (right > W - pad) d.style.marginLeft = (W - pad - right) + 'px';
 }
 sock.on('chat', m => {
   chatMsgs.push(m); if (chatMsgs.length > 50) chatMsgs.shift();
@@ -1452,6 +1474,7 @@ $('soundBtn').onclick = () => { muted = !muted; store.set('rb-muted', muted ? '1
 syncSound();
 $('rulesBtn').onclick = () => { $('rules').hidden = false; };
 $('awayBtn').onclick = () => send('away', true);
+$('tblInvite').onclick = tableInviteSheet;
 // Leaving the app (call, WhatsApp, home screen): the server marks you away after 10 seconds, and back when you return
 document.addEventListener('visibilitychange', () => { if (S && me0() && sock.connected) sock.emit('hidden', document.hidden); });
 $('rulesClose').onclick = () => { $('rules').hidden = true; };
