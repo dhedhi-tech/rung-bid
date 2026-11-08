@@ -384,7 +384,8 @@ class Table {
       acts: Object.fromEntries(Object.entries(G.acts).map(([s, a]) => [rot(+s), a])),
       hist: G.hist.map(h => ({ ...h, seat: rot(h.seat) })),
       roundTrump: Object.fromEntries(Object.entries(G.roundTrump).map(([r, t]) => [r, { ...t, seat: rot(t.seat) }])),
-      trick: G.trick.map(t => ({ seat: rot(t.seat), card: t.card })),
+      trick: G.trick.map(t => ({ seat: rot(t.seat), card: t.card })), trickNo: (this.trickNo || 0) + 1,
+      lastTrick: G.lastTrick ? { k: G.lastTrick.k, cards: G.lastTrick.trick.map(t => ({ seat: rot(t.seat), card: t.card })), to: rot(G.lastTrick.credit), team: rotTeam(G.lastTrick.team), ws: rot(G.lastTrick.show.seat), wid: G.lastTrick.show.id } : null,
       counts: Array.from({ length: n }, (_, i) => G.players[(i + base) % n].hand.length),
       tricks: Array.from({ length: n }, (_, i) => G.players[(i + base) % n].tricks),
       hand: me >= 0 ? G.players[me].hand : [],
@@ -819,6 +820,9 @@ class Table {
       this.broadcast();
       this.fx('trick', { team: res.team, credit: res.credit, lead: res.lead, flipped: res.flipped, showSeat: res.show.seat, showId: res.show.card.id });
       await this.sleep(PACE.trick + (res.flipped ? 500 : 0));
+      // Remember the finished trick, so a phone that froze for a moment can still show it before it is cleared
+      this.trickNo = (this.trickNo || 0) + 1;
+      G.lastTrick = { k: this.trickNo, trick: G.trick.slice(), credit: res.credit, team: res.team, show: { seat: res.show.seat, id: res.show.card.id } };
       G.trick = []; G.leadSuit = null; this.broadcast();
       await this.sleep(350 * SPEED);
       leader = res.lead;

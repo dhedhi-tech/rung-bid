@@ -1459,8 +1459,30 @@ sock.on('connect_error', () => connecting());
 sock.on('state', st => {
   if (awaitingCreate && !tableCode) tableCode = st.code;
   if (!tableCode || st.code !== tableCode) return;
-  S = st; hideWelcome(); render();
+  hideWelcome(); applyState(st);
 });
+// After a short freeze (weak internet) game updates arrive in a burst and the screen could jump past a whole trick.
+// If a finished trick was not on screen for about a second, show it first, then sweep it and carry on.
+const trickSeen = {}; let heldState = null, holdUntil = 0;
+function applyState(st) {
+  const now = Date.now();
+  if (now < holdUntil) { heldState = st; return; }
+  const lt = st.lastTrick, key = lt && st.code + ':' + lt.k;
+  if (lt && st.phase === 'game' && !(st.trick && st.trick.length) && S && S.code === st.code) {
+    const seen = trickSeen[key], need = seen ? 1100 - (now - seen) : 1300;
+    if (need > 120) {
+      trickSeen[key] = seen || now;
+      S = Object.assign({}, st, { trick: lt.cards }); render();
+      const el = $('trick').querySelector(`[data-key="${lt.ws}-${lt.wid}"]`);
+      if (el) el.classList.add('win', lt.team === 0 ? 'ta' : 'tb');
+      sweepTo = lt.to; heldState = st; holdUntil = now + need;
+      setTimeout(() => { holdUntil = 0; const h = heldState; heldState = null; if (h && tableCode && h.code === tableCode) applyState(h); }, need);
+      return;
+    }
+  }
+  S = st; render();
+  if (S.trick && S.trick.length >= S.n && !trickSeen[S.code + ':' + S.trickNo]) trickSeen[S.code + ':' + S.trickNo] = now;
+}
 sock.on('fx', f => onFx(f));
 sock.on('invite', v => invitePop(v));
 sock.on('friend:count', n => { FRQ = Number(n) || 0; renderChip(); });
