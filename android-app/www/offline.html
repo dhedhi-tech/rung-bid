@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Patta Party</title>
+<style>body{margin:0;height:100vh;display:grid;place-items:center;background:#0c1618;color:#fff;font-family:sans-serif;text-align:center;padding:0 24px}
+p{color:#9fb3b6}button{margin-top:16px;padding:12px 24px;border:0;border-radius:10px;font-size:16px;font-weight:700;background:#f4a940;color:#1a1205}</style></head>
+<body><div><h2>No internet connection</h2><p>Patta Party needs internet to play.<br><span id="t">Trying again…</span></p><button id="go">Try again</button></div>
+<script>
+// Shown by the app when the game could not load (no internet yet, DNS hiccup, server restarting). Retries on its own.
+var URL = 'https://www.pattaparty.com/', n = 0;
+try { n = +sessionStorage.getItem('pp-retry') || 0; sessionStorage.setItem('pp-retry', n + 1); } catch (e) {}
+function go() { location.replace(URL); }
+document.getElementById('go').onclick = go;
+window.addEventListener('online', function () { setTimeout(go, 500); });
+setTimeout(go, Math.min(15000, 3000 + n * 2000)); // 3s, 5s, 7s ... up to 15s
+</script></body></html>

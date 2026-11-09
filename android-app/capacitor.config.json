@@ -8,7 +8,8 @@
     "allowNavigation": [
       "pattaparty.com",
       "www.pattaparty.com"
-    ]
+    ],
+    "errorPath": "offline.html"
   },
   "appendUserAgent": "PattaPartyApp",
   "android": {

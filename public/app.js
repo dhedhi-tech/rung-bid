@@ -518,6 +518,7 @@ let FRQ = 0; // friend requests waiting
 let AUTH = { auth: false }, PROFILE = null, sbClient = null, sbToken = null;
 // Running inside the Patta Party Android app (the app adds "PattaPartyApp" to the user agent)
 const NATIVE_APP = /PattaPartyApp/.test(navigator.userAgent || '');
+try { if (NATIVE_APP) sessionStorage.removeItem('pp-retry'); } catch (e) {} // game loaded: the app's offline page starts its retries fresh next time
 const APP_AUTH_URL = 'com.dhedhitech.pattaparty://auth';
 const capPlugin = n => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[n]) || null;
 // Google blocks sign-in inside app webviews, so the app signs in through the phone's browser and comes back with a code
