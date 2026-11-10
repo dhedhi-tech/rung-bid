@@ -4,7 +4,7 @@ Online team bidding card game (Rung style) for 4, 6 or 8 players. Created by Ans
 
 ## Handover (Nov 2026)
 - Ansa's brother now manages the project from his own Claude account. Wherever these notes say "Ansa", read "the person managing the project" (her brother), unless he says otherwise.
-- Ask him early how he likes to work (language, detail, screenshots). Until then keep Ansa's style below: simple English, one task at a time, screenshots for design changes, deploy only when told.
+- His preferences (asked Nov 10 2026): simple English, short summary first with details only when he asks, screenshots in chat for design changes, never deploy until he says "deploy" (same rules as Ansa below).
 - Accounts: GitHub collaborator on dhedhi-tech/rung-bid; Render, Supabase, Play Console (tech.dhedhi@gmail.com), Namecheap (pattaparty.com), ExpressTURN, Google Cloud (OAuth) are shared with him by Ansa. Never ask for or store passwords in chat or in this repo.
 Live on Render (auto-deploys every push to `main`), accounts in Supabase, code on GitHub `dhedhi-tech/rung-bid`.
 
