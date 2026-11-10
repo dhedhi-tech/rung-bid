@@ -9,7 +9,7 @@
 ## Status (1 Nov 2026)
 - Closed test live since 28 Oct (16 testers, Pakistan). Needs 12+ testers for 14 days, then Apply for production.
 - Latest app 1.0.8: opens in the app, back button works, invite links open the app.
-- To do from me: add Google review test account in Play Console App access; CONTACT_EMAIL on Render; run supabase-stats.sql if not done.
+- To do from me: add Google review test account in Play Console App access; run supabase-stats.sql if not done.
 - Before production: Delete my account button, logo and app icon, WhatsApp link preview image, upgrade Render to the $7 plan.
 - Later: AdMob (rewarded ads only), push notifications.
 
