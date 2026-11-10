@@ -1,6 +1,11 @@
 # Patta Party: handover notes for Claude
 
-Online team bidding card game (Rung style) for 4, 6 or 8 players. Owner: Ansa (non-developer, works mostly on mobile).
+Online team bidding card game (Rung style) for 4, 6 or 8 players. Created by Ansa (non-developer, works mostly on mobile).
+
+## Handover (Nov 2026)
+- Ansa's brother now manages the project from his own Claude account. Wherever these notes say "Ansa", read "the person managing the project" (her brother), unless he says otherwise.
+- Ask him early how he likes to work (language, detail, screenshots). Until then keep Ansa's style below: simple English, one task at a time, screenshots for design changes, deploy only when told.
+- Accounts: GitHub collaborator on dhedhi-tech/rung-bid; Render, Supabase, Play Console (tech.dhedhi@gmail.com), Namecheap (pattaparty.com), ExpressTURN, Google Cloud (OAuth) are shared with him by Ansa. Never ask for or store passwords in chat or in this repo.
 Live on Render (auto-deploys every push to `main`), accounts in Supabase, code on GitHub `dhedhi-tech/rung-bid`.
 
 ## Working rules (important)
@@ -83,6 +88,11 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Rival: rung.gg (4 players, invite links, bots, voice, Google sign-in, WhatsApp). Our edge: 6 and 8 players, bidding Rung, Joker mode, guided first game.
 - Logo: in progress. Ansa wants bold modern flat, adult (not childish): grinning joker (original, not DC), friends, cards, PATTA PARTY wordmark. Latest drafts: teal+gold (A) or crimson+gold (B); then a simple icon version and a WhatsApp link preview image (og:image).
 - Play App Access: Google asked for login credentials; Ansa to add a review test Gmail (no 2FA) under App access.
+
+## Small notes (Nov 2026)
+- Keep-awake: while a table is open the client fetches /health every 4 min (Render free plan sleeps after 15 min without normal HTTP requests; socket traffic does not count). Real fix: Render $7 plan before launch.
+- Admin "What people play": table size x Joker table (each column adds up to 100%) and "Game length chosen" table, both from `game_log` (last 30 days), computed in `stats.js` (`countModes`).
+- Not built yet (idea only): tracking players joining/leaving mid-game for admin stats.
 
 ## Render environment (names only)
 SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TURN_USER, TURN_PASS, optional CONTACT_EMAIL. Never print or store their values.
