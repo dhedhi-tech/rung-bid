@@ -90,7 +90,7 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Play App Access: Google asked for login credentials; Ansa to add a review test Gmail (no 2FA) under App access.
 
 ## Characters and bot names (deployed Nov 11 2026)
-- 12 character avatars in `public/avatars/0-11.svg` (Ali, Bilal, Sana, Hira, Usman, Zara, Hamza, Maham, Ayesha, Omar, Chacha, Khala). Same cast as the Play Store video. Profile pic value `a:<n>` (accounts.js `CHARS`); index order is stored in profiles, so only add new ones at the end.
+- 12 character avatars in `public/avatars/0-11.svg` (Ali, Bilal, Sana, Hira, Usman, Zara, Hamza, Maham, Ayesha, Omar, Kaka, Khala). Same cast as the Play Store video. Profile pic value `a:<n>` (accounts.js `CHARS`); index order is stored in profiles, so only add new ones at the end.
 - Bots show a character picture (`botAv`). Bot names follow the table creator's phone time zone (`myRegion` in app.js -> `region` on create): India and Bangladesh get local names, everyone else Pakistani names (`BOT_SETS` in game.js).
 
 ## Small notes (Nov 2026)
