@@ -215,7 +215,7 @@ function renderSeats() {
     const talking = p.voice && !p.voice.muted && (talkers.has(p.voice.sid) || (i === 0 && me0() && V.talking));
     const bidding = active && (S.gphase === 'bid' || S.gphase === 'trump');
     const spot = S.bid && S.bid.seat === i && S.gphase === 'play';
-    const pic = p.av ? avatarHTML({ name: p.name, av: p.av }, 's-av') : '<span class="dot"></span>';
+    const pic = p.av ? avatarHTML({ name: p.name, av: p.av }, 's-av', t) : '<span class="dot"></span>';
     {
       // Small round picture with the name only. Tap it for details.
       let badge = '';
@@ -226,7 +226,7 @@ function renderSeats() {
       const won = (S.gphase === 'play' || S.gphase === 'done') && S.tricks[i] ? `<span class="cb won">${S.tricks[i]}</span>` : '';
       const dealer = S.phase !== 'lobby' && i === S.dealer ? `<span class="cb dealer">D</span>` : '';
       const who = p.bot ? `<span class="cb who" title="Bot">🤖</span>` : !p.connected ? `<span class="cb who away" title="Away">💤</span>` : '';
-      const face = p.av ? avatarHTML({ name: p.name, av: p.av }, 'c-av') : `<span class="avatar c-av">${esc((i === 0 && me0() ? 'You' : p.name)[0].toUpperCase())}</span>`;
+      const face = p.av ? avatarHTML({ name: p.name, av: p.av }, 'c-av', t) : `<span class="avatar c-av">${esc((i === 0 && me0() ? 'You' : p.name)[0].toUpperCase())}</span>`;
       html += `<div class="seat compact ${t} ${active ? 'active' : ''} ${bidding ? 'bidding' : ''} ${spot ? 'spot' : ''} ${talking ? 'speaking' : ''} ${!p.bot && !p.connected ? 'offline' : ''}" data-seat="${i}" data-real="${p.real}" style="left:${pos.x}%;top:${pos.y}%">${spot ? '<span class="spot-light"></span>' : ''}<span class="c-face">${face}${badge}${dealer}${won}${who}</span><span class="c-name">${esc(i === 0 && me0() ? 'You' : p.name)}</span>${tmr}</div>`;
       continue;
     }
@@ -598,9 +598,9 @@ function myRegion() {
   let tz = ''; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
   return /^Asia\/(Kolkata|Calcutta)$/.test(tz) ? 'in' : /^Asia\/(Dhaka|Dacca)$/.test(tz) ? 'bd' : 'pk';
 }
-function avatarHTML(p, cls = '') {
+function avatarHTML(p, cls = '', team = '') {
   const av = p.av;
-  if (av && av.a !== undefined) return `<img class="avatar char ${cls}" src="/avatars/${+av.a}.svg" alt="">`;
+  if (av && av.a !== undefined) return `<img class="avatar char ${cls}" src="/avatars/${+av.a}${team === 'ta' ? '-a' : team === 'tb' ? '-b' : ''}.svg" alt="">`;
   if (av && av.e) return `<span class="avatar emo ${cls}">${esc(av.e)}</span>`;
   if (av && av.u) return `<img class="avatar ${cls}" src="${esc(av.u)}" alt="" referrerpolicy="no-referrer">`;
   if (p.av === null) return `<span class="avatar ${cls}">${esc((p.name || '?')[0].toUpperCase())}</span>`;

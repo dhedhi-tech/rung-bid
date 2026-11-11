@@ -33,6 +33,17 @@ const APP_CERTS = ['2F:FE:EE:66:1B:60:B2:4D:79:FE:AA:91:2C:96:83:32:36:C4:38:B0:
   ...String(process.env.APP_SHA256 || '').split(',').map(s => s.trim().toUpperCase()).filter(s => /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/.test(s))];
 app.get('/.well-known/assetlinks.json', (_req, res) => res.json([{ relation: ['delegate_permission/common.handle_all_urls'],
   target: { namespace: 'android_app', package_name: 'com.dhedhitech.pattaparty', sha256_cert_fingerprints: APP_CERTS } }]));
+// Character picture with the team colour as background (table seats): /avatars/3-a.svg (orange) or /avatars/3-b.svg (blue)
+const TEAM_BG = { a: '#F4A93A', b: '#6CC4D8' }, teamAvCache = {};
+app.get(/^\/avatars\/(\d+)-(a|b)\.svg$/, (req, res) => {
+  const key = req.params[0] + '-' + req.params[1];
+  if (!teamAvCache[key]) {
+    const file = path.join(__dirname, 'public', 'avatars', (+req.params[0]) + '.svg');
+    if (!fs.existsSync(file)) return res.sendStatus(404);
+    teamAvCache[key] = fs.readFileSync(file, 'utf8').replace(/(<rect width="120" height="120" fill=")#[0-9A-Fa-f]{6}"/, `$1${TEAM_BG[req.params[1]]}"`);
+  }
+  res.type('image/svg+xml').set('Cache-Control', 'public, max-age=86400').send(teamAvCache[key]);
+});
 app.use(express.static(path.join(__dirname, 'public'), {
   extensions: ['html'], index: false,
   setHeaders: (res, file) => { if (/\.(js|css)$/.test(file)) res.set('Cache-Control', 'no-cache'); },
