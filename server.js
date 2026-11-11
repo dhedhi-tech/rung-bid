@@ -143,7 +143,7 @@ io.on('connection', socket => {
     if (tables.size > 500) return reply(cb, 'Server is busy. Try again in a minute.');
     const code = newCode();
     const guided = !!(opts && opts.guided);
-    const t = new Table(code, { n, joker: !!(opts && opts.joker), hostId: pid, limit: opts && Number(opts.limit), pub: !!(opts && opts.pub) && !guided, swap: !!(opts && opts.swap) && !guided }, io);
+    const t = new Table(code, { n, joker: !!(opts && opts.joker), hostId: pid, limit: opts && Number(opts.limit), pub: !!(opts && opts.pub) && !guided, swap: !!(opts && opts.swap) && !guided, region: opts && ['pk', 'in', 'bd'].includes(opts.region) ? opts.region : 'pk' }, io);
     t.guided = guided;
     wireProgress(t);
     tables.set(code, t);

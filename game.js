@@ -6,7 +6,13 @@ const SUITS = ['S', 'H', 'C', 'D'];
 const SYM = { S: '♠', H: '♥', D: '♦', C: '♣' };
 const SNAME = { S: 'Spades', H: 'Hearts', D: 'Diamonds', C: 'Clubs' };
 const RL = r => ({ 11: 'J', 12: 'Q', 13: 'K', 14: 'A' })[r] || String(r);
-const BOT_NAMES = ['Sana', 'Bilal', 'Hira', 'Usman', 'Zara', 'Hamza', 'Maham', 'Ali', 'Ayesha', 'Omar'];
+// Bot names by the table creator's country (from the phone's time zone), each with its character picture (public/avatars/<n>.svg)
+const BOT_SETS = {
+  pk: [['Sana', 2], ['Bilal', 1], ['Hira', 3], ['Usman', 4], ['Zara', 5], ['Hamza', 6], ['Maham', 7], ['Ali', 0], ['Ayesha', 8], ['Omar', 9]],
+  in: [['Priya', 2], ['Rahul', 0], ['Ayesha', 3], ['Karan', 4], ['Neha', 5], ['Arjun', 6], ['Pooja', 7], ['Vikram', 1], ['Anjali', 8], ['Rohan', 9]],
+  bd: [['Riya', 2], ['Sakib', 1], ['Nusrat', 3], ['Arif', 4], ['Mim', 5], ['Tanvir', 6], ['Farhana', 7], ['Rafi', 0], ['Tania', 8], ['Imran', 9]],
+};
+const BOT_NAMES = BOT_SETS.pk.map(b => b[0]);
 const TARGET = 52;
 const SPEED = Number(process.env.RB_SPEED) || 1; // test hook: 0.1 runs ten times faster
 const PACE = { bot: 800 * SPEED, trick: 1300 * SPEED, trump: 1800 * SPEED, deal: 700 * SPEED };
@@ -53,14 +59,15 @@ function perms(a) { if (a.length < 2) return [a]; return a.flatMap((x, i) => per
 class Abort extends Error {}
 
 class Table {
-  constructor(code, { n, joker, hostId, limit, pub, swap }, io) {
+  constructor(code, { n, joker, hostId, limit, pub, swap, region }, io) {
     this.code = code; this.io = io; this.pub = !!pub; // pub: listed in Open tables on the home screen
     this.swap = !!swap && !pub; // link-only tables: a human bidder who fails swaps out for the first person on the waiting list
     this.waitList = [];        // audience waiting for a seat (player ids, first in line first)
     this.n = n; this.joker = !!joker; this.hostId = hostId;
     this.limit = [0, 6, 10].includes(limit) ? limit : 10; // hand limit: 6 quick, 10 normal, 0 = no limit
     this.alive = true; this.running = false; this.phase = 'lobby';
-    const names = shuffle(BOT_NAMES.slice());
+    this.bots = BOT_SETS[region] || BOT_SETS.pk;
+    const names = shuffle(this.bots.map(b => b[0]));
     this.seats = Array.from({ length: n }, (_, i) => ({ pid: null, name: names[i], bot: true }));
     this.clients = new Map(); // socket.id -> {socket, pid}
     this.voice = new Map();   // socket.id -> {pid, muted} for people in voice chat
@@ -229,9 +236,11 @@ class Table {
     this.fx('watch', { text: `${np.name} takes ${op.name}'s seat. ${op.name} joins the waiting list` });
     this.broadcast();
   }
+  botAv(name) { const b = this.bots.find(b => b[0] === name); return b ? { a: b[1] } : null; }
   botName(seat) {
     const used = new Set(this.seats.map(s => s.name));
-    return BOT_NAMES.find(n => !used.has(n)) || ('Bot ' + (seat + 1));
+    const b = this.bots.find(b => !used.has(b[0]));
+    return b ? b[0] : ('Bot ' + (seat + 1));
   }
   isHuman(seat) {
     const s = this.seats[seat]; if (s.bot || !s.pid) return false;
@@ -365,7 +374,7 @@ class Table {
         const pl = s.pid && this.players.get(s.pid);
         const vc = s.pid && !s.bot ? [...this.voice.entries()].find(([, x]) => x.pid === s.pid) : null;
         return { name: s.name, bot: s.bot, human: !s.bot, mid: !s.bot && s.pid ? this.midOf(s.pid) : null, connected: !!(pl && pl.connected && !pl.away), host: s.pid === this.hostId, real: (i + base) % n,
-          voice: vc ? { sid: vc[0], muted: vc[1].muted } : null, lvl: !s.bot && s.pid && this.levelOf ? this.levelOf(s.pid) : null, av: !s.bot && s.pid && this.avOf ? this.avOf(s.pid) : null };
+          voice: vc ? { sid: vc[0], muted: vc[1].muted } : null, lvl: !s.bot && s.pid && this.levelOf ? this.levelOf(s.pid) : null, av: !s.bot && s.pid && this.avOf ? this.avOf(s.pid) : s.bot ? this.botAv(s.name) : null };
       }),
       lobbyNames: [...this.players.values()].filter(x => x.connected && x.seat == null).map(x => x.name),
       paused: !!this.paused,

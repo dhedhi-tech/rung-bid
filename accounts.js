@@ -82,19 +82,21 @@ function save(p) {
   }, 800));
 }
 
-// Profile picture: 'e:<n>' for a ready-made avatar, a small JPEG (data URL) for an uploaded photo, '' for the Google photo
+// Profile picture: 'a:<n>' for a character (public/avatars/<n>.svg), 'e:<n>' for a ready-made avatar, a small JPEG (data URL) for an uploaded photo, '' for the Google photo
 const AVATARS = ['🦁', '🐯', '🦊', '🐼', '🐨', '🐸', '🦉', '🐺', '🐻', '🦄', '🐵', '🐲', '🦅', '🐬', '🐝', '🌹'];
+const CHARS = 12;
 const picVer = s => { let h = 0; for (let i = 0; i < s.length; i += 7) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
 function avOf(p) {
   if (!p) return null;
   const pic = p.pic || '';
+  if (/^a:\d+$/.test(pic) && +pic.slice(2) < CHARS) return { a: +pic.slice(2) };
   if (/^e:\d+$/.test(pic) && AVATARS[+pic.slice(2)]) return { e: AVATARS[+pic.slice(2)] };
   if (pic.startsWith('data:image/')) return { u: `/pic/${p.id}?v=${picVer(pic)}` };
   return p.avatar ? { u: p.avatar } : null;
 }
 async function setPic(p, val) {
   val = String(val || '');
-  if (!(val === '' || /^e:\d+$/.test(val) && AVATARS[+val.slice(2)] || /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(val) && val.length <= 60000)) return 'That picture is not allowed';
+  if (!(val === '' || /^a:\d+$/.test(val) && +val.slice(2) < CHARS || /^e:\d+$/.test(val) && AVATARS[+val.slice(2)] || /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(val) && val.length <= 60000)) return 'That picture is not allowed';
   p.pic = val;
   if (enabled) {
     try { await sb(`/rest/v1/profiles?id=eq.${encodeURIComponent(p.id)}`, { method: 'PATCH', body: JSON.stringify({ pic: val }) }); }

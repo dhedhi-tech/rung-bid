@@ -593,8 +593,14 @@ async function signOut() {
   store.set('rb-dev', ''); sbToken = null; PROFILE = null;
   send('signout'); applyFelt(); renderChip(); closeModal();
 }
+// Country from the phone's time zone, so bots get local names (India, Bangladesh; everyone else Pakistani names)
+function myRegion() {
+  let tz = ''; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+  return /^Asia\/(Kolkata|Calcutta)$/.test(tz) ? 'in' : /^Asia\/(Dhaka|Dacca)$/.test(tz) ? 'bd' : 'pk';
+}
 function avatarHTML(p, cls = '') {
   const av = p.av;
+  if (av && av.a !== undefined) return `<img class="avatar char ${cls}" src="/avatars/${+av.a}.svg" alt="">`;
   if (av && av.e) return `<span class="avatar emo ${cls}">${esc(av.e)}</span>`;
   if (av && av.u) return `<img class="avatar ${cls}" src="${esc(av.u)}" alt="" referrerpolicy="no-referrer">`;
   if (p.av === null) return `<span class="avatar ${cls}">${esc((p.name || '?')[0].toUpperCase())}</span>`;
@@ -669,6 +675,7 @@ function picSheet() {
   openModal('pic', `<div class="eyebrow">Profile picture</div><h2>Choose your picture</h2>
     <div class="pic-grid" id="picGrid">
       ${PROFILE.avatar ? `<button data-pic="" class="${cur === '' ? 'on' : ''}"><img class="avatar big" src="${esc(PROFILE.avatar)}" alt="" referrerpolicy="no-referrer"><small>Google</small></button>` : ''}
+      ${Array.from({ length: 12 }, (_, i) => `<button data-pic="a:${i}" class="${cur === 'a:' + i ? 'on' : ''}"><img class="avatar char big" src="/avatars/${i}.svg" alt=""></button>`).join('')}
       ${AVATARS.map((e, i) => `<button data-pic="e:${i}" class="${cur === 'e:' + i ? 'on' : ''}"><span class="avatar emo big">${e}</span></button>`).join('')}
     </div>
     <label class="secondary pic-up">${cur === 'u' ? 'Upload a new photo' : 'Upload your photo'}<input type="file" id="picFile" accept="image/*" hidden></label>
@@ -1426,7 +1433,7 @@ function connecting() {
 let awaitingCreate = false;
 async function createTable(practice) {
   awaitingCreate = true;
-  const r = await send('create', { n: homeN, joker: homeJ, limit: homeL, pub: homePub, swap: !practice && !homePub && homeSwap, guided: !!(practice && homeCoach) });
+  const r = await send('create', { n: homeN, joker: homeJ, limit: homeL, pub: homePub, swap: !practice && !homePub && homeSwap, guided: !!(practice && homeCoach), region: myRegion() });
   awaitingCreate = false;
   if (!r || !r.ok) return;
   tableCode = r.code; history.replaceState(null, '', '/?t=' + r.code); store.set('rb-table', r.code);
@@ -1516,7 +1523,7 @@ document.addEventListener('pointerdown', () => ac(), { once: true });
 
 /* ---------- boot: a sample table behind the home screen ---------- */
 function boot() {
-  S = { n: 4, code: '', phase: 'demo', spectator: false, seats: [{ name: 'You', bot: false, connected: true, real: 0 }, { name: 'Sana', bot: true, real: 1 }, { name: 'Bilal', bot: true, real: 2 }, { name: 'Hira', bot: true, real: 3 }], score: 0, won: [0, 0], hand: [], counts: [5, 5, 5, 5], tricks: [0, 0, 0, 0], log: [], main: '', trick: [] };
+  S = { n: 4, code: '', phase: 'demo', spectator: false, seats: [{ name: 'You', bot: false, connected: true, real: 0 }, { name: 'Sana', bot: true, real: 1, av: { a: 2 } }, { name: 'Bilal', bot: true, real: 2, av: { a: 1 } }, { name: 'Hira', bot: true, real: 3, av: { a: 3 } }], score: 0, won: [0, 0], hand: [], counts: [5, 5, 5, 5], tricks: [0, 0, 0, 0], log: [], main: '', trick: [] };
   renderHeader(); renderSeats(); renderHand();
   $('stMain').textContent = 'Create a table or join one to play'; $('stLog').textContent = '';
   $('contract').innerHTML = '<div class="c1">Patta Party</div><div class="c2">4, 6 or 8 players</div>';
