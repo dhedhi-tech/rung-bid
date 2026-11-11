@@ -383,12 +383,16 @@ button.watchn{background:none;border:0;padding:0;font:inherit;color:inherit;lett
 .whero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px 0 6px;min-height:280px}
 .wfan{position:relative;width:240px;height:150px;--cw:72px;margin-bottom:40px}
 .coin{color:#ffd76a}
+.wfaces{display:flex;justify-content:center;margin-bottom:30px}
+.wfaces img{width:min(56px,11.5vw);height:min(56px,11.5vw);margin:0 -5px;border-radius:50%;border:4px solid var(--felt-dark);box-shadow:0 8px 18px rgba(0,0,0,.35);animation:faceIn .55s cubic-bezier(.2,.9,.3,1.3) both;animation-delay:calc(var(--i) * 70ms + 120ms)}
+@keyframes faceIn{from{transform:translateY(18px) scale(.6);opacity:0}to{transform:none;opacity:1}}
+.wtag2{color:var(--muted);font-size:13px;margin:6px 0 0;opacity:.8}
 .wfan-card{position:absolute;left:50%;bottom:0;transform-origin:50% 140%;animation:fanIn .9s cubic-bezier(.2,.9,.3,1.2) both;animation-delay:calc((var(--i) + 2) * 90ms)}
 .wfan-card .card{position:relative;margin-left:calc(var(--cw) / -2);box-shadow:inset 0 0 0 1px var(--paper-edge),0 10px 24px rgba(0,0,0,.45)}
 @keyframes fanIn{from{transform:rotate(0) translateY(40px);opacity:0}to{transform:rotate(calc(var(--i) * 14deg)) translateY(0);opacity:1}}
 .wlogo{font-family:var(--font-display);font-weight:900;font-stretch:125%;font-size:clamp(46px,13vw,72px);line-height:.95;margin:4px 0 6px;letter-spacing:-.02em;text-shadow:0 6px 24px rgba(0,0,0,.45)}
 .wlogo em{font-style:normal;color:var(--team-a)}
-.wtag{color:var(--muted);font-size:15px;margin:0;max-width:30ch}
+.wtag{color:var(--text,#f3efe6);font-size:16px;font-weight:600;margin:0;max-width:32ch}
 .wmenu{display:grid;gap:9px;max-width:420px;width:100%;margin:0 auto;padding-top:10px}
 .wmenu .primary{margin-top:0;padding:15px;font-size:16px}
 .wmenu .secondary{width:100%;padding:13px}

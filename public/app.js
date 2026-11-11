@@ -398,14 +398,14 @@ function welcomeScreen(err) {
   closeModal();
   let w = $('welcome');
   if (!w) { w = document.createElement('div'); w.id = 'welcome'; w.className = 'welcome'; document.body.appendChild(w); }
-  const fan = [{ r: 14, s: 'S' }, { r: 13, s: 'H' }, { r: 12, s: 'C' }, { r: 11, s: 'D' }, { r: 10, s: 'S' }]
-    .map((c, i) => `<div class="wfan-card" style="--i:${i - 2}">${cardHTML({ ...c, id: 'w' + i })}</div>`).join('');
+  const faces = [0, 1, 2, 6, 5, 9, 3, 4].map((a, i) => `<img src="/avatars/${a}.svg" alt="" style="--i:${i}">`).join('');
   const firstTime = !store.get('rb-tut-seen');
   w.innerHTML = `<div class="wtop"><div id="wChip"></div></div>
     <div class="whero">
-      <div class="wfan">${fan}</div>
+      <div class="wfaces">${faces}</div>
       <h1 class="wlogo">Patta<em>·</em>Party</h1>
-      <p class="wtag">The team bidding card game for 4, 6 or 8 players</p>
+      <p class="wtag">The Trump Card Game with a Joker Twist</p>
+      <p class="wtag2">Bidding Rung for 4, 6 or 8 players</p>
     </div>
     <div class="wmenu">
       ${firstTime ? '<div class="tut-banner"><b>New to Patta Party?</b><span>Learn the rules in 2 minutes with a hands-on tutorial.</span></div>' : ''}
