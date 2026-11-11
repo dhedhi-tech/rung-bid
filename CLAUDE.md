@@ -91,6 +91,7 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 
 ## Characters and bot names (deployed Nov 11 2026)
 - 12 character avatars in `public/avatars/0-11.svg` (Ali, Bilal, Sana, Hira, Usman, Zara, Hamza, Maham, Ayesha, Omar, Kaka, Khala). Same cast as the Play Store video. Profile pic value `a:<n>` (accounts.js `CHARS`); index order is stored in profiles, so only add new ones at the end.
+- Table seats: character pictures get the team colour as background (server route `/avatars/<n>-a.svg` orange, `-b.svg` blue; `avatarHTML(p, cls, team)`); letter pictures are filled with the team colour too. Deployed Nov 11 2026.
 - Bots show a character picture (`botAv`). Bot names follow the table creator's phone time zone (`myRegion` in app.js -> `region` on create): India and Bangladesh get local names, everyone else Pakistani names (`BOT_SETS` in game.js).
 
 ## Small notes (Nov 2026)
