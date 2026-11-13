@@ -23,7 +23,7 @@
   --font-display:"Archivo", system-ui, sans-serif;
   --font-body:"Archivo", system-ui, sans-serif;
   --font-card:"DM Serif Display", Georgia, "Times New Roman", serif;
-  --cw:64px; --tw:52px;
+  --cw:64px; --tw:62px;
   color-scheme:dark;
 }
 [hidden]{display:none!important}
@@ -82,6 +82,10 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
 .felt{position:absolute;inset:7% 5%;border-radius:50%;
   background:radial-gradient(ellipse at 50% 40%, var(--felt) 0%, var(--felt-dark) 100%);
   box-shadow:0 0 0 10px var(--rim),0 0 0 12px var(--rim-light),0 18px 40px rgba(0,0,0,.55), inset 0 0 60px rgba(0,0,0,.45)}
+/* Default green table: brighter felt. A faint chatai (woven mat) pattern sits on every felt colour */
+:root[data-felt=green] .felt,:root:not([data-felt]) .felt{--felt:#1f7a4d;--felt-dark:#0d4a2e}
+.felt::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:.09;
+  background:repeating-linear-gradient(45deg,#f6d27a 0 6px,transparent 6px 14px),repeating-linear-gradient(-45deg,#f6d27a 0 6px,transparent 6px 14px)}
 .watermark{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:var(--font-card);font-size:clamp(70px,16vmin,150px);color:var(--fg);opacity:.07;pointer-events:none;transition:opacity .3s}
 .watermark.red{color:#ff8a80;opacity:.1}
 #seats,#trick{position:absolute;inset:0}
