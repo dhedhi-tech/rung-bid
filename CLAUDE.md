@@ -94,6 +94,11 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Table seats: character pictures get the team colour as background (server route `/avatars/<n>-a.svg` orange, `-b.svg` blue; `avatarHTML(p, cls, team)`); letter pictures are filled with the team colour too. Deployed Nov 11 2026.
 - Bots show a character picture (`botAv`). Bot names follow the table creator's phone time zone (`myRegion` in app.js -> `region` on create): India and Bangladesh get local names, everyone else Pakistani names (`BOT_SETS` in game.js).
 
+## Table look (deployed Nov 13 2026)
+- Default green felt brighter (#1f7a4d) + faint chatai pattern on every felt (`.felt::before`). Played cards bigger: `sizeCards` sets `--tw` (base x 1.15 for 4p, 1.05 for 6p, 0.95 for 8p); the CSS `--tw` is only a fallback.
+- Status line under the table (`.status`: main text, log, team tricks strip) is hidden. A turn bubble sits above the active seat (`.turn-bub`: "Your turn" orange, "Playing…"/"Bidding…" white).
+- Trick score in the middle of the table (`#tscore`, in `renderTricks`): our team big in orange as won/needed, opponents small in blue. Header line 2 shows only "<team> need N". Manager tried "US/THEM" labels and declined them.
+
 ## Small notes (Nov 2026)
 - Keep-awake: while a table is open the client fetches /health every 4 min (Render free plan sleeps after 15 min without normal HTTP requests; socket traffic does not count). Real fix: Render $7 plan before launch.
 - Admin "What people play": table size x Joker table (each column adds up to 100%) and "Game length chosen" table, both from `game_log` (last 30 days), computed in `stats.js` (`countModes`).

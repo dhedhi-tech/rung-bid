@@ -23,7 +23,7 @@
   --font-display:"Archivo", system-ui, sans-serif;
   --font-body:"Archivo", system-ui, sans-serif;
   --font-card:"DM Serif Display", Georgia, "Times New Roman", serif;
-  --cw:64px; --tw:62px;
+  --cw:64px; --tw:52px;
   color-scheme:dark;
 }
 [hidden]{display:none!important}
@@ -192,6 +192,23 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
 .status{display:flex;align-items:baseline;gap:12px;min-height:22px;padding-inline:2px;flex-wrap:wrap}
 #stMain{font-weight:750;font-size:14px}
 #stLog{font-size:13px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+/* Nov 13: the move log and the team tricks strip under the table are hidden (tricks show on the table) */
+#stLog,.status .tboard{display:none!important}
+/* Nov 13: no status line under the table; a turn bubble above the active player instead */
+.status{display:none!important}
+.turn-bub{position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);white-space:nowrap;z-index:6;pointer-events:none;
+  background:var(--fg);color:#111;font-size:11px;font-weight:800;padding:3px 8px;border-radius:10px;box-shadow:0 3px 8px rgba(0,0,0,.4);animation:bubIn .25s ease}
+.turn-bub::after{content:"";position:absolute;left:50%;top:100%;margin-left:-5px;border:5px solid transparent;border-top-color:var(--fg)}
+.turn-bub.mine{background:var(--team-a)}.turn-bub.mine::after{border-top-color:var(--team-a)}
+@keyframes bubIn{from{opacity:0;transform:translateX(-50%) translateY(4px)}}
+/* Nov 13: tricks score on the table */
+.tscore{display:flex;align-items:baseline;gap:10px}
+.tk-us{color:var(--team-a);font-weight:900;font-size:36px;font-variant-numeric:tabular-nums}
+.tk-us small{font-size:18px;opacity:.85;margin-left:1px}
+.tk-them{color:var(--team-b);font-weight:800;font-size:15px;opacity:.85;font-variant-numeric:tabular-nums}
+.tk-them small{font-size:11px}
+.tscore{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;pointer-events:none;font-size:34px;line-height:1;
+  background:rgba(0,0,0,.28);border-radius:16px;padding:6px 14px;text-shadow:0 2px 4px rgba(0,0,0,.5)}
 
 /* Hand */
 .hand{position:relative;height:calc(var(--cw)*1.4 + 40px)}
@@ -601,6 +618,7 @@ button.watchn{background:none;border:0;padding:0;font:inherit;color:inherit;lett
   <main class="table" id="table">
     <div class="felt"></div>
     <div class="watermark" id="watermark"></div>
+    <div class="tscore" id="tscore" hidden></div>
     <div id="trick"></div>
     <div id="seats"></div>
     <button class="tbl-invite" id="tblInvite" hidden>➕ Invite</button>
