@@ -577,8 +577,53 @@ class Table {
       if (cur < cap && shareT >= needS && tc.length >= Math.ceil(h / 4) && tc.some(c => c.r >= 13)) { G.supportSeat = seat; return cur + 1; }
       if (maxBid < cur + 2) return null;
     }
-    if (maxBid > cur) return Math.max(6, cur + 1);
+    const v = maxBid > cur ? Math.max(6, cur + 1) : null;
+    return this.endBid(seat, round, v, tricks, share, cur);
+  }
+  // ---------- end of game: far behind in the last hands ----------
+  // Our team behind in the last 3 hands of a game with a hand limit: the gap to close, hands left, and points needed per hand
+  behind(team) {
+    const G = this.G; if (!this.limit || !G) return null;
+    const left = G.handNo > this.limit ? 1 : this.limit - G.handNo + 1;
+    const gap = team === 0 ? -G.score : G.score;
+    if (left > 3 || gap <= 0) return null;
+    return { left, gap, per: Math.ceil(gap / left) };
+  }
+  // Far behind: on the last hand any gap a normal bid can't close; with 2-3 hands left, more than about 8 points a hand
+  desperate(team) { const e = this.behind(team); return e && (e.left === 1 || e.gap > 8 * e.left) ? e : null; }
+  // Far behind: no small "safe" bid that can't change the result. Bid what closes the gap, or a bid whose sweep would,
+  // otherwise pass so the opponents take the bid and we try to break it.
+  endBid(seat, round, v, tricks, share, cur) {
+    const G = this.G, e = this.desperate(seat % 2);
+    if (!e || (G.bid && G.bid.seat % 2 === seat % 2)) return v; // normal, or partner holds the bid (don't bid over partner)
+    if (v && v >= e.per) return v;
+    const maxV = round === 1 ? 7 : 13, need = Math.max(6, cur + 1, e.per);
+    // Last hand: losing a stretched bid costs nothing more, so bid what's needed when the cards are close to it
+    if (e.left === 1 && need <= maxV && tricks >= 7 && tricks + 1 >= need) return need;
+    // Very strong cards: the sweep (double) of a smaller bid closes the gap
+    if (v && 2 * v >= e.per && share >= 2.2) return v;
     return null;
+  }
+  // Play to win every trick (sweep for the bidding team, whitewash for the defenders) while the opponents have no trick:
+  // from the start when my sure winners cover the tricks still needed, after 4+ tricks with strong cards,
+  // or from the first trick when only a sweep / whitewash can still win the game
+  allOut(seat) {
+    const G = this.G, team = seat % 2, tw = G.tricksWon;
+    if (!G.bid || tw[1 - team] > 0) return false;
+    const e = this.behind(team);
+    if (e && e.left === 1) {
+      const us = G.bid.seat % 2 === team, v = G.bid.value;
+      if ((us ? v : 2 * v) < e.gap && (us ? 2 * v : 4 * v) >= e.gap) return true;
+    }
+    const hand = G.players[seat].hand, T = G.trump;
+    // From the start: my sure winners (cards nobody can beat) cover every trick our team still needs
+    const sure = hand.filter(c => this.isBoss(seat, c)).length;
+    const left = G.bid.seat % 2 === team ? this.need() - tw[team] : 14 - this.need() - tw[team];
+    if (sure >= left) return true;
+    // After 4+ tricks all ours: go for it with strong cards
+    if (tw[team] < 4) return false;
+    const strong = hand.filter(c => !isJ(c) && (c.s === T || this.isBoss(seat, c))).length;
+    return strong >= Math.max(1, Math.ceil(hand.length / 3));
   }
   botTrump(seat) {
     const G = this.G;
@@ -603,8 +648,10 @@ class Table {
     const G = this.G, hand = G.players[seat].hand, legal = this.legalCards(hand), T = G.trump, team = seat % 2;
     const nonJ = legal.filter(c => !isJ(c)), jok = legal.find(isJ);
     const lowest = cs => { const pool = cs.filter(c => !isJ(c)); return (pool.length ? pool : cs).slice().sort((a, b) => ((a.s === T) - (b.s === T)) * 100 + (a.r - b.r))[0]; };
-    if (!G.trick.length) return this.botLead(seat, legal);
+    const all = this.allOut(seat);
+    if (!G.trick.length) return this.botLead(seat, legal, all);
     const after = G.n - G.trick.length - 1;
+    const oppAfter = [...Array(after).keys()].some(k => (seat + k + 1) % G.n % 2 !== team);
     if (G.joker) {
       const eff = this.trickResult();
       if (jok && eff.team !== team && (after === 0 || !nonJ.some(c => c.s === T) || hand.length <= 3)) return jok;
@@ -620,6 +667,11 @@ class Table {
         const over = legal.filter(c => c.s === G.leadSuit && this.beats(c, cur.card) && this.isBoss(seat, c)).sort((a, b) => a.r - b.r);
         if (over.length) return over[0];
       }
+      if (all && oppAfter && !isJ(cur.card) && !this.isBoss(seat, cur.card)) {
+        // Going for every trick: partner's card can still be beaten, so take over with a card nobody can beat
+        const over = legal.filter(c => !isJ(c) && (c.s === G.leadSuit || c.s === T) && this.beats(c, cur.card) && this.isBoss(seat, c)).sort((a, b) => ((a.s === T) - (b.s === T)) * 100 + (a.r - b.r));
+        if (over.length) return over[0];
+      }
       return lowest(legal);
     }
     const winners = legal.filter(c => !isJ(c) && this.beats(c, cur.card));
@@ -628,7 +680,7 @@ class Table {
     // Partner has already played (or no partner comes after me): it's up to me, so go for the trick
     const partnerPlayed = G.trick.some(t => t.seat % 2 === team);
     const partnerAfter = [...Array(after).keys()].some(k => (seat + k + 1) % G.n % 2 === team);
-    const mustTry = partnerPlayed || !partnerAfter;
+    const mustTry = partnerPlayed || !partnerAfter || all; // going for every trick: don't leave it to partner
     if (fw.length) {
       if (after === 0) return fw[0];
       if (mustTry) {
@@ -649,7 +701,7 @@ class Table {
     }
     return winners.sort((a, b) => a.r - b.r)[0];
   }
-  botLead(seat, hand) {
+  botLead(seat, hand, all = false) {
     const G = this.G, T = G.trump, team = seat % 2, bidTeam = G.bid.seat % 2 === team;
     const low = cs => cs.slice().sort((a, b) => a.r - b.r)[0];
     const of = s => hand.filter(c => c.s === s);
@@ -659,6 +711,15 @@ class Table {
     const mayTrump = p => !G.voids[p].has(T);
     const oppCuts = s => opps.some(p => G.voids[p].has(s) && mayTrump(p));
     const r = G.returnTo[seat]; G.returnTo[seat] = null;
+    if (all) {
+      // Going for every trick: bidding team pulls out the opponents' trumps with a top trump, then leads cards nobody can beat
+      const top = hand.filter(c => c.s === T).sort((a, b) => b.r - a.r)[0];
+      const seen = new Set(G.played.map(x => x.id)); for (const x of G.players[seat].hand) seen.add(x.id);
+      const oppTrumps = opps.some(mayTrump) && G.fullDeck.some(d => d.s === T && !seen.has(d.id));
+      if (bidTeam && top && oppTrumps && this.isBoss(seat, top)) return top;
+      const boss = hand.filter(c => !isJ(c) && c.s !== T && !oppCuts(c.s) && this.isBoss(seat, c)).sort((a, b) => b.r - a.r)[0];
+      if (boss) return boss;
+    }
     // A lead that sets up partner's cut should be a low card, not an Ace or King that could be wasted
     const cheap = s => { const c = of(s).length ? low(of(s)) : null; return c && (c.r < 13 || this.isBoss(seat, c)) ? c : null; };
     if (r && r.suit !== T && cheap(r.suit) && mayTrump(r.partner)) return cheap(r.suit);
@@ -666,7 +727,7 @@ class Table {
     const trumps = of(T).sort((a, b) => b.r - a.r);
     const safe = hand.filter(c => c.s !== T && !isJ(c) && !oppCuts(c.s));
     const pool = safe.length ? safe : hand.filter(c => c.s !== T && !isJ(c));
-    if (seat === G.bid.seat && trumps.length >= 2) {
+    if (seat === G.bid.seat && trumps.length >= 2 && !all) {
       const single = SUITS.find(s => s !== T && of(s).length === 1 && of(s)[0].r < 14 && !oppCuts(s));
       if (single) return of(single)[0];
     }
