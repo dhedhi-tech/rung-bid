@@ -615,6 +615,7 @@ class Table {
       const us = G.bid.seat % 2 === team, v = G.bid.value;
       if ((us ? v : 2 * v) < e.gap && (us ? 2 * v : 4 * v) >= e.gap) return true;
     }
+    if (G.n === 8) return false; // 8 players: four teammates all fighting for one trick wastes good cards (tested worse)
     const hand = G.players[seat].hand, T = G.trump;
     // From the start: my sure winners (cards nobody can beat) cover every trick our team still needs
     const sure = hand.filter(c => this.isBoss(seat, c)).length;
