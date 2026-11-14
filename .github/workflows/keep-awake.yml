@@ -1,0 +1,17 @@
+# Keeps the live server awake on Render's free plan (it sleeps after 15 min with no web visits).
+# Visits https://www.pattaparty.com/health every 5 minutes. GitHub may run it a few minutes late.
+# Remove this file after moving to Render's paid plan (paid servers never sleep).
+name: Keep server awake
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Visit /health
+        run: curl -fsS --retry 3 --retry-delay 20 --max-time 90 https://www.pattaparty.com/health
