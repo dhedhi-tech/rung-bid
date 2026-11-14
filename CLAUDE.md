@@ -30,7 +30,7 @@ Live on Render (auto-deploys every push to `main`), accounts in Supabase, code o
 ## Game rules
 - 4 players: 1 deck. 6 players: 2 decks without 2s, 3s, 4s and both 5♦ (78 cards). 8 players: 2 decks. Teams sit alternately.
 - Deal 5, then 4, then 4. A bidding round after each deal. Bids 6 to 13; round 1 max 7. Bid 6 needs 7 tricks but scores 6.
-- In a round: if you bid and someone (opponent or partner) raises over you, you get another turn. A player who passed is out for that round. Bots never re-raise over their own partner.
+- In a round: if you bid and someone (opponent or partner) raises over you, you get another turn. A player who passed is out for that round. Bots never raise over their own partner's bid in the same round it was made (a later round is fine).
 - All pass in round 1: first player is forced to bid 6. Trump is called after round 1 and re-called only when the bid is raised.
 - Follow suit; if void play anything. With 2 decks, identical cards: the one played last wins.
 - Scoring (tug of war, one score): made = bid; made without losing a trick = 2x; failed = 2x to opponents; failed without winning a trick = 4x to opponents. Lead of 52 wins. Hand limit: Quick 6, Normal 10, Full none; a level score at the limit plays a decider hand.

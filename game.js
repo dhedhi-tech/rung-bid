@@ -570,7 +570,9 @@ class Table {
     const cur = G.bid ? G.bid.value : 5;
     const partnerHolds = G.bid && G.bid.seat % 2 === seat % 2;
     if (partnerHolds) {
-      if (round === 1) return null;
+      // Never raise over partner's bid in the same round they made it (a later round is fine)
+      const bidRound = (G.hist.filter(x => x.v).pop() || {}).r;
+      if (round === 1 || bidRound === round) return null;
       const tc = p.hand.filter(c => c.s === G.trump);
       const shareT = power(p.hand, G.trump) / G.avg[h];
       const needS = round === 2 ? 1.35 : 1.6;
