@@ -604,6 +604,7 @@ class Table {
     if (v && 2 * v >= e.per && share >= 2.2) return v;
     return null;
   }
+  teamHasHuman(team) { return this.seats.some((_, i) => i % 2 === team && this.isHuman(i)); }
   // Play to win every trick (sweep for the bidding team, whitewash for the defenders) while the opponents have no trick:
   // from the start when my sure winners cover the tricks still needed, after 4+ tricks with strong cards,
   // or from the first trick when only a sweep / whitewash can still win the game
@@ -615,7 +616,8 @@ class Table {
       const us = G.bid.seat % 2 === team, v = G.bid.value;
       if ((us ? v : 2 * v) < e.gap && (us ? 2 * v : 4 * v) >= e.gap) return true;
     }
-    if (G.n === 8) return false; // 8 players: four teammates all fighting for one trick wastes good cards (tested worse)
+    // 8 players: all-bot teams don't (four teammates fighting for one trick tested worse), but bots back a real teammate's sweep / whitewash
+    if (G.n === 8 && !this.teamHasHuman(team)) return false;
     const hand = G.players[seat].hand, T = G.trump;
     // From the start: my sure winners (cards nobody can beat) cover every trick our team still needs
     const sure = hand.filter(c => this.isBoss(seat, c)).length;
