@@ -109,7 +109,7 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 ## Growth (Nov 17 2026, on pending-updates until deploy)
 - Android phone browsers (not the app, `ANDROID_WEB`) see a "Get the Patta Party app" Play Store link on the home screen and on the game over sheet (`playUrl(from)`, utm referrer website/home or game_over).
 - In the app: Google Play in-app review (`@capacitor-community/in-app-review`, plugin `InAppReview`, app 1.0.13+) via `maybeAskReview` on game over: a win once 2+ games are done, or the 3rd game; at most once per 30 days (`rb-games-done`, `rb-review-at`). Older app versions skip it.
-- Share your win (game over sheet, winners only, `shareWin`/`winImage`): 1080px square picture (trophy, We won!, margin + hands, my team's avatars and names, table size/Joker, pattaparty.com) + text with the www link. App 1.0.14+: `@capacitor/filesystem` writes it to cache, `@capacitor/share` opens the share sheet; older apps share text via WhatsApp. Browser: Web Share with the file, else download + copy text.
+- Share your win (game over sheet, winners only, `shareWin`/`winImage`): 1080px square picture (trophy, We won!, margin + hands, my team's avatars and names, table size/Joker, "Free on Google Play") + text with the Play Store link (referrer utm_source=share_win). App 1.0.14+: `@capacitor/filesystem` writes it to cache, `@capacitor/share` opens the share sheet; older apps share text via WhatsApp. Browser: Web Share with the file, else download + copy text.
 - `play-store/listing.md`: keyword title "Patta Party: Rung Court Piece" + Urdu, Hindi, Bengali listings.
 
 ## Render environment (names only)

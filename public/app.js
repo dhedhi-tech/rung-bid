@@ -555,11 +555,11 @@ async function winImage(info) {
     x.fillText(nm, cx, cy + sz / 2 + 48);
   }
   x.fillStyle = 'rgba(255,255,255,.72)'; x.font = `600 36px ${F}`; x.fillText(info.tags, W / 2, 925);
-  x.fillStyle = '#f4a93a'; x.font = `800 40px ${F}`; x.fillText('Play Rung with friends · pattaparty.com', W / 2, 1010);
+  x.fillStyle = '#f4a93a'; x.font = `800 40px ${F}`; x.fillText('Play Rung with friends · Free on Google Play', W / 2, 1010);
   return new Promise(res => c.toBlob(res, 'image/png'));
 }
 async function shareWin(info) {
-  const text = `🏆 We won at Patta Party${info.margin ? ` by ${info.margin} point${info.margin === 1 ? '' : 's'}` : ''}! Think you can beat us? Play Rung with friends: https://www.pattaparty.com`;
+  const text = `🏆 We won at Patta Party${info.margin ? ` by ${info.margin} point${info.margin === 1 ? '' : 's'}` : ''}! Think you can beat us? Get Patta Party free on Google Play: https://play.google.com/store/apps/details?id=com.dhedhitech.pattaparty&referrer=utm_source%3Dshare_win`;
   const blob = await winImage(info);
   if (NATIVE_APP) {
     const Sh = capPlugin('Share'), Fs = capPlugin('Filesystem');
