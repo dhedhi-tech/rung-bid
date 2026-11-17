@@ -597,10 +597,21 @@ function featShare(R) {
     text: sw ? `🧹 Clean sweep at Patta Party! We bid ${R.contract} and made it without losing a single trick.` : `⚪ Whitewash at Patta Party! The other team bid ${R.contract} and didn't win a single trick.`,
     team: (S.seats || []).filter((_, i) => i % 2 === 0), tags: `${S.n} players${S.joker ? ' · Joker mode' : ''}` };
 }
+// This game's sweeps / whitewashes by my team, kept for the game over sheet (per table, survives a reload)
+let HL = { key: '', list: [] };
+try { HL = JSON.parse(sessionStorage.getItem('rb-hl')) || HL; } catch (e) {}
+function noteHighlight(R) {
+  if (!S || !R) return;
+  const last = HL.list.length ? HL.list[HL.list.length - 1].hand : 0;
+  if (HL.key !== S.code || R.handNo < last) HL = { key: S.code, list: [] }; // new table or new game
+  const f = featShare(R);
+  if (f && !HL.list.some(h => h.hand === R.handNo)) HL.list.push({ hand: R.handNo, contract: R.contract, info: f });
+  try { sessionStorage.setItem('rb-hl', JSON.stringify(HL)); } catch (e) {}
+}
 function bindShare(id, info, label) {
   const b = $(id); if (!b) return;
   b.onclick = async () => {
-    if (b.disabled) return; b.disabled = true; b.textContent = 'Getting your picture ready…';
+    if (b.disabled) return; b.disabled = true; b.textContent = label.length < 8 ? '…' : 'Getting your picture ready…';
     try { await shareWin(info); } finally { b.disabled = false; b.textContent = label; }
   };
 }
@@ -1055,6 +1066,7 @@ function tableInviteSheet() {
 function selectLink() { const r = document.createRange(); r.selectNodeContents($('linkTxt')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
 function resultScreen() {
   const R = S.result;
+  noteHighlight(R);
   const you = R.winner === 0 && me0();
   const good = S.spectator ? '' : (R.winner === 0 ? 'good' : 'bad');
   const grid = `<div class="res-grid">
@@ -1072,7 +1084,7 @@ function resultScreen() {
       <h2 class="over-title ${S.spectator ? '' : w === 0 ? 'good' : 'bad'}">${iWon ? 'Your team wins!' : `${teamName(w)} ${sv(w, 'wins', 'win')}`}</h2>
       <p class="over-sub">${margin ? `Won by ${margin} point${margin === 1 ? '' : 's'}` : ''}</p></div>${grid}
       ${iWon ? '<button class="share-win" id="shareWin">🏆 Share your win</button>' : ''}
-      ${featShare(R) ? `<button class="share-win" id="shareFeat">${featShare(R).label}</button>` : ''}
+      ${HL.key === S.code && HL.list.length ? `<div class="hl-box"><div class="hl-head">Your highlights</div>${HL.list.map((h, i) => `<div class="hl-row"><span>${h.info.title === 'Clean sweep!' ? '🧹 Clean sweep' : '⚪ Whitewash'} <small>Hand ${h.hand} · ${h.info.title === 'Clean sweep!' ? 'Bid' : 'They bid'} ${esc(h.contract)}</small></span><button class="hl-share" id="hl${i}">Share</button></div>`).join('')}</div>` : ''}
       ${S.isHost ? '<button class="primary" id="againBtn">Play again</button>' : '<p class="hint">Waiting for the host to start a new game.</p>'}
       ${ANDROID_WEB ? `<a class="get-app" href="${playUrl('game_over')}" target="_blank" rel="noopener"><span class="ga-ico">▶</span><span><b>Play in the free app</b><small>Get Patta Party on Google Play</small></span></a>` : ''}
       <button class="linkbtn" id="leaveOver">Leave table</button>`);
@@ -1085,7 +1097,7 @@ function resultScreen() {
           tags: `${S.n} players${S.joker ? ' · Joker mode' : ''}` });
       } finally { if ($('shareWin')) { b.disabled = false; b.textContent = '🏆 Share your win'; } }
     };
-    if (featShare(R)) bindShare('shareFeat', featShare(R), featShare(R).label);
+    if (HL.key === S.code) HL.list.forEach((h, i) => bindShare('hl' + i, h.info, 'Share'));
     if ($('againBtn')) $('againBtn').onclick = () => send('again');
     $('leaveOver').onclick = leaveTable;
     return;
