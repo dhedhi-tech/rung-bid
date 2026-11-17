@@ -591,10 +591,10 @@ async function shareWin(info) {
 // Sweep / whitewash by my team in this hand result: share info, or null
 function featShare(R) {
   if (!R || !me0() || R.winner !== 0 || (R.kind !== 'sweep' && R.kind !== 'whitewash')) return null;
-  const all = (R.tricks[0] || 0) + (R.tricks[1] || 0), sw = R.kind === 'sweep';
+  const sw = R.kind === 'sweep';
   return { title: sw ? 'Clean sweep!' : 'Whitewash!', label: sw ? '🧹 Share your clean sweep' : '⚪ Share your whitewash', ref: sw ? 'share_sweep' : 'share_whitewash',
-    sub: sw ? `All ${all} tricks · Bid ${R.contract} · Double points` : `They bid ${R.contract} and won 0 tricks · 4× points`,
-    text: sw ? `🧹 Clean sweep at Patta Party! We bid ${R.contract} and won all ${all} tricks.` : `⚪ Whitewash at Patta Party! The other team bid ${R.contract} and didn't win a single trick.`,
+    sub: sw ? `Bid ${R.contract} · Made it without losing a trick` : `They bid ${R.contract} and won 0 tricks · 4× points`,
+    text: sw ? `🧹 Clean sweep at Patta Party! We bid ${R.contract} and made it without losing a single trick.` : `⚪ Whitewash at Patta Party! The other team bid ${R.contract} and didn't win a single trick.`,
     team: (S.seats || []).filter((_, i) => i % 2 === 0), tags: `${S.n} players${S.joker ? ' · Joker mode' : ''}` };
 }
 function bindShare(id, info, label) {
