@@ -417,6 +417,7 @@ function welcomeScreen(err) {
       <div class="wrow"><button class="secondary" id="wJoin">Join with a code</button><button class="secondary" id="wTut">${firstTime ? 'Tutorial' : 'How to play'}</button></div>
       <button class="secondary" id="wLb">🏆 Leaderboard</button>
       <div id="wRooms" class="wrooms"></div>
+      ${ANDROID_WEB ? `<a class="get-app" href="${playUrl('home')}" target="_blank" rel="noopener"><span class="ga-ico">▶</span><span><b>Get the Patta Party app</b><small>Free on Google Play · invite links open in the app</small></span></a>` : ''}
       <div class="err" id="wErr">${err ? esc(err) : ''}</div>
       <div class="wlegal"><a href="/privacy">Privacy Policy</a><span>·</span><a href="/terms">Terms of Use</a></div>
     </div>`;
@@ -523,6 +524,22 @@ let AUTH = { auth: false }, PROFILE = null, sbClient = null, sbToken = null;
 const NATIVE_APP = /PattaPartyApp/.test(navigator.userAgent || '');
 const APP_AUTH_URL = 'com.dhedhitech.pattaparty://auth';
 const capPlugin = n => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[n]) || null;
+// Android phone browser (not our app): point players to the Play Store app
+const ANDROID_WEB = !NATIVE_APP && /Android/i.test(navigator.userAgent || '');
+const playUrl = from => 'https://play.google.com/store/apps/details?id=com.dhedhitech.pattaparty&referrer=' + encodeURIComponent('utm_source=website&utm_medium=' + from);
+// Google Play in-app review: in the app, after a finished game (a win once 2+ games are done, or the 3rd game). Google decides if the card shows.
+let reviewCounted = '';
+function maybeAskReview(key, iWon) {
+  if (!NATIVE_APP || reviewCounted === key) return;
+  reviewCounted = key;
+  const games = Number(store.get('rb-games-done') || 0) + 1;
+  store.set('rb-games-done', String(games));
+  if (Date.now() - Number(store.get('rb-review-at') || 0) < 30 * 24 * 3600 * 1000) return;
+  if (!((iWon && games >= 2) || games >= 3)) return;
+  const R = capPlugin('InAppReview'); if (!R) return; // older app versions don't have it
+  store.set('rb-review-at', String(Date.now()));
+  setTimeout(() => { try { R.requestReview().catch(() => {}); } catch (e) {} }, 2000);
+}
 // Google blocks sign-in inside app webviews, so the app signs in through the phone's browser and comes back with a code
 async function appAuthReturn(url) {
   if (!url || url.indexOf(APP_AUTH_URL) !== 0 || !sbClient) return;
@@ -981,7 +998,9 @@ function resultScreen() {
       <h2 class="over-title ${S.spectator ? '' : w === 0 ? 'good' : 'bad'}">${iWon ? 'Your team wins!' : `${teamName(w)} ${sv(w, 'wins', 'win')}`}</h2>
       <p class="over-sub">${margin ? `Won by ${margin} point${margin === 1 ? '' : 's'}` : ''}</p></div>${grid}
       ${S.isHost ? '<button class="primary" id="againBtn">Play again</button>' : '<p class="hint">Waiting for the host to start a new game.</p>'}
+      ${ANDROID_WEB ? `<a class="get-app" href="${playUrl('game_over')}" target="_blank" rel="noopener"><span class="ga-ico">▶</span><span><b>Play in the free app</b><small>Get Patta Party on Google Play</small></span></a>` : ''}
       <button class="linkbtn" id="leaveOver">Leave table</button>`);
+    if (me0()) maybeAskReview(S.code + ':' + S.handNo + ':' + S.score, iWon);
     if ($('againBtn')) $('againBtn').onclick = () => send('again');
     $('leaveOver').onclick = leaveTable;
     return;
