@@ -527,6 +527,61 @@ const capPlugin = n => (window.Capacitor && window.Capacitor.Plugins && window.C
 // Android phone browser (not our app): point players to the Play Store app
 const ANDROID_WEB = !NATIVE_APP && /Android/i.test(navigator.userAgent || '');
 const playUrl = from => 'https://play.google.com/store/apps/details?id=com.dhedhitech.pattaparty&referrer=' + encodeURIComponent('utm_source=website&utm_medium=' + from);
+// Share a win: a square picture of the result + text, through the phone's share sheet
+function loadImg(src) { return new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; }); }
+async function winImage(info) {
+  const W = 1080, c = document.createElement('canvas'); c.width = c.height = W;
+  const x = c.getContext('2d'), F = '"Archivo", system-ui, sans-serif';
+  try { await document.fonts.load(`900 80px ${F}`); } catch (e) {}
+  const g = x.createLinearGradient(0, 0, 0, W); g.addColorStop(0, '#0c1618'); g.addColorStop(1, '#14513a'); x.fillStyle = g; x.fillRect(0, 0, W, W);
+  x.globalAlpha = .06; x.strokeStyle = '#fff'; x.lineWidth = 3; // chatai lines
+  for (let i = -W; i < W * 2; i += 36) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i + W, W); x.stroke(); x.beginPath(); x.moveTo(i, W); x.lineTo(i + W, 0); x.stroke(); }
+  x.globalAlpha = 1; x.textAlign = 'center';
+  x.fillStyle = '#fff'; x.font = `900 64px ${F}`; x.fillText('Patta · Party', W / 2, 120);
+  const t = document.querySelector('.over-hero .trophy svg');
+  if (t) { const im = await loadImg('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(t).replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240"'))); if (im) x.drawImage(im, W / 2 - 120, 165, 240, 240); }
+  x.fillStyle = '#f4c542'; x.font = `900 120px ${F}`; x.fillText('We won!', W / 2, 520);
+  x.fillStyle = '#e8efe9'; x.font = `600 44px ${F}`; x.fillText(info.sub, W / 2, 590);
+  const team = info.team, sz = team.length > 3 ? 120 : 150, gap = 26, row = team.length * sz + (team.length - 1) * gap;
+  for (let i = 0; i < team.length; i++) {
+    const p = team[i], cx = W / 2 - row / 2 + i * (sz + gap) + sz / 2, cy = 720;
+    x.save(); x.beginPath(); x.arc(cx, cy, sz / 2, 0, Math.PI * 2); x.closePath(); x.fillStyle = '#f4a93a'; x.fill(); x.clip();
+    const im = p.av && p.av.a !== undefined ? await loadImg(`/avatars/${+p.av.a}-a.svg`) : null;
+    if (im) x.drawImage(im, cx - sz / 2, cy - sz / 2, sz, sz);
+    else { x.fillStyle = '#1b1208'; x.font = `900 ${sz * .5}px ${F}`; x.textBaseline = 'middle'; x.fillText((p.name || '?')[0].toUpperCase(), cx, cy + 4); x.textBaseline = 'alphabetic'; }
+    x.restore();
+    x.fillStyle = '#fff'; x.font = `700 ${team.length > 3 ? 30 : 34}px ${F}`;
+    let nm = p.name || ''; while (nm.length > 3 && x.measureText(nm).width > sz + gap - 6) nm = nm.slice(0, -2) + '…';
+    x.fillText(nm, cx, cy + sz / 2 + 48);
+  }
+  x.fillStyle = 'rgba(255,255,255,.72)'; x.font = `600 36px ${F}`; x.fillText(info.tags, W / 2, 925);
+  x.fillStyle = '#f4a93a'; x.font = `800 40px ${F}`; x.fillText('Play Rung with friends · pattaparty.com', W / 2, 1010);
+  return new Promise(res => c.toBlob(res, 'image/png'));
+}
+async function shareWin(info) {
+  const text = `🏆 We won at Patta Party${info.margin ? ` by ${info.margin} point${info.margin === 1 ? '' : 's'}` : ''}! Think you can beat us? Play Rung with friends: https://www.pattaparty.com`;
+  const blob = await winImage(info);
+  if (NATIVE_APP) {
+    const Sh = capPlugin('Share'), Fs = capPlugin('Filesystem');
+    if (Sh && Fs && blob) {
+      try {
+        const data = await new Promise(res => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.readAsDataURL(blob); });
+        const f = await Fs.writeFile({ path: 'patta-party-win.png', data, directory: 'CACHE' });
+        await Sh.share({ title: 'We won at Patta Party!', text, files: [f.uri], dialogTitle: 'Share your win' });
+      } catch (e) {}
+      return;
+    }
+    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank'); // older app versions: text only
+    return;
+  }
+  const file = blob && new File([blob], 'patta-party-win.png', { type: 'image/png' });
+  try {
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) return await navigator.share({ files: [file], text });
+    if (navigator.share) return await navigator.share({ text });
+  } catch (e) { return; } // closed the share sheet
+  if (file) { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click(); }
+  try { await navigator.clipboard.writeText(text); toast('Picture saved and message copied. Paste it with the picture.'); } catch (e) { toast('Picture saved.'); }
+}
 // Google Play in-app review: in the app, after a finished game (a win once 2+ games are done, or the 3rd game). Google decides if the card shows.
 let reviewCounted = '';
 function maybeAskReview(key, iWon) {
@@ -997,10 +1052,19 @@ function resultScreen() {
       <div class="eyebrow">Game over · ${R.byLimit ? 'hand limit reached' : S.handNo + ' hands'}</div>
       <h2 class="over-title ${S.spectator ? '' : w === 0 ? 'good' : 'bad'}">${iWon ? 'Your team wins!' : `${teamName(w)} ${sv(w, 'wins', 'win')}`}</h2>
       <p class="over-sub">${margin ? `Won by ${margin} point${margin === 1 ? '' : 's'}` : ''}</p></div>${grid}
+      ${iWon ? '<button class="share-win" id="shareWin">🏆 Share your win</button>' : ''}
       ${S.isHost ? '<button class="primary" id="againBtn">Play again</button>' : '<p class="hint">Waiting for the host to start a new game.</p>'}
       ${ANDROID_WEB ? `<a class="get-app" href="${playUrl('game_over')}" target="_blank" rel="noopener"><span class="ga-ico">▶</span><span><b>Play in the free app</b><small>Get Patta Party on Google Play</small></span></a>` : ''}
       <button class="linkbtn" id="leaveOver">Leave table</button>`);
     if (me0()) maybeAskReview(S.code + ':' + S.handNo + ':' + S.score, iWon);
+    if ($('shareWin')) $('shareWin').onclick = async () => {
+      const b = $('shareWin'); if (b.disabled) return; b.disabled = true; b.textContent = 'Getting your picture ready…';
+      try {
+        await shareWin({ margin, team: (S.seats || []).filter((_, i) => i % 2 === 0),
+          sub: `${margin ? `By ${margin} point${margin === 1 ? '' : 's'} · ` : ''}${S.handNo} hand${S.handNo === 1 ? '' : 's'}`,
+          tags: `${S.n} players${S.joker ? ' · Joker mode' : ''}` });
+      } finally { if ($('shareWin')) { b.disabled = false; b.textContent = '🏆 Share your win'; } }
+    };
     if ($('againBtn')) $('againBtn').onclick = () => send('again');
     $('leaveOver').onclick = leaveTable;
     return;
