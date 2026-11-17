@@ -595,11 +595,22 @@ function featShare(R) {
   return { title: sw ? 'Clean sweep!' : 'Whitewash!', label: sw ? '🧹 Share your clean sweep' : '⚪ Share your whitewash', ref: sw ? 'share_sweep' : 'share_whitewash',
     sub: sw ? `Bid ${R.contract} · Made it without losing a trick` : `They bid ${R.contract} and won 0 tricks · 4× points`,
     text: sw ? `🧹 Clean sweep at Patta Party! We bid ${R.contract} and made it without losing a single trick.` : `⚪ Whitewash at Patta Party! The other team bid ${R.contract} and didn't win a single trick.`,
-    team: (S.seats || []).filter((_, i) => i % 2 === 0), tags: `${S.n} players${S.joker ? ' · Joker mode' : ''}` };
+    team: (S.seats || []).filter((_, i) => i % 2 === 0).map(p => ({ name: p.name, av: p.av })), tags: `${S.n} players${S.joker ? ' · Joker mode' : ''}` };
 }
 // This game's sweeps / whitewashes by my team, kept for the game over sheet (per table, survives a reload)
 let HL = { key: '', list: [] };
 try { HL = JSON.parse(sessionStorage.getItem('rb-hl')) || HL; } catch (e) {}
+// The winning team as it was when the game ended (players who leave afterwards become bots in S.seats)
+let OVER_TEAM = { key: '', team: [] };
+try { OVER_TEAM = JSON.parse(sessionStorage.getItem('rb-over-team')) || OVER_TEAM; } catch (e) {}
+function overTeam() {
+  const key = S.code + ':' + S.handNo + ':' + S.score;
+  if (OVER_TEAM.key !== key) {
+    OVER_TEAM = { key, team: (S.seats || []).filter((_, i) => i % 2 === 0).map(p => ({ name: p.name, av: p.av })) };
+    try { sessionStorage.setItem('rb-over-team', JSON.stringify(OVER_TEAM)); } catch (e) {}
+  }
+  return OVER_TEAM.team;
+}
 function noteHighlight(R) {
   if (!S || !R) return;
   const last = HL.list.length ? HL.list[HL.list.length - 1].hand : 0;
@@ -1078,6 +1089,7 @@ function resultScreen() {
       <div><span>${teamName(1)} total won</span><b>${S.won[1]}</b></div></div>`;
   if (S.phase === 'over' || R.over) {
     const w = (S.score || 0) > 0 ? 0 : 1, iWon = me0() && w === 0, margin = Math.abs(S.score || 0);
+    const team = overTeam(); // captured once, when the game ends
     const trophy = TROPHY;
     openModal('over', `<div class="over-hero ${iWon ? 'win' : me0() ? 'lose' : ''}"><div class="trophy">${trophy}</div>
       <div class="eyebrow">Game over · ${R.byLimit ? 'hand limit reached' : S.handNo + ' hands'}</div>
@@ -1092,7 +1104,7 @@ function resultScreen() {
     if ($('shareWin')) $('shareWin').onclick = async () => {
       const b = $('shareWin'); if (b.disabled) return; b.disabled = true; b.textContent = 'Getting your picture ready…';
       try {
-        await shareWin({ margin, team: (S.seats || []).filter((_, i) => i % 2 === 0),
+        await shareWin({ margin, team,
           sub: `${margin ? `By ${margin} point${margin === 1 ? '' : 's'} · ` : ''}${S.handNo} hand${S.handNo === 1 ? '' : 's'}`,
           tags: `${S.n} players${S.joker ? ' · Joker mode' : ''}` });
       } finally { if ($('shareWin')) { b.disabled = false; b.textContent = '🏆 Share your win'; } }
