@@ -106,6 +106,11 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Admin "What people play": table size x Joker table (each column adds up to 100%) and "Game length chosen" table, both from `game_log` (last 30 days), computed in `stats.js` (`countModes`).
 - Not built yet (idea only): tracking players joining/leaving mid-game for admin stats.
 
+## Growth (Nov 17 2026, on pending-updates until deploy)
+- Android phone browsers (not the app, `ANDROID_WEB`) see a "Get the Patta Party app" Play Store link on the home screen and on the game over sheet (`playUrl(from)`, utm referrer website/home or game_over).
+- In the app: Google Play in-app review (`@capacitor-community/in-app-review`, plugin `InAppReview`, app 1.0.13+) via `maybeAskReview` on game over: a win once 2+ games are done, or the 3rd game; at most once per 30 days (`rb-games-done`, `rb-review-at`). Older app versions skip it.
+- `play-store/listing.md`: keyword title "Patta Party: Rung Court Piece" + Urdu, Hindi, Bengali listings.
+
 ## Render environment (names only)
 SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TURN_USER, TURN_PASS, optional CONTACT_EMAIL. Never print or store their values.
 
