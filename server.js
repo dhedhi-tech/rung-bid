@@ -137,7 +137,7 @@ function takeGuestGain(pid, profile) {
   return A.award(profile, p.xp, p.coins, p.stats);
 }
 // Beginners: guests, or signed in with fewer than 5 finished games. Classic only (Joker locked), longer turn timer, no auto-away
-const BEGINNER_GAMES = 5;
+const BEGINNER_GAMES = process.env.RB_BEGINNER_GAMES != null ? +process.env.RB_BEGINNER_GAMES : 5; // env only for tests
 const isBeginner = p => { const a = pidAuth.get(p); return !a || (a.profile.games || 0) < BEGINNER_GAMES; };
 function wireProgress(t) {
   t.isBeginner = isBeginner;
@@ -178,6 +178,7 @@ io.on('connection', socket => {
     const guided = !!(opts && opts.guided);
     const t = new Table(code, { n, joker: !!(opts && opts.joker) && !isBeginner(pid), hostId: pid, limit: opts && Number(opts.limit), pub: !!(opts && opts.pub) && !guided, swap: !!(opts && opts.swap) && !guided, region: opts && ['pk', 'in', 'bd'].includes(opts.region) ? opts.region : 'pk' }, io);
     t.guided = guided;
+    t.beginnerTable = isBeginner(pid); // made by a beginner: only these show in a beginner's Open tables list
     wireProgress(t);
     tables.set(code, t);
     leave(); table = t; socket.data.tableCode = t.code; t.addClient(socket, pid, name);
@@ -195,10 +196,12 @@ io.on('connection', socket => {
     const sameAcct = acct ? t.seats.findIndex(s => !s.bot && s.pid && s.pid !== pid && pidAuth.has(s.pid) && pidAuth.get(s.pid).profile.id === acct.profile.id) : -1;
     const lname = String(name).trim().toLowerCase();
     const sameName = t.seats.some(s => !s.bot && s.pid && s.pid !== pid && String(s.name).trim().toLowerCase() === lname) && !(t.players.get(pid) && t.players.get(pid).seat != null);
-    t.addClient(socket, pid, name, { noAutoSeat: sameAcct >= 0 || sameName || !!(opts && opts.watch) });
+    // Beginners never just watch: they take the first empty seat (lobby or mid-game)
+    const newbieSeat = isBeginner(pid) && sameAcct < 0 && !sameName;
+    t.addClient(socket, pid, name, { noAutoSeat: sameAcct >= 0 || sameName || (!!(opts && opts.watch) && !newbieSeat) });
     if (sameAcct >= 0) t.takeOver(pid, sameAcct);
     // From Open tables during a game: take a free bot seat straight away
-    if (opts && opts.seat === 'auto' && t.phase === 'game') {
+    if (((opts && opts.seat === 'auto') || newbieSeat) && t.phase === 'game') {
       const p = t.players.get(pid);
       if (p && p.seat == null) {
         const free = p.lastSeat != null && t.seats[p.lastSeat].bot ? p.lastSeat : t.seats.findIndex(s => s.bot);
@@ -209,7 +212,7 @@ io.on('connection', socket => {
   });
   // Open tables for the home screen: public tables with a free seat and real people still there
   socket.on('rooms', cb => {
-    const list = [];
+    const list = [], newbie = isBeginner(pid);
     for (const t of tables.values()) {
       const mine = t.players.has(pid);
       if (mine && t.phase !== 'over') {
@@ -219,17 +222,17 @@ io.on('connection', socket => {
         continue;
       }
       if (!t.pub || t.phase === 'over' || !t.humansConnected()) continue;
+      if (newbie && !t.beginnerTable) continue; // beginners only see beginner tables
       const free = t.seats.filter(s => s.bot).length;
       const host = t.players.get(t.hostId);
       const hs = t.seats.filter(s => !s.bot && s.pid);
       const lv = hs.map(s => { const a = pidAuth.get(s.pid); return a ? A.levelOf(a.profile.xp) : 1; });
       list.push({ code: t.code, host: host ? host.name : 'Player', n: t.n, joker: t.joker, limit: t.limit, free,
-        beginners: hs.length > 0 && hs.every(s => isBeginner(s.pid)), lvl: lv.length ? Math.max(...lv) : 1,
+        beginners: !!t.beginnerTable, lvl: lv.length ? Math.max(...lv) : 1,
         names: t.seats.filter(s => !s.bot && s.pid !== t.hostId).map(s => s.name).slice(0, 3),
         humans: t.seats.filter(s => !s.bot).length, playing: t.phase === 'game', hand: t.G ? t.G.handNo : 0, mine: false });
     }
-    const newbie = isBeginner(pid);
-    list.sort((a, b) => (b.mine - a.mine) || (newbie ? (!!b.beginners - !!a.beginners) : 0) || (a.playing - b.playing) || (b.humans - a.humans));
+    list.sort((a, b) => (b.mine - a.mine) || (a.playing - b.playing) || (b.humans - a.humans));
     reply(cb, null, { list: list.slice(0, 20) });
   });
 

@@ -122,7 +122,9 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Beginner = guest, or signed in with under 5 finished games (`BEGINNER_GAMES`, `isBeginner` in server.js and app.js). Manager chose: Joker unlocks after 5 games and needs sign-in.
 - Create sheet for beginners: name + summary line + Create/Start, everything else under "More options"; Joker button locked (🔒, note "Sign in and play 5 games to unlock" / "N to go"); Quick (6 hands) default. Server also forces joker off for beginner hosts. Joining someone else's Joker table (invite/list) is allowed.
 - Turn timer for beginners `BEGINNER_MS` (card 15s, bid/trump 30s) via `t.isBeginner`; missed turns never make a beginner away (leaving the app still does).
-- Open tables list: "🌱 Beginners" tag when every real player is a beginner, else "Level N+" (highest level); beginners see beginner tables first.
+- Beginner table = created by a beginner (`t.beginnerTable`). Open tables list: beginners see ONLY beginner tables (manager's choice); everyone sees the "🌱 Beginner table" tag, other tables show "Level N+" (highest seated level).
+- Beginners never just watch: joining from the list or a link seats them on the first free (bot) seat, also mid-game (`newbieSeat` in the join handler); the list button says "Play". Full table: they watch.
+- `RB_BEGINNER_GAMES` env is a test hook only (e.g. 0 makes signed-in dev logins experts).
 
 ## Render environment (names only)
 SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TURN_USER, TURN_PASS, optional CONTACT_EMAIL. Never print or store their values.
