@@ -129,6 +129,9 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 ## First open (Nov 18 2026, on pending-updates until deploy)
 - Manager's father (reads Urdu + English) closed the app on the first screen: too many choices. Very first open (`isNewcomer()`: not signed in, no table link, none of rb-started/rb-name/rb-coached/rb-tut-seen/rb-games-done) shows only faces, logo, "Rung, the card game you know" and one big "▶ Start playing / کھیلنا شروع کریں" button + "I have played before" link (normal home). Start (`startFirstGame`) sets name "Guest NNN", 4 players Classic Quick, coach on, private, and starts the guided practice at once. Afterwards the normal home shows (rb-started).
 
+## Lobby (Nov 18 2026, on pending-updates until deploy)
+- Host's "Start game" button + hint sit in `.start-dock`, sticky at the bottom of the lobby sheet, so it is visible without scrolling even with 8 seats on small phones (tested 360x640).
+
 ## Render environment (names only)
 SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TURN_USER, TURN_PASS, optional CONTACT_EMAIL. Never print or store their values.
 

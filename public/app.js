@@ -1119,7 +1119,7 @@ function lobbyScreen() {
     <div class="eyebrow">Pick your seat</div>
     <div class="seatgrid" id="seatGrid">${seats}</div>
     ${watchers}
-    ${S.isHost ? `<button class="primary" id="startBtn">Start game</button><p class="hint" style="margin-top:8px">Bots play any empty seat. Friends can still take a bot's seat after the game starts.</p>`
+    ${S.isHost ? `<div class="start-dock"><button class="primary" id="startBtn">Start game</button><p class="hint">Bots play any empty seat. Friends can still take a bot's seat after the game starts.</p></div>`
       : `<p class="hint">${me0() ? 'Waiting for the host (★) to start the game.' : 'Tap an empty seat to sit down.'}</p>`}
     <button class="linkbtn" id="leaveLobby">Leave table</button>`);
   if ($('lobbyL')) $('lobbyL').onclick = e => { const b = e.target.closest('button[data-l]'); if (b) send('setLimit', +b.dataset.l); };
