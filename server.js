@@ -282,6 +282,7 @@ io.on('connection', socket => {
     reply(cb, table.act(pid, msg.kind, val));
   });
   socket.on('coach', (msg, cb) => { if (table) table.coach(pid, msg); reply(cb); });
+  socket.on('hint', cb => { const h = table && table.hint(pid); reply(cb, h ? null : 'No hint', h || {}); });
   socket.on('setLimit', (lim, cb) => { if (!table) return reply(cb, 'Not at a table'); reply(cb, table.setLimit(pid, Number(lim))); });
   socket.on('next', cb => { if (table) table.dealNow(pid); reply(cb); });
   socket.on('again', cb => { if (!table) return reply(cb, 'Not at a table'); reply(cb, table.playAgain(pid)); });

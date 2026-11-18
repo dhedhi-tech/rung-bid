@@ -307,6 +307,15 @@ class Table {
       this.hold = { p, release: () => { clearTimeout(t); r(); } };
     } else if (!on && this.hold) { const h = this.hold; this.hold = null; h.release(); }
   }
+  // Hint button (tutorial off, playing alone with bots): the coach's pick for this turn only.
+  // Up to 3 hints still count as winning on your own; more and the game won't level you up.
+  hint(pid) {
+    const p = this.players.get(pid), P = this.pending;
+    if (!p || p.seat == null || !P || P.seat !== p.seat || this.pub || this.seats.filter((_, i) => this.isHuman(i)).length !== 1) return null;
+    this.hintsUsed = (this.hintsUsed || 0) + 1;
+    if (this.hintsUsed > 3) this.coachUsed = true;
+    try { return { kind: P.kind, hint: this.coachHint(P.seat, P.kind), left: Math.max(0, 3 - this.hintsUsed) }; } catch (e) { return null; }
+  }
   coach(pid, msg) {
     const p = this.players.get(pid); if (!p || p.seat == null || !msg) return;
     if (msg.off) { this.guided = false; this.setHold(false); this.broadcast(); return; }
@@ -499,6 +508,7 @@ class Table {
   }
   newGame() {
     this.coachUsed = !!this.guided; // a win only levels you up if the tutorial was off the whole game
+    this.hintsUsed = 0;
     this.G = {
       n: this.n, joker: this.joker, avg: calibrate(this.n, this.joker), fullDeck: buildDeck(this.n, this.joker), played: [], players: Array.from({ length: this.n }, () => ({ hand: [], tricks: 0 })),
       dealer: Math.floor(Math.random() * this.n), score: 0, won: [0, 0], handNo: 1,
