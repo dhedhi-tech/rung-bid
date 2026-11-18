@@ -65,6 +65,9 @@ async function load() {
 let last = null;
 function show(j, warn) {
   if (!j) { j = last; if (!j) return login(warn); } else last = j;
+  // Players = typed a name or signed in; visitors only opened the site (needs the updated supabase-stats.sql)
+  const split = (j.daily || []).some(d => 'visitors' in d);
+  if (split) for (const d of j.daily) if (!d._split) { d.players = d.real_players; d.new_players = d.real_new; d._split = 1; }
   const L = j.live, D = j.daily || [], T = D.find(d => String(d.day).slice(0, 10) === j.today) || {};
   const d7 = D.slice(0, 7), d30 = D;
   const chartDays = D.slice(0, 14).reverse();
@@ -93,6 +96,7 @@ function show(j, warn) {
   <div class="grid">
     <div class="tile"><b>${num(T.players)}</b><span>players</span></div>
     <div class="tile"><b>${num(T.new_players)}</b><span>new players</span></div>
+    ${split ? `<div class="tile"><b>${num(T.visitors)}</b><span>opened the site only (no name)</span></div>` : ''}
     <div class="tile"><b>${num(T.signups)}</b><span>Google sign-ups</span></div>
     <div class="tile"><b>${appToday}</b><span>played in the app</span></div>
     <div class="tile"><b>${num(T.games_started)}</b><span>games started</span></div>
@@ -129,8 +133,8 @@ function show(j, warn) {
           ${[[6, 'Quick · 6 hands'], [10, 'Normal · 10 hands'], [0, 'Full · no limit']].map(([k, t]) => `<tr><td>${t}</td><td>${L[k]}</td><td>${pct(L[k], tot)}</td></tr>`).join('')}
           <tr><td><b>All</b></td><td>${tot}</td><td>${tot ? '100%' : '–'}</td></tr></table></div>`; })() : ''}`; })() : ''}
   <h2>Day by day</h2>
-  <div class="tw"><table><tr><th>Day</th><th>Players</th><th>New</th><th>Signed in</th><th>Sign-ups</th><th>Games</th><th>Finished</th><th>Hands</th><th>Joker</th><th>App</th></tr>
-    ${D.map(d => `<tr><td>${dd(d.day)}</td><td>${num(d.players)}</td><td>${num(d.new_players)}</td><td>${num(d.signed_players)}</td><td>${num(d.signups)}</td><td>${num(d.games_started)}</td><td>${num(d.games_finished)}</td><td>${num(d.hands)}</td><td>${num(d.joker_games)}</td><td>${j.app ? num(appDay[String(d.day).slice(0, 10)]) : '–'}</td></tr>`).join('') || '<tr><td colspan="10">No data yet</td></tr>'}
+  <div class="tw"><table><tr><th>Day</th><th>Players</th><th>New</th>${split ? '<th>Opened only</th>' : ''}<th>Signed in</th><th>Sign-ups</th><th>Games</th><th>Finished</th><th>Hands</th><th>Joker</th><th>App</th></tr>
+    ${D.map(d => `<tr><td>${dd(d.day)}</td><td>${num(d.players)}</td><td>${num(d.new_players)}</td>${split ? `<td>${num(d.visitors)}</td>` : ''}<td>${num(d.signed_players)}</td><td>${num(d.signups)}</td><td>${num(d.games_started)}</td><td>${num(d.games_finished)}</td><td>${num(d.hands)}</td><td>${num(d.joker_games)}</td><td>${j.app ? num(appDay[String(d.day).slice(0, 10)]) : '–'}</td></tr>`).join('') || `<tr><td colspan="${split ? 11 : 10}">No data yet</td></tr>`}
   </table></div>
   <h2>Top players (${num(j.accounts)} accounts)</h2>
   <div class="tw"><table><tr><th>Name</th><th>XP</th><th>Games</th><th>Wins</th><th>Coins</th><th>Joined</th></tr>

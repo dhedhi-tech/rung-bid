@@ -46,7 +46,11 @@ with k as (
   select k.day,
          count(distinct k.who) as players,
          count(distinct k.who) filter (where k.signed) as signed_players,
-         count(distinct k.who) filter (where f.first_day = k.day) as new_players
+         count(distinct k.who) filter (where f.first_day = k.day) as new_players,
+         -- Played = typed a name or signed in; a visitor only opened the site (no name)
+         count(distinct k.who) filter (where k.who not like 'p:%') as real_players,
+         count(distinct k.who) filter (where k.who not like 'p:%' and f.first_day = k.day) as real_new,
+         count(distinct k.who) filter (where k.who like 'p:%') as visitors
   from k join f using (who) group by k.day
 ), g as (
   select (at at time zone 'Asia/Karachi')::date as day,
@@ -68,7 +72,8 @@ select d.day,
        coalesce(s.signups, 0) as signups,
        coalesce(g.games_started, 0) as games_started, coalesce(g.games_finished, 0) as games_finished, coalesce(g.hands, 0) as hands,
        coalesce(g.joker_games, 0) as joker_games, coalesce(g.p4, 0) as p4, coalesce(g.p6, 0) as p6, coalesce(g.p8, 0) as p8,
-       coalesce(g.bot_games, 0) as bot_games
+       coalesce(g.bot_games, 0) as bot_games,
+       coalesce(p.real_players, 0) as real_players, coalesce(p.real_new, 0) as real_new, coalesce(p.visitors, 0) as visitors
 from d left join p using (day) left join g using (day) left join s using (day);
 revoke all on public.admin_daily from anon, authenticated;
 

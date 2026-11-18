@@ -81,6 +81,7 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 
 ## Admin stats: people
 - `player_days` has `name` (typed name) and `uid`. A person = typed name, else account, else player id (views `admin_daily`, `admin_people`, `admin_retention` in supabase-stats.sql; Ansa re-runs that file after changes). Same name = same person (accepted trade-off while small).
+- Nov 18 2026: `admin_daily` has `real_players`/`real_new` (typed a name or signed in) and `visitors` (opened the site, no name: often link checkers/crawlers). admin.html uses them for players/new and shows "opened the site only" when the columns exist (needs supabase-stats.sql re-run).
 - Admin page: Return rate (came back another day, last 30 days; still playing a week later) and Players list (named or signed-in, last 30 days, longest absent first, orange 3+ days, red 7+ days, App tag).
 
 ## Marketing (Nov 2026)
