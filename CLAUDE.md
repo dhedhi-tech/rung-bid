@@ -131,6 +131,7 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 
 ## Lobby (Nov 18 2026, on pending-updates until deploy)
 - Host's "Start game" button + hint sit in `.start-dock`, sticky at the bottom of the lobby sheet, so it is visible without scrolling even with 8 seats on small phones (tested 360x640).
+- Manager wants the lobby on one screen without scrolling: compact head (code + summary), share row WhatsApp / Copy link / 👥 Friends (link text hidden, shown only if copying fails), seat tiles show only name + You/Sit here/Taken (team by colour, key next to "Pick your seat"), 6p 3 columns, 8p 4 columns, Leave table inside the dock. Fits at 360x640 and 390x844 for 4/6/8, guest and signed in.
 
 ## Render environment (names only)
 SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TURN_USER, TURN_PASS, optional CONTACT_EMAIL. Never print or store their values.

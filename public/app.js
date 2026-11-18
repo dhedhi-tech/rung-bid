@@ -1100,28 +1100,26 @@ function lobbyScreen() {
     if (mine) act = 'You · tap an empty seat to move';
     else if (p.bot) act = 'Empty · tap to sit';
     else act = p.connected ? 'Taken' : 'Away';
-    return `<button class="seatbtn ${tcls(i)} ${mine ? 'mine' : ''}" data-sit="${p.real}" ${!p.bot && !mine ? 'disabled' : ''}>
-      <span class="st">Seat ${p.real + 1} · ${team}</span>
-      <span class="sn">${p.bot ? 'Bot' : esc(p.name)}${p.host ? ' ★' : ''}</span>
-      <span class="act">${act}</span></button>`;
+    const short = mine ? 'You' : p.bot ? 'Sit here' : p.connected ? 'Taken' : 'Away';
+    return `<button class="seatbtn ${tcls(i)} ${mine ? 'mine' : ''}" data-sit="${p.real}" ${!p.bot && !mine ? 'disabled' : ''} title="Seat ${p.real + 1} · ${team} · ${act}">
+      <span class="sn">${p.bot ? '🤖 Bot' : esc(p.name)}${p.host ? ' ★' : ''}</span>
+      <span class="act">${short}</span></button>`;
   }).join('');
   const watchers = S.lobbyNames.length ? `<p class="hint">Not seated yet: ${S.lobbyNames.map(esc).join(', ')}</p>` : '';
   const dupAsk = S.dup && dupNo !== S.code + S.dup.real ? `<div class="dup-ask"><b>${esc(S.dup.name)} is already sitting here.</b><span>Is that you on another phone or app?</span>
       <div class="btns"><button class="primary" id="dupYes">Yes, play here</button><button class="secondary" id="dupNo">No, I'm someone else</button></div></div>` : '';
-  openModal('lobby', `${dupAsk}<div class="eyebrow">Table code</div>
-    <div class="codebig">${esc(S.code)}</div>
-    <p class="hint" style="margin-top:6px">${S.n} players · ${S.joker ? 'Joker mode' : 'Classic'} · ${S.limit ? S.limit + ' hands' : 'no hand limit'} · teams sit alternately</p>
+  openModal('lobby', `${dupAsk}<div class="lob-head"><div><div class="eyebrow">Table code</div><div class="codebig">${esc(S.code)}</div></div>
+    <p class="hint">${S.n} players · ${S.joker ? 'Joker' : 'Classic'}<br>${S.limit ? S.limit + ' hands' : 'no hand limit'}</p></div>
     ${S.isHost ? `<div class="field"><span>Game length</span><div class="seg" id="lobbyL">
       <button data-l="6" class="${S.limit === 6 ? 'on' : ''}">Quick<small>6 hands</small></button><button data-l="10" class="${S.limit === 10 ? 'on' : ''}">Normal<small>10 hands</small></button><button data-l="0" class="${!S.limit ? 'on' : ''}">Full<small>no limit</small></button></div></div>` : ''}
-    <div class="share"><span class="link" id="linkTxt">${esc(link)}</span>
-      <div class="btns"><button class="secondary" id="copyBtn">Copy link</button><a class="secondary" href="${wa}" target="_blank" rel="noopener">WhatsApp</a></div></div>
-    ${PROFILE ? `<button class="secondary inv-friends" id="invFriends">👥 Invite friends</button>` : ''}
-    <div class="eyebrow">Pick your seat</div>
-    <div class="seatgrid" id="seatGrid">${seats}</div>
+    <div class="share"><span class="link" id="linkTxt" hidden>${esc(link)}</span>
+      <div class="btns ${PROFILE ? 'three' : ''}"><a class="secondary" href="${wa}" target="_blank" rel="noopener">WhatsApp</a><button class="secondary" id="copyBtn">Copy link</button>${PROFILE ? `<button class="secondary" id="invFriends">👥 Friends</button>` : ''}</div></div>
+    <div class="eyebrow">Pick your seat <span class="seat-key"><i class="ka"></i>your team <i class="kb"></i>opponents</span></div>
+    <div class="seatgrid n${S.n}" id="seatGrid">${seats}</div>
     ${watchers}
-    ${S.isHost ? `<div class="start-dock"><button class="primary" id="startBtn">Start game</button><p class="hint">Bots play any empty seat. Friends can still take a bot's seat after the game starts.</p></div>`
+    ${S.isHost ? `<div class="start-dock"><button class="primary" id="startBtn">Start game</button><p class="hint">Bots play empty seats. Friends can join later.</p><button class="linkbtn" id="leaveLobby">Leave table</button></div>`
       : `<p class="hint">${me0() ? 'Waiting for the host (★) to start the game.' : 'Tap an empty seat to sit down.'}</p>`}
-    <button class="linkbtn" id="leaveLobby">Leave table</button>`);
+    ${S.isHost ? '' : '<button class="linkbtn" id="leaveLobby">Leave table</button>'}`);
   if ($('lobbyL')) $('lobbyL').onclick = e => { const b = e.target.closest('button[data-l]'); if (b) send('setLimit', +b.dataset.l); };
   $('seatGrid').onclick = e => { const b = e.target.closest('button[data-sit]'); if (!b || b.disabled) return; send('sit', +b.dataset.sit); };
   $('copyBtn').onclick = () => {
@@ -1149,7 +1147,7 @@ function tableInviteSheet() {
   if ($('invFriends')) $('invFriends').onclick = inviteSheet;
   $('tinvClose').onclick = closeModal;
 }
-function selectLink() { const r = document.createRange(); r.selectNodeContents($('linkTxt')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+function selectLink() { $('linkTxt').hidden = false; const r = document.createRange(); r.selectNodeContents($('linkTxt')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
 function resultScreen() {
   const R = S.result;
   noteHighlight(R);
