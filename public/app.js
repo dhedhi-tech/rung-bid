@@ -403,6 +403,24 @@ function welcomeScreen(err) {
   if (!w) { w = document.createElement('div'); w.id = 'welcome'; w.className = 'welcome'; document.body.appendChild(w); }
   const faces = [0, 1, 2, 6, 5, 9, 3, 4].map((a, i) => `<img src="/avatars/${a}.svg" alt="" style="--i:${i}">`).join('');
   const firstTime = !store.get('rb-tut-seen');
+  // Very first open (no name, no game, not signed in): one big button straight into the coached practice game
+  if (isNewcomer()) {
+    w.innerHTML = `<div class="whero first">
+        <div class="wfaces">${faces}</div>
+        <h1 class="wlogo">Patta<em>·</em>Party</h1>
+        <p class="wtag">Rung, the card game you know</p>
+      </div>
+      <div class="wmenu first">
+        <button class="primary big-start" id="wStart">▶ Start playing<small>کھیلنا شروع کریں</small></button>
+        <p class="first-note">A friendly coach shows you what to tap.</p>
+        <button class="linkbtn" id="wKnow">I have played before</button>
+        <div class="err" id="wErr">${err ? esc(err) : ''}</div>
+      </div>`;
+    w.hidden = false;
+    $('wStart').onclick = startFirstGame;
+    $('wKnow').onclick = () => { store.set('rb-started', '1'); welcomeScreen(); };
+    return;
+  }
   w.innerHTML = `<div class="wtop"><div id="wChip"></div></div>
     <div class="whero">
       <div class="wfaces">${faces}</div>
@@ -429,6 +447,15 @@ function welcomeScreen(err) {
   $('wLb').onclick = () => lbSheet('xp');
   renderChip();
   loadRooms();
+}
+function isNewcomer() {
+  return !PROFILE && !looksSignedIn() && !tableCode && !['rb-started', 'rb-name', 'rb-coached', 'rb-tut-seen', 'rb-games-done'].some(k => store.get(k));
+}
+function startFirstGame() {
+  ac(); store.set('rb-started', '1');
+  if (!myName) setName('Guest ' + (100 + Math.floor(Math.random() * 900))); // they can change it later
+  homeN = 4; homeJ = false; homeL = 6; homePub = false; homeCoach = true;
+  hideWelcome(); createTable(true);
 }
 // Open tables: public tables with a free seat, refreshed while the home screen is showing
 let roomsTimer = null, autoSeat = false;
