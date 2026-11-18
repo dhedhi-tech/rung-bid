@@ -137,8 +137,20 @@ function takeGuestGain(pid, profile) {
   return A.award(profile, p.xp, p.coins, p.stats);
 }
 // Beginners: guests, or signed in with fewer than 5 finished games. Classic only (Joker locked), longer turn timer, no auto-away
-const BEGINNER_GAMES = process.env.RB_BEGINNER_GAMES != null ? +process.env.RB_BEGINNER_GAMES : 5; // env only for tests
-const isBeginner = p => { const a = pidAuth.get(p); return !a || (a.profile.games || 0) < BEGINNER_GAMES; };
+// Skill stage (A.skillOf): 0 beginner, 1 Classic done, 2 Joker done. You move up by winning a game with the tutorial off.
+// Guests: the phone keeps it (rb-skill) and tells us on connect and when it changes.
+const guestSkill = new Map();
+const skillOf = p => { const a = pidAuth.get(p); return a ? A.skillOf(a.profile) : (guestSkill.get(p) || 0); };
+const isBeginner = p => skillOf(p) < 1;
+function levelUp(t, info) {
+  for (const s of info.seats) {
+    if (!s.pid || info.gameWinner !== s.seat % 2 || t.coachUsed) continue;
+    const want = t.joker ? 2 : 1, a = pidAuth.get(s.pid), cur = skillOf(s.pid);
+    if (want <= cur) continue;
+    if (a) A.setSkill(a.profile, want); else guestSkill.set(s.pid, want);
+    for (const { socket, pid: cp } of t.clients.values()) if (cp === s.pid) socket.emit('skill', { skill: want, up: true });
+  }
+}
 function wireProgress(t) {
   t.isBeginner = isBeginner;
   t.onGameStart = () => S.logGame({ kind: 'start', ...tableInfo(t) });
@@ -147,6 +159,7 @@ function wireProgress(t) {
   t.idOf = p => { const a = pidAuth.get(p); return a ? a.profile.id : null; };
   t.onHandEnd = info => {
     if (info.over) S.logGame({ kind: 'finish', ...tableInfo(t), hands: t.G.handNo });
+    if (info.over) try { levelUp(t, info); } catch (e) { console.error('skill', e); }
     for (const s of info.seats) {
       if (!s.pid) continue;
       const a = pidAuth.get(s.pid);
@@ -165,6 +178,13 @@ io.on('connection', socket => {
   if (!pid) { socket.emit('fatal', 'Missing player id'); socket.disconnect(true); return; }
   S.playerSeen(pid, false, name);
   socket.data.app = !!(socket.handshake.auth && socket.handshake.auth.app); // opened in the Android app
+  { const k = +(socket.handshake.auth && socket.handshake.auth.skill); if (k >= 0 && k <= 2) guestSkill.set(pid, Math.max(guestSkill.get(pid) || 0, k)); }
+  // The phone moved up (guest progress, or merging a guest's progress into a new sign-in)
+  socket.on('skill', (k, cb) => {
+    k = +k; if (!(k >= 0 && k <= 2)) return reply(cb, 'bad');
+    const a = pidAuth.get(pid); if (a) A.setSkill(a.profile, k); else guestSkill.set(pid, Math.max(guestSkill.get(pid) || 0, k));
+    reply(cb, null, { skill: skillOf(pid) });
+  });
   if (socket.data.app) S.appSeen(pid, null);
 
   const reply = (cb, err, data) => { if (typeof cb === 'function') cb(err ? { error: err } : { ok: true, ...data }); };
@@ -176,7 +196,7 @@ io.on('connection', socket => {
     if (tables.size > 500) return reply(cb, 'Server is busy. Try again in a minute.');
     const code = newCode();
     const guided = !!(opts && opts.guided);
-    const t = new Table(code, { n, joker: !!(opts && opts.joker) && !isBeginner(pid), hostId: pid, limit: opts && Number(opts.limit), pub: !!(opts && opts.pub) && !guided, swap: !!(opts && opts.swap) && !guided, region: opts && ['pk', 'in', 'bd'].includes(opts.region) ? opts.region : 'pk' }, io);
+    const t = new Table(code, { n, joker: !!(opts && opts.joker) && (skillOf(pid) >= 2 || (skillOf(pid) >= 1 && !(opts && opts.pub))), hostId: pid, limit: opts && Number(opts.limit), pub: !!(opts && opts.pub) && !guided, swap: !!(opts && opts.swap) && !guided, region: opts && ['pk', 'in', 'bd'].includes(opts.region) ? opts.region : 'pk' }, io);
     t.guided = guided;
     t.beginnerTable = isBeginner(pid); // made by a beginner: only these show in a beginner's Open tables list
     wireProgress(t);

@@ -193,13 +193,21 @@ function award(p, xp, coins, stats = {}) {
   return { xp, coins: coins + bonus, levelUp: after > before ? after : 0 };
 }
 
+// Skill stage: 0 beginner (Classic with bots), 1 Classic done (won a game with the tutorial off), 2 Joker done too.
+// Stored in equipped.skill (no new column). Accounts from before this rule with 5+ games count as 2.
+function skillOf(p) {
+  if (!p) return 0;
+  const k = p.equipped && p.equipped.skill;
+  return k != null ? k : ((p.games || 0) >= 5 ? 2 : 0);
+}
+function setSkill(p, k) { if (k <= skillOf(p)) return false; p.equipped = { ...(p.equipped || {}), skill: k }; save(p); return true; }
 function view(p) {
   if (!p) return null;
   const L = levelOf(p.xp), base = xpForLevel(L), next = xpForLevel(L + 1);
   return {
     name: p.name, avatar: p.avatar, av: avOf(p), pic: p.pic && !p.pic.startsWith('data:') ? p.pic : (p.pic ? 'u' : ''), level: L, xp: p.xp, levelXp: p.xp - base, levelNeed: next - base, coins: p.coins,
     games: p.games, wins: p.wins, hands: p.hands, handWins: p.hand_wins, bidsMade: p.bids_made, bidsTotal: p.bids_total, sweeps: p.sweeps,
-    owned: p.owned, equipped: p.equipped,
+    owned: p.owned, equipped: p.equipped, skill: skillOf(p),
     store: Object.entries(STORE).map(([id, it]) => ({ id, ...it, owned: p.owned.includes(id), locked: !!(it.level && L < it.level) })),
   };
 }
@@ -233,5 +241,5 @@ function handGains(info, seatIdx) {
 
 module.exports = {
   enabled, DEV, config: () => ({ auth: enabled || DEV, supabaseUrl: enabled ? SB_URL : '', anonKey: enabled ? ANON : '', dev: DEV && !enabled }),
-  verify, load, view, deleteAccount, avOf, leaderboard, people, setPic, picData, AVATARS, award, claimDaily, buy, equip, handGains, levelOf, STORE, XP, COINS,
+  verify, load, view, deleteAccount, avOf, leaderboard, people, setPic, picData, AVATARS, award, claimDaily, buy, equip, handGains, levelOf, STORE, XP, COINS, skillOf, setSkill,
 };

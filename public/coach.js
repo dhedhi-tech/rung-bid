@@ -53,7 +53,7 @@
   function place(b, pos) {
     b.classList.toggle('low', pos !== 'top');
     const h = $('hand');
-    b.style.bottom = pos === 'hand' && h ? Math.max(12, innerHeight - h.getBoundingClientRect().top + 6) + 'px' : '';
+    b.style.bottom = pos === 'hand' && h ? Math.max(12, innerHeight - h.getBoundingClientRect().top + 44) + 'px' : ''; // room for the arrow
   }
   function skip() {
     if (!C) return;
@@ -64,14 +64,25 @@
   function closeAskTip() { if (C && C.open && C.open.ask) next(); }
 
   /* ---------- glow on the coach's pick ---------- */
+  let arrowFor = null;
+  function arrow(t) {
+    let a = $('coachArrow');
+    if (!a) { a = document.createElement('div'); a.id = 'coachArrow'; a.className = 'coach-arrow'; a.textContent = '👇'; document.body.appendChild(a); }
+    arrowFor = t || null;
+    if (!t) { a.hidden = true; return; }
+    const r = t.getBoundingClientRect();
+    a.style.left = (t.classList.contains('card') ? r.left + Math.min(r.width / 2, 24) : r.left + r.width / 2) + 'px'; a.style.top = (r.top + 2) + 'px'; a.hidden = false;
+  }
+  addEventListener('resize', () => arrowFor && arrow(arrowFor.isConnected ? arrowFor : null));
   function mark() {
     document.querySelectorAll('.coach-pick').forEach(x => x.classList.remove('coach-pick'));
+    arrow(null);
     if (!on() || !S.ask || !S.ask.hint) return;
     const a = S.ask, h = a.hint;
     const t = a.kind === 'bid' ? $('panelBody') && $('panelBody').querySelector(`button[data-v="${h.v || 0}"]`)
       : a.kind === 'trump' ? $('panelBody') && $('panelBody').querySelector(`button[data-s="${h.s}"]`)
       : $('hand').querySelector(`.card[data-id="${h.id}"]`);
-    if (t) t.classList.add('coach-pick');
+    if (t) { t.classList.add('coach-pick'); requestAnimationFrame(() => arrow(t)); }
   }
   new MutationObserver(mark).observe($('hand'), { childList: true });
   new MutationObserver(mark).observe($('panelBody'), { childList: true });

@@ -310,7 +310,7 @@ class Table {
   coach(pid, msg) {
     const p = this.players.get(pid); if (!p || p.seat == null || !msg) return;
     if (msg.off) { this.guided = false; this.setHold(false); this.broadcast(); return; }
-    if (msg.on) { if (!this.pub) { this.guided = true; this.broadcast(); } return; } // coach back on (private tables; works while you play alone with bots)
+    if (msg.on) { if (!this.pub) { this.guided = true; this.coachUsed = true; this.broadcast(); } return; } // coach back on (private tables; works while you play alone with bots)
     this.setHold(!!msg.hold);
   }
   // What the bots would do in this seat, with a short reason code for the coach bubble
@@ -498,6 +498,7 @@ class Table {
     return null;
   }
   newGame() {
+    this.coachUsed = !!this.guided; // a win only levels you up if the tutorial was off the whole game
     this.G = {
       n: this.n, joker: this.joker, avg: calibrate(this.n, this.joker), fullDeck: buildDeck(this.n, this.joker), played: [], players: Array.from({ length: this.n }, () => ({ hand: [], tricks: 0 })),
       dealer: Math.floor(Math.random() * this.n), score: 0, won: [0, 0], handNo: 1,

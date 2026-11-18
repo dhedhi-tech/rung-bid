@@ -158,7 +158,7 @@ function renderAway() {
   const seated = !!(S && me0() && S.phase === 'game');
   $('awayBtn').hidden = !seated || !!S.away;
   const cb = $('coachBtn'); cb.hidden = !(seated && S.coachable);
-  if (!cb.hidden) { const onNow = window.coachIsOn && coachIsOn(); cb.classList.toggle('on', onNow); cb.title = onNow ? 'Coach tips are on. Tap to turn off' : 'Turn coach tips on'; }
+  if (!cb.hidden) { const onNow = !!(window.coachIsOn && coachIsOn()); cb.classList.toggle('on', onNow); cb.querySelector('.st').textContent = onNow ? 'ON' : 'OFF'; }
   $('awayBar').hidden = !seated || !S.away;
   if (seated && S.away) $('awayBar').innerHTML = `💤 You're away. ${S.paused ? 'The game is paused.' : 'A bot plays your turns.'} <button id="backBtn">I'm back</button>`;
   if ($('backBtn')) $('backBtn').onclick = () => send('away', false);
@@ -406,21 +406,24 @@ function welcomeScreen(err) {
   const faces = [0, 1, 2, 6, 5, 9, 3, 4].map((a, i) => `<img src="/avatars/${a}.svg" alt="" style="--i:${i}">`).join('');
   const firstTime = !store.get('rb-tut-seen');
   // Very first open (no name, no game, not signed in): one big button straight into the coached practice game
-  if (isNewcomer()) {
-    w.innerHTML = `<div class="whero first">
+  if (isBeginner() && !tableCode) {
+    w.innerHTML = `<div class="wtop"><div id="wChip"></div></div><div class="whero first">
         <div class="wfaces">${faces}</div>
         <h1 class="wlogo">Patta<em>·</em>Party</h1>
         <p class="wtag">Rung, the card game you know</p>
       </div>
       <div class="wmenu first">
         <button class="primary big-start" id="wStart">▶ Start playing<small>کھیلنا شروع کریں</small></button>
-        <p class="first-note">A friendly coach shows you what to tap.</p>
+        <p class="first-note">${store.get('rb-first') === 'done' ? 'Win one game with the tutorial off to unlock all games.' : 'A friendly coach shows you what to tap.'}</p>
+        <button class="secondary" id="wFriends">👥 Play with friends</button>
         <button class="linkbtn" id="wKnow">I have played before</button>
         <div class="err" id="wErr">${err ? esc(err) : ''}</div>
       </div>`;
     w.hidden = false;
     $('wStart').onclick = startFirstGame;
-    $('wKnow').onclick = () => { store.set('rb-started', '1'); store.set('rb-first', 'done'); welcomeScreen(); };
+    $('wFriends').onclick = () => createSheet(false);
+    $('wKnow').onclick = () => { store.set('rb-started', '1'); store.set('rb-first', 'done'); setSkill(1); welcomeScreen(); };
+    renderChip();
     return;
   }
   w.innerHTML = `<div class="wtop"><div id="wChip"></div></div>
@@ -450,15 +453,18 @@ function welcomeScreen(err) {
   renderChip();
   loadRooms();
 }
-function isNewcomer() {
-  if (PROFILE || looksSignedIn() || tableCode) return false;
-  const f = store.get('rb-first'); if (f) return f === 'started'; // started the first game but not finished it yet
-  return !['rb-started', 'rb-name', 'rb-coached', 'rb-tut-seen', 'rb-games-done'].some(k => store.get(k));
+function setSkill(k) {
+  if (k <= mySkill()) return;
+  store.set('rb-skill', String(k)); if (PROFILE) PROFILE.skill = k;
+  if (sock.connected) send('skill', k);
 }
 function startFirstGame() {
-  ac(); store.set('rb-started', '1'); store.set('rb-first', 'started');
+  ac(); store.set('rb-started', '1');
+  const first = store.get('rb-first') !== 'done';
+  if (first) store.set('rb-first', 'started');
   if (!myName) setName('Guest ' + (100 + Math.floor(Math.random() * 900))); // they can change it later
-  homeN = 4; homeJ = false; homeL = 6; homePub = false; homeCoach = true;
+  // First game: tutorial on. After that it is off unless the player turned it on (they move up by winning without it)
+  homeN = 4; homeJ = false; homeL = 6; homePub = false; homeCoach = first || store.get('rb-coach') === '1';
   hideWelcome(); createTable(true);
 }
 // Open tables: public tables with a free seat, refreshed while the home screen is showing
@@ -498,15 +504,17 @@ function takeName() {
   setName(v); return true;
 }
 // Beginners (guest, or under 5 games): Joker locked, setup shows only name + Start, the rest under "More options"
-const BEGINNER_GAMES = 5;
-const isBeginner = () => !PROFILE || (PROFILE.games || 0) < BEGINNER_GAMES;
+// Skill stage: 0 beginner (Classic with bots), 1 Classic done, 2 Joker done. Up by winning a game with the tutorial off (server sends 'skill').
+const mySkill = () => Math.max(PROFILE && PROFILE.skill != null ? PROFILE.skill : 0, +(store.get('rb-skill') || 0));
+const isBeginner = () => mySkill() < 1;
 const COACH_FIELD = '<div class="field"><span>🎓 Coach tips</span><div class="seg text" id="segC"><button data-c="1">On</button><button data-c="0">Off</button></div></div>';
 // Coach default: on for the first game; afterwards what the player last chose (rb-coach)
 const coachPref = () => store.get('rb-coach') ? store.get('rb-coach') === '1' : !store.get('rb-coached');
 function createSheet(practice) {
   const newbie = isBeginner();
   if (newbie) { homeJ = false; if (!createSheet.seen) homeL = 6; createSheet.seen = true; } // beginners start with Quick (6 hands)
-  const lockTxt = PROFILE ? `Unlocks after ${BEGINNER_GAMES} games · ${BEGINNER_GAMES - (PROFILE.games || 0)} to go` : `Sign in and play ${BEGINNER_GAMES} games to unlock`;
+  const lockTxt = 'Win a game with the tutorial off to unlock it';
+  const jTrain = mySkill() === 1; // Joker not learned yet: choosing it starts Joker training with bots
   openModal('create', `<div class="eyebrow">${practice ? 'Practice with bots' : 'New table'}</div>
     <h2>${practice ? 'Set up a practice game' : 'Create a table'}</h2>
     ${nameField()}
@@ -516,7 +524,7 @@ function createSheet(practice) {
     <button class="linkbtn" id="moreOpts">More options ▾</button><div id="optsBox" hidden>` : ''}
     <div class="field"><span>Players</span><div class="seg" id="segN">
       <button data-n="4">4<small>1 deck</small></button><button data-n="6">6<small>78 cards</small></button><button data-n="8">8<small>2 decks</small></button></div></div>
-    <div class="field"><span>Mode</span><div class="seg text" id="segJ"><button data-j="0">Classic</button><button data-j="1" class="${newbie ? 'locked' : ''}">${newbie ? '🔒 ' : ''}Joker mode</button></div>${newbie ? `<small class="lock-note">🔒 Joker: ${lockTxt}</small>` : ''}</div>
+    <div class="field"><span>Mode</span><div class="seg text" id="segJ"><button data-j="0">Classic</button><button data-j="1" class="${newbie ? 'locked' : ''}">${newbie ? '🔒 ' : ''}Joker mode</button></div>${newbie ? `<small class="lock-note">🔒 Joker: ${lockTxt}</small>` : jTrain ? `<small class="lock-note" id="jNote" ${homeJ ? '' : 'hidden'}>🃏 New to Joker mode? You'll play Joker training games with bots first. Win one with the tutorial off and Joker is open for all your tables.</small>` : ''}</div>
     <div class="field"><span>Game length</span><div class="seg" id="segL">
       <button data-l="6">Quick<small>6 hands</small></button><button data-l="10">Normal<small>10 hands</small></button><button data-l="0">Full<small>no limit</small></button></div></div>
     ${practice && !newbie ? COACH_FIELD : ''}
@@ -545,7 +553,9 @@ function createSheet(practice) {
   $('segN').onclick = e => { const b = e.target.closest('button'); if (b) { homeN = +b.dataset.n; sync(); } };
   $('segJ').onclick = e => { const b = e.target.closest('button'); if (!b) return;
     if (newbie && b.dataset.j === '1') { $('homeErr').textContent = `Joker mode is locked. ${lockTxt}.`; return; }
-    homeJ = b.dataset.j === '1'; sync(); };
+    homeJ = b.dataset.j === '1'; if ($('jNote')) $('jNote').hidden = !homeJ;
+    if ($('goCreate') && jTrain) $('goCreate').textContent = homeJ ? '▶ Start Joker training' : (practice ? 'Start practice' : 'Create table');
+    sync(); };
   $('segL').onclick = e => { const b = e.target.closest('button'); if (b) { homeL = +b.dataset.l; sync(); } };
   $('goCreate').onclick = () => { if (takeName()) { ac(); createTable(practice); } };
   $('backHome').onclick = closeModal;
@@ -650,7 +660,13 @@ let HL = { key: '', list: [] };
 /* ---------- guests: sign-in nudge on the hand result sheet ---------- */
 // Shown after the guest's first hand of a game, once more at game over, then (after 3 games) not again.
 const G_LOGO = '<svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17.5z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>';
-let GG = { xp: 0, coins: 0, last: null };          // XP/coins a guest would have saved (server keeps them for 3 hours)
+let GG = { xp: 0, coins: 0, last: null };
+let LEVELUP = null; // shown on the game over sheet after winning a game with the tutorial off
+function levelUpHTML() {
+  if (!LEVELUP || !S || LEVELUP.code !== S.code) return '';
+  return LEVELUP.skill >= 2 ? '<div class="lvlup"><b>🃏 Joker mode unlocked!</b><span>You won with the tutorial off. Choose Joker mode for any table now.</span></div>'
+    : '<div class="lvlup"><b>🎉 You won on your own!</b><span>All games are open now: play with friends, 6 and 8 players, and open tables.</span></div>';
+}          // XP/coins a guest would have saved (server keeps them for 3 hours)
 let NUDGE = { code: '', lastHand: 0, hand: 0, over: false, later: false };
 function nudgeGame(R) {
   if (NUDGE.code !== S.code || R.handNo < NUDGE.lastHand) NUDGE = { code: S.code, lastHand: 0, hand: 0, over: false, later: false };
@@ -764,6 +780,8 @@ async function authNow() {
 }
 function gotProfile(p, daily) {
   PROFILE = p;
+  { const local = +(store.get('rb-skill') || 0); // progress made as a guest moves into the account
+    if (local > (p.skill || 0)) { p.skill = local; send('skill', local); } else store.set('rb-skill', String(p.skill || 0)); }
   if (!myName && p.name) setName(p.name.split(' ')[0]);
   { const n = $('nudge'); if (n) n.remove(); }
   applyFelt(); renderChip();
@@ -1057,6 +1075,7 @@ function gainToast(text, big) {
   document.body.appendChild(t); setTimeout(() => t.remove(), big ? 3200 : 2600);
 }
 sockReady.push(() => {
+  sock.on('skill', ({ skill, up }) => { store.set('rb-skill', String(Math.max(skill, +(store.get('rb-skill') || 0)))); if (PROFILE) PROFILE.skill = skill; if (up) LEVELUP = { skill, code: S && S.code }; });
   sock.on('guestGain', g => { if (PROFILE) return; GG = { xp: g.totalXp, coins: g.totalCoins, last: g }; });
   sock.on('profile', ({ profile, gain, saved }) => {
     PROFILE = profile; applyFelt(); renderChip();
@@ -1177,6 +1196,7 @@ function resultScreen() {
       <h2 class="over-title ${S.spectator ? '' : w === 0 ? 'good' : 'bad'}">${iWon ? 'Your team wins!' : `${teamName(w)} ${sv(w, 'wins', 'win')}`}</h2>
       <p class="over-sub">${margin ? `Won by ${margin} point${margin === 1 ? '' : 's'}` : ''}</p></div>${grid}
       ${iWon ? '<button class="share-win" id="shareWin">🏆 Share your win</button>' : ''}
+      ${levelUpHTML()}
       ${nudgeHTML(R, true)}
       ${HL.key === S.code && HL.list.length ? `<div class="hl-box"><div class="hl-head">Your highlights</div>${HL.list.map((h, i) => `<div class="hl-row"><span>${h.info.title === 'Clean sweep!' ? '🧹 Clean sweep' : '⚪ Whitewash'} <small>Hand ${h.hand} · ${h.info.title === 'Clean sweep!' ? 'Bid' : 'They bid'} ${esc(h.contract)}</small></span><button class="hl-share" id="hl${i}">Share</button></div>`).join('')}</div>` : ''}
       ${S.isHost ? '<button class="primary" id="againBtn">Play again</button>' : '<p class="hint">Waiting for the host to start a new game.</p>'}
@@ -1358,7 +1378,10 @@ $('hand').addEventListener('click', e => {
   S.ask = null; renderHand();
   send('act', { kind: 'play', value: id });
 });
-const sock = io({ auth: { pid, name: myName || 'Player', app: NATIVE_APP ? 1 : 0 }, autoConnect: false });
+// First run of this version: players from before keep what they had (5+ games: everything; played before: Classic done)
+if (store.get('rb-skill') == null) store.set('rb-skill', String(+(store.get('rb-games-done') || 0) >= 5 ? 2
+  : !store.get('rb-first') && ['rb-started', 'rb-name', 'rb-coached', 'rb-tut-seen'].some(k => store.get(k)) ? 1 : 0));
+const sock = io({ auth: { pid, name: myName || 'Player', app: NATIVE_APP ? 1 : 0, skill: +store.get('rb-skill') || 0 }, autoConnect: false });
 sockReady.forEach(f => f());
 
 /* In-app browsers (WhatsApp, Facebook, Instagram) often block the microphone and speech typing */
@@ -1651,6 +1674,10 @@ function connecting() {
 let awaitingCreate = false;
 async function createTable(practice) {
   awaitingCreate = true;
+  if (homeJ && mySkill() === 1) { // Joker training: 4 players with bots, private; tutorial on the first time
+    practice = true; homeN = 4; homePub = false;
+    homeCoach = !store.get('rb-jtrain') || store.get('rb-coach') === '1'; store.set('rb-jtrain', '1');
+  }
   const r = await send('create', { n: homeN, joker: homeJ, limit: homeL, pub: homePub, swap: !practice && !homePub && homeSwap, guided: !!(practice && homeCoach), region: myRegion() });
   awaitingCreate = false;
   if (!r || !r.ok) return;
