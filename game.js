@@ -64,7 +64,7 @@ class Table {
     this.code = code; this.io = io; this.pub = !!pub; // pub: listed in Open tables on the home screen
     this.swap = !!swap && !pub; // link-only tables: a human bidder who fails swaps out for the first person on the waiting list
     this.waitList = [];        // audience waiting for a seat (player ids, first in line first)
-    this.n = n; this.joker = !!joker; this.hostId = hostId;
+    this.n = n; this.joker = !!joker; this.hostId = hostId; this.createdAt = Date.now();
     this.limit = [0, 6, 10].includes(limit) ? limit : 10; // hand limit: 6 quick, 10 normal, 0 = no limit
     this.alive = true; this.running = false; this.phase = 'lobby';
     this.bots = BOT_SETS[region] || BOT_SETS.pk;

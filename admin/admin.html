@@ -92,6 +92,8 @@ function show(j, warn) {
     <div class="tile"><b>${L.waiting}</b><span>tables waiting to start</span></div>
     <div class="tile live"><b>${num(L.inApp)}</b><span>using the app now</span></div>
   </div>
+  ${(L.waitList || []).length ? `<h2>Tables waiting to start</h2><div class="tw"><table><tr><th>Host</th><th>Table</th><th>Made</th><th>Idle</th><th>Seated</th><th>Online</th></tr>${L.waitList.sort((a, b) => b.ageMin - a.ageMin).map(w =>
+    `<tr><td>${esc(w.host)}${w.hostOnline ? '' : ' <small>(offline)</small>'}${w.inApp ? ' <small>App</small>' : ''}</td><td>${w.n}p ${w.joker ? 'Joker' : 'Classic'}${w.pub ? ' · open' : ' · link'}${w.beginner ? ' · 🌱' : ''}</td><td>${w.ageMin} min ago</td><td>${w.idleMin} min</td><td>${w.seated}</td><td>${w.online}</td></tr>`).join('')}</table></div>` : ''}
   <h2>Today</h2>
   <div class="grid">
     <div class="tile"><b>${num(T.players)}</b><span>players</span></div>

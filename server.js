@@ -500,7 +500,14 @@ app.get('/admin/data', async (req, res) => {
   const live = { inApp, online: io.engine.clientsCount, tables: tables.size, playing: 0, waiting: 0, people: 0, modes: { 4: 0, 6: 0, 8: 0, joker: 0 } };
   for (const t of tables.values()) {
     const humans = t.seats.filter(s => !s.bot && s.pid).length;
-    if (t.phase === 'game') { live.playing++; live.people += humans; live.modes[t.n]++; if (t.joker) live.modes.joker++; } else if (t.phase === 'lobby') live.waiting++;
+    if (t.phase === 'game') { live.playing++; live.people += humans; live.modes[t.n]++; if (t.joker) live.modes.joker++; } else if (t.phase === 'lobby') {
+      live.waiting++;
+      // Who is behind each waiting table (admin wanted to know why tables sit unstarted)
+      const host = t.players.get(t.hostId), now = Date.now();
+      (live.waitList = live.waitList || []).push({ host: host ? host.name : '?', hostOnline: !!(host && host.connected), inApp: !!(host && [...t.clients.values()].some(c => c.pid === t.hostId && c.socket.data.app)),
+        n: t.n, joker: t.joker, pub: t.pub, beginner: !!t.beginnerTable, seated: humans, online: [...t.players.values()].filter(p => p.connected).length,
+        ageMin: Math.round((now - (t.createdAt || now)) / 60000), idleMin: Math.round((now - t.lastActive) / 60000) });
+    }
   }
   try { res.json({ live, ...(await S.report()), today: S.dayOf() }); }
   catch (e) { console.error('admin report', e.message); res.json({ live, daily: [], top: [], accounts: 0, today: S.dayOf(), error: 'Saved stats could not load. Did you run supabase-stats.sql in Supabase?' }); }
