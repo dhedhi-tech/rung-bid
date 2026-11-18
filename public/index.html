@@ -266,6 +266,7 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
 .seatgrid.n6 .seatbtn .sn,.seatgrid.n8 .seatbtn .sn{font-size:12.5px}
 #sheet .field{margin-bottom:6px}
 /* Lobby: Start game always visible at the bottom of the sheet, even with 8 seats */
+#coachBtn{opacity:.55}#coachBtn.on{opacity:1;border-color:#ffd166;box-shadow:0 0 0 2px rgba(255,209,102,.35)}
 .start-dock{position:sticky;bottom:-22px;margin:12px -22px -22px;padding:12px 22px 14px;background:var(--panel);border-top:1px solid var(--line);box-shadow:0 -10px 20px rgba(0,0,0,.35);z-index:2}
 .start-dock .primary{margin-top:0}.start-dock .hint{margin:6px 0 0;text-align:center}.start-dock .linkbtn{display:block;margin:4px auto 0}
 #startBtn{position:sticky;bottom:0;z-index:2;box-shadow:0 -10px 18px 6px var(--panel)}
@@ -647,7 +648,7 @@ button.watchn{background:none;border:0;padding:0;font:inherit;color:inherit;lett
       <div class="tilt-ends"><span>52</span><span>0</span><span>52</span></div>
     </div>
     <div class="contract" id="contract"></div>
-    <div class="tools"><button class="ghost" id="soundBtn" aria-label="Sound on or off">Sound</button><button class="ghost" id="rulesBtn">Rules</button><button class="ghost" id="awayBtn" aria-label="Away" hidden>💤<span class="aw-t"> Away</span></button><button class="ghost" id="leaveBtn">Leave</button></div>
+    <div class="tools"><button class="ghost" id="soundBtn" aria-label="Sound on or off">Sound</button><button class="ghost" id="rulesBtn">Rules</button><button class="ghost" id="coachBtn" aria-label="Coach tips" hidden>🎓</button><button class="ghost" id="awayBtn" aria-label="Away" hidden>💤<span class="aw-t"> Away</span></button><button class="ghost" id="leaveBtn">Leave</button></div>
   </header>
 
   <main class="table" id="table">

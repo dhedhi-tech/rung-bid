@@ -3,8 +3,16 @@
    The server pauses the game while a tip is open (coach hold) and sends the bots' pick as ask.hint. */
 (function () {
   let C = null; // per table: { code, shown, queue, open, off, plays, askKey }
-  const reset = code => (C = { code, shown: new Set(), queue: [], open: null, off: false, plays: 0, askKey: '' });
-  const on = () => S && S.guided && C && !C.off && S.code === C.code && me0() && (S.phase === 'game' || S.phase === 'over') && S.handNo === 1;
+  // Coach is on for the whole first game; afterwards only if the player turns it back on (🎓 button, rb-coach = '1')
+  const reset = code => (C = { code, shown: new Set(), queue: [], open: null, off: false, plays: 0, askKey: '', over: false });
+  const on = () => S && S.guided && C && !C.off && S.code === C.code && me0() && (S.phase === 'game' || S.phase === 'over');
+  window.coachIsOn = () => !!(S && S.guided && C && !C.off);
+  window.coachToggle = () => {
+    if (!S) return;
+    if (coachIsOn()) { skip(); store.set('rb-coach', '0'); }
+    else { reset(S.code); C.shown.add('start'); store.set('rb-coach', '1'); send('coach', { on: true }); }
+    setTimeout(() => { if (window.render) render(); }, 50);
+  };
   const cardName = c => (isJ(c) ? 'Joker' : RL(c.r) + SYM[c.s]);
   const suitTxt = s => `${SYM[s]} ${SNAME[s]}`;
   const mate = () => (S.n === 4 ? 'partner' : 'teammate');
@@ -117,21 +125,21 @@
     else if (a.kind === 'trump') say('ask' + key, trumpTip(a), { ask: true, pos: 'top' });
     else if (a.kind === 'play') {
       C.plays++;
-      // Full tip for the first 3 turns and for special moments; after that only the glow
-      if (C.plays <= 3 || ['joker', 'cut'].includes(a.hint.why) && !C.shown.has('why:' + a.hint.why)) {
-        C.shown.add('why:' + a.hint.why);
-        say('ask' + key, playTip(a), { ask: true });
-      }
+      say('ask' + key, playTip(a), { ask: true }); // a tip on every turn while the coach is on
     }
   }
 
   /* ---------- tips for moments in the hand ---------- */
   function onState() {
     if (!S) return;
-    if (!C || C.code !== S.code) reset(S.code);
+    if (!C || C.code !== S.code) { reset(S.code); if (store.get('rb-coach') === '0' && store.get('rb-first') === 'done' && S.guided && me0()) { C.off = true; send('coach', { off: true }); } }
+    // First game over: from now on the coach is off unless the player turns it on with 🎓
+    if (S.phase === 'over' && !C.over) { C.over = true; if (store.get('rb-coach') == null) store.set('rb-coach', '0'); store.set('rb-first', 'done'); }
+    if (S.phase === 'game' && S.handNo === 1 && C.over) { C.over = false; C.shown = new Set(['start', 'deals', 'decks', 'jokerMode', 'bidRule', 'playRule', 'follow', 'tap', 'end']);
+      if (store.get('rb-coach') === '0' && S.guided) { C.off = true; send('coach', { off: true }); } }
     if (!on()) { mark(); return; }
     if (S.round === 1) {
-      say('start', `<b>Welcome to guided practice!</b> I'll help you through your first hand. You sit at the bottom. ${team()} <b class="pn ta">Orange</b> names are your team, <b class="pn tb">blue</b> are opponents. The bots wait for you, so take your time.`);
+      say('start', `<b>Welcome to guided practice!</b> I'll help you through your first game. You sit at the bottom. ${team()} <b class="pn ta">Orange</b> names are your team, <b class="pn tb">blue</b> are opponents. The bots wait for you, so take your time.`);
       say('deals', 'Cards come in 3 deals: 5, then 4, then 4 (13 each). After every deal there is a round of bidding. The highest bidder picks <b>trump</b>, the strongest suit for this hand.');
       if (S.n > 4) say('decks', `With ${S.n} players there are <b>2 decks</b>, so every card is there twice${S.n === 6 ? ' (the 2s, 3s and 4s are taken out)' : ''}. If two identical cards land in one trick, the one played <b>last</b> wins. So a second A♠ beats the first A♠!`);
       if (S.joker) say('jokerMode', '<b>Joker mode:</b> there is a Joker in the deck, and it can flip a trick to the other team. I\'ll show you how it works.');
@@ -139,9 +147,9 @@
     if ((S.hand || []).some(isJ)) say('gotJoker', `You have the <b>Joker</b>! How it works:<br>• You can only play it when you have <b>no cards of the suit led</b>, and you can never lead with it.<br>• It <b>flips the trick</b>: the team that was losing takes it, and you lead next.<br>• Best time: when the other team is about to win a trick.<br>• Don't keep it to the very end. If you must lead and only the Joker is left, the other team gets that trick.`, { pos: 'top' });
     if (S.round === 2 && S.gphase !== 'play') say('r2', 'Round 2: 4 more cards each. Bids can now go higher than 7. Whoever takes the bid can also pick a new trump.');
     if (S.round === 3 && S.gphase !== 'play') say('r3', 'Last 4 cards. This is the final round of bidding, then the play starts.');
-    if (S.gphase === 'play' && S.bid && !C.shown.has('play')) {
+    if (S.gphase === 'play' && S.bid && !C.shown.has('play' + S.handNo)) {
       const bt = S.bid.seat % 2, v = S.bid.value, nd = need();
-      say('play', `Bidding is done. ${teamName(bt)} bid <b>${v}</b> with ${suitTxt(S.trump)} trump, so they must win <b>${nd} tricks</b>${v === 6 ? ' (a bid of 6 still needs 7)' : ''}. ${bt === 0 ? 'The opponents need' : 'Your team needs'} ${14 - nd} to break it. ${esc(nm(S.bid.seat))} ${S.bid.seat === 0 ? 'lead' : 'leads'} the first trick.`);
+      say('play' + S.handNo, `Bidding is done. ${teamName(bt)} bid <b>${v}</b> with ${suitTxt(S.trump)} trump, so they must win <b>${nd} tricks</b>${v === 6 ? ' (a bid of 6 still needs 7)' : ''}. ${bt === 0 ? 'The opponents need' : 'Your team needs'} ${14 - nd} to break it. ${esc(nm(S.bid.seat))} ${S.bid.seat === 0 ? 'lead' : 'leads'} the first trick.`);
     }
     onAsk();
     mark();
@@ -174,11 +182,11 @@
           : kind === 'sweep' ? `The bidding team won every single trick, so they score double: ${to}.`
           : kind === 'broken' ? `The bid was broken, so the defending team scores double: ${to}.`
           : `The bidding team didn't win a single trick, so the defenders score 4×: ${to}.`;
-        say('end', `${res} The score bar at the top is a tug of war: the first team to lead by <b>52</b> wins the game.<br><br><b>You're ready!</b> Tips are off from here. Finish this game, or go home and play online with friends.`, { pos: 'low', end: true });
+        say('end', `${res} The score bar at the top is a tug of war: the first team to lead by <b>52</b> wins the game.<br><br>I'll keep showing my pick (it glows) for the rest of this game. Tap <b>Skip tips</b> to turn me off, or 🎓 at the top to turn me back on.`, { pos: 'low', end: true });
         break;
       }
     }
   }
-  sock.on('state', () => setTimeout(onState, 0));
+  window.coachTick = () => setTimeout(onState, 0); // called by app.js after every state it shows
   sock.on('fx', f => setTimeout(() => onFxCoach(f), 0));
 })();

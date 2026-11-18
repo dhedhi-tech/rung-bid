@@ -157,6 +157,8 @@ function renderAway() {
   $('tblInvite').hidden = !(S && S.code && S.phase !== 'lobby');
   const seated = !!(S && me0() && S.phase === 'game');
   $('awayBtn').hidden = !seated || !!S.away;
+  const cb = $('coachBtn'); cb.hidden = !(seated && S.coachable);
+  if (!cb.hidden) { const onNow = window.coachIsOn && coachIsOn(); cb.classList.toggle('on', onNow); cb.title = onNow ? 'Coach tips are on. Tap to turn off' : 'Turn coach tips on'; }
   $('awayBar').hidden = !seated || !S.away;
   if (seated && S.away) $('awayBar').innerHTML = `💤 You're away. ${S.paused ? 'The game is paused.' : 'A bot plays your turns.'} <button id="backBtn">I'm back</button>`;
   if ($('backBtn')) $('backBtn').onclick = () => send('away', false);
@@ -418,7 +420,7 @@ function welcomeScreen(err) {
       </div>`;
     w.hidden = false;
     $('wStart').onclick = startFirstGame;
-    $('wKnow').onclick = () => { store.set('rb-started', '1'); welcomeScreen(); };
+    $('wKnow').onclick = () => { store.set('rb-started', '1'); store.set('rb-first', 'done'); welcomeScreen(); };
     return;
   }
   w.innerHTML = `<div class="wtop"><div id="wChip"></div></div>
@@ -449,10 +451,12 @@ function welcomeScreen(err) {
   loadRooms();
 }
 function isNewcomer() {
-  return !PROFILE && !looksSignedIn() && !tableCode && !['rb-started', 'rb-name', 'rb-coached', 'rb-tut-seen', 'rb-games-done'].some(k => store.get(k));
+  if (PROFILE || looksSignedIn() || tableCode) return false;
+  const f = store.get('rb-first'); if (f) return f === 'started'; // started the first game but not finished it yet
+  return !['rb-started', 'rb-name', 'rb-coached', 'rb-tut-seen', 'rb-games-done'].some(k => store.get(k));
 }
 function startFirstGame() {
-  ac(); store.set('rb-started', '1');
+  ac(); store.set('rb-started', '1'); store.set('rb-first', 'started');
   if (!myName) setName('Guest ' + (100 + Math.floor(Math.random() * 900))); // they can change it later
   homeN = 4; homeJ = false; homeL = 6; homePub = false; homeCoach = true;
   hideWelcome(); createTable(true);
@@ -496,6 +500,9 @@ function takeName() {
 // Beginners (guest, or under 5 games): Joker locked, setup shows only name + Start, the rest under "More options"
 const BEGINNER_GAMES = 5;
 const isBeginner = () => !PROFILE || (PROFILE.games || 0) < BEGINNER_GAMES;
+const COACH_FIELD = '<div class="field"><span>🎓 Coach tips</span><div class="seg text" id="segC"><button data-c="1">On</button><button data-c="0">Off</button></div></div>';
+// Coach default: on for the first game; afterwards what the player last chose (rb-coach)
+const coachPref = () => store.get('rb-coach') ? store.get('rb-coach') === '1' : !store.get('rb-coached');
 function createSheet(practice) {
   const newbie = isBeginner();
   if (newbie) { homeJ = false; if (!createSheet.seen) homeL = 6; createSheet.seen = true; } // beginners start with Quick (6 hands)
@@ -503,6 +510,7 @@ function createSheet(practice) {
   openModal('create', `<div class="eyebrow">${practice ? 'Practice with bots' : 'New table'}</div>
     <h2>${practice ? 'Set up a practice game' : 'Create a table'}</h2>
     ${nameField()}
+    ${newbie && practice ? COACH_FIELD : ''}
     ${newbie ? `<div class="sub" id="simpleNote">${homeN} players · Classic · ${homeL === 6 ? 'Quick (6 hands)' : homeL === 10 ? 'Normal (10 hands)' : 'Full game'}</div>
     <button class="primary" id="goCreate">${practice ? 'Start practice' : 'Create table'}</button>
     <button class="linkbtn" id="moreOpts">More options ▾</button><div id="optsBox" hidden>` : ''}
@@ -511,7 +519,7 @@ function createSheet(practice) {
     <div class="field"><span>Mode</span><div class="seg text" id="segJ"><button data-j="0">Classic</button><button data-j="1" class="${newbie ? 'locked' : ''}">${newbie ? '🔒 ' : ''}Joker mode</button></div>${newbie ? `<small class="lock-note">🔒 Joker: ${lockTxt}</small>` : ''}</div>
     <div class="field"><span>Game length</span><div class="seg" id="segL">
       <button data-l="6">Quick<small>6 hands</small></button><button data-l="10">Normal<small>10 hands</small></button><button data-l="0">Full<small>no limit</small></button></div></div>
-    ${practice ? '<div class="field"><span>Coach tips</span><div class="seg text" id="segC"><button data-c="1">On</button><button data-c="0">Off</button></div></div>' : ''}
+    ${practice && !newbie ? COACH_FIELD : ''}
     <div class="field"><span>Who can join</span><div class="seg text" id="segP"><button data-p="1">Anyone</button><button data-p="0">Only with link</button></div></div>
     ${practice ? '' : '<div class="field" id="swapField"><span>If the bidder fails</span><div class="seg text" id="segS"><button data-s="0">Keeps the seat</button><button data-s="1">Swaps with waiting list</button></div></div>'}
     ${newbie ? '</div>' : `<button class="primary" id="goCreate">${practice ? 'Start practice' : 'Create table'}</button>`}
@@ -529,9 +537,9 @@ function createSheet(practice) {
   };
   if ($('moreOpts')) $('moreOpts').onclick = () => { const b = $('optsBox'); b.hidden = !b.hidden; $('moreOpts').textContent = b.hidden ? 'More options ▾' : 'Fewer options ▴'; };
   homePub = !practice;
-  homeCoach = !store.get('rb-coached'); // on until the player has finished one guided hand
+  homeCoach = coachPref();
   if ($('segS')) $('segS').onclick = e => { const b = e.target.closest('button'); if (b) { homeSwap = b.dataset.s === '1'; sync(); } };
-  if ($('segC')) $('segC').onclick = e => { const b = e.target.closest('button'); if (b) { homeCoach = b.dataset.c === '1'; sync(); } };
+  if ($('segC')) $('segC').onclick = e => { const b = e.target.closest('button'); if (b) { homeCoach = b.dataset.c === '1'; store.set('rb-coach', homeCoach ? '1' : '0'); sync(); } };
   sync();
   $('segP').onclick = e => { const b = e.target.closest('button'); if (b) { homePub = b.dataset.p === '1'; sync(); } };
   $('segN').onclick = e => { const b = e.target.closest('button'); if (b) { homeN = +b.dataset.n; sync(); } };
@@ -1698,6 +1706,7 @@ function applyState(st) {
     }
   }
   S = st; render();
+  if (window.coachTick) coachTick(); // the coach also sees states shown after a held trick (no new 'state' event then)
   if (S.trick && S.trick.length >= S.n && !trickSeen[S.code + ':' + S.trickNo]) trickSeen[S.code + ':' + S.trickNo] = now;
 }
 sock.on('fx', f => onFx(f));
@@ -1716,6 +1725,7 @@ $('soundBtn').onclick = () => { muted = !muted; store.set('rb-muted', muted ? '1
 syncSound();
 $('rulesBtn').onclick = () => { $('rules').hidden = false; };
 $('awayBtn').onclick = () => send('away', true);
+$('coachBtn').onclick = () => window.coachToggle && coachToggle();
 $('tblInvite').onclick = tableInviteSheet;
 // Leaving the app (call, WhatsApp, home screen): the server marks you away after 10 seconds, and back when you return
 document.addEventListener('visibilitychange', () => { if (S && me0() && sock.connected) sock.emit('hidden', document.hidden); });

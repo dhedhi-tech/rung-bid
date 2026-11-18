@@ -78,7 +78,7 @@ class Table {
     this.lastActive = Date.now();
     this.G = null;
     this.waitNext = null;
-    this.guided = false;      // guided practice: coach tips during the first hand
+    this.guided = false;      // guided practice: coach tips (whole game while playing alone with bots)
     this.hold = null;         // coach bubble open: the game waits until the player taps "Got it"
   }
 
@@ -292,9 +292,9 @@ class Table {
   }
 
   // ---------- guided practice (coach) ----------
-  // Only while one real player is seated and during the first hand
+  // Only while one real player is seated (the whole game; only hand 1 is rigged)
   guidedOn() {
-    return this.guided && this.G && this.G.handNo === 1 && this.seats.filter((_, i) => this.isHuman(i)).length === 1;
+    return this.guided && this.G && this.seats.filter((_, i) => this.isHuman(i)).length === 1;
   }
   coachWait() {
     if (!this.hold || !this.guidedOn()) return Promise.resolve();
@@ -309,7 +309,8 @@ class Table {
   }
   coach(pid, msg) {
     const p = this.players.get(pid); if (!p || p.seat == null || !msg) return;
-    if (msg.off) { this.guided = false; this.setHold(false); return; }
+    if (msg.off) { this.guided = false; this.setHold(false); this.broadcast(); return; }
+    if (msg.on) { if (!this.pub) { this.guided = true; this.broadcast(); } return; } // coach back on (private tables; works while you play alone with bots)
     this.setHold(!!msg.hold);
   }
   // What the bots would do in this seat, with a short reason code for the coach bubble
@@ -368,7 +369,7 @@ class Table {
     const rotTeam = t => (t - base % 2 + 2) % 2;
     const flip = base % 2 === 1 ? -1 : 1;
     const v = {
-      code: this.code, n, joker: this.joker, guided: this.guided, limit: this.limit, phase: this.phase, me: me < 0 ? null : 0, spectator: me < 0,
+      code: this.code, n, joker: this.joker, guided: this.guided, coachable: !this.pub && this.seats.filter((_, i) => this.isHuman(i)).length === 1, limit: this.limit, phase: this.phase, me: me < 0 ? null : 0, spectator: me < 0,
       isHost: pid === this.hostId,
       seats: Array.from({ length: n }, (_, i) => {
         const s = this.seats[(i + base) % n];
@@ -952,7 +953,7 @@ class Table {
   dealNow(pid) { if (pid === this.hostId && this.waitNext) this.waitNext(); }
   playAgain(pid) {
     if (pid !== this.hostId || this.phase !== 'over' || this.running) return 'Only the host can restart';
-    this.newGame(); return null;
+    this.coachGames = (this.coachGames || 0) + 1; this.newGame(); return null;
   }
   async playHand() {
     const G = this.G;
@@ -963,7 +964,7 @@ class Table {
     G.players.forEach(p => { p.hand = []; p.tricks = 0; });
     G.deck = shuffle(buildDeck(G.n, G.joker));
     G.rigged = false;
-    if (this.guidedOn()) this.rigDeck();
+    if (this.guidedOn() && G.handNo === 1 && !this.coachGames) this.rigDeck(); // winning first hand, first game only
     this.log(`{v${G.dealer}:deal:deals}`);
     const plan = [5, 4, 4];
     for (let r = 1; r <= 3; r++) {
