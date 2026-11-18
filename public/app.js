@@ -448,7 +448,7 @@ function renderRooms(list) {
   const mine = list.filter(r => r.mine), open = list.filter(r => !r.mine);
   const item = r => `<button class="wroom ${r.mine ? 'mine' : ''}" data-code="${esc(r.code)}">
       <span class="wr-main"><b>${esc(r.host)}'s table</b>
-        <span class="wr-tags"><i class="${r.joker ? 'jk' : ''}">${r.joker ? '🃏 Joker' : 'No Joker'}</i><i>${r.n} players</i><i>${r.limit === 6 ? 'Quick · 6 hands' : r.limit === 10 ? 'Normal · 10 hands' : 'Full game'}</i></span>
+        <span class="wr-tags">${r.mine ? '' : r.beginners ? '<i class="bg">🌱 Beginners</i>' : `<i>Level ${r.lvl || 1}+</i>`}<i class="${r.joker ? 'jk' : ''}">${r.joker ? '🃏 Joker' : 'No Joker'}</i><i>${r.n} players</i><i>${r.limit === 6 ? 'Quick · 6 hands' : r.limit === 10 ? 'Normal · 10 hands' : 'Full game'}</i></span>
         <span>${r.playing ? `Playing, hand ${r.hand}${r.limit ? ' of ' + r.limit : ''}` : 'Waiting to start'}${r.names && r.names.length ? ` · with ${r.names.map(esc).join(', ')}` : ''}</span></span>
       ${r.mine ? '' : `<span class="wr-free">${r.free ? `${r.free} seat${r.free > 1 ? 's' : ''} free` : 'Full'}</span>`}<span class="wr-go">${r.mine ? 'Continue' : r.free ? 'Join' : 'Watch'}</span></button>`;
   box.innerHTML = (mine.length ? `<div class="wr-head">Your game</div>` + mine.map(item).join('') : '') + (open.length ? `<div class="wr-head">Open tables</div>` + open.map(item).join('') : '');
@@ -466,19 +466,28 @@ function takeName() {
   if (!v) { $('homeErr').textContent = 'Type your name first so friends know who you are.'; $('nameIn').focus(); return false; }
   setName(v); return true;
 }
+// Beginners (guest, or under 5 games): Joker locked, setup shows only name + Start, the rest under "More options"
+const BEGINNER_GAMES = 5;
+const isBeginner = () => !PROFILE || (PROFILE.games || 0) < BEGINNER_GAMES;
 function createSheet(practice) {
+  const newbie = isBeginner();
+  if (newbie) { homeJ = false; if (!createSheet.seen) homeL = 6; createSheet.seen = true; } // beginners start with Quick (6 hands)
+  const lockTxt = PROFILE ? `Unlocks after ${BEGINNER_GAMES} games · ${BEGINNER_GAMES - (PROFILE.games || 0)} to go` : `Sign in and play ${BEGINNER_GAMES} games to unlock`;
   openModal('create', `<div class="eyebrow">${practice ? 'Practice with bots' : 'New table'}</div>
     <h2>${practice ? 'Set up a practice game' : 'Create a table'}</h2>
     ${nameField()}
+    ${newbie ? `<div class="sub" id="simpleNote">${homeN} players · Classic · ${homeL === 6 ? 'Quick (6 hands)' : homeL === 10 ? 'Normal (10 hands)' : 'Full game'}</div>
+    <button class="primary" id="goCreate">${practice ? 'Start practice' : 'Create table'}</button>
+    <button class="linkbtn" id="moreOpts">More options ▾</button><div id="optsBox" hidden>` : ''}
     <div class="field"><span>Players</span><div class="seg" id="segN">
       <button data-n="4">4<small>1 deck</small></button><button data-n="6">6<small>78 cards</small></button><button data-n="8">8<small>2 decks</small></button></div></div>
-    <div class="field"><span>Mode</span><div class="seg text" id="segJ"><button data-j="0">Classic</button><button data-j="1">Joker mode</button></div></div>
+    <div class="field"><span>Mode</span><div class="seg text" id="segJ"><button data-j="0">Classic</button><button data-j="1" class="${newbie ? 'locked' : ''}">${newbie ? '🔒 ' : ''}Joker mode</button></div>${newbie ? `<small class="lock-note">🔒 Joker: ${lockTxt}</small>` : ''}</div>
     <div class="field"><span>Game length</span><div class="seg" id="segL">
       <button data-l="6">Quick<small>6 hands</small></button><button data-l="10">Normal<small>10 hands</small></button><button data-l="0">Full<small>no limit</small></button></div></div>
     ${practice ? '<div class="field"><span>Coach tips</span><div class="seg text" id="segC"><button data-c="1">On</button><button data-c="0">Off</button></div></div>' : ''}
     <div class="field"><span>Who can join</span><div class="seg text" id="segP"><button data-p="1">Anyone</button><button data-p="0">Only with link</button></div></div>
     ${practice ? '' : '<div class="field" id="swapField"><span>If the bidder fails</span><div class="seg text" id="segS"><button data-s="0">Keeps the seat</button><button data-s="1">Swaps with waiting list</button></div></div>'}
-    <button class="primary" id="goCreate">${practice ? 'Start practice' : 'Create table'}</button>
+    ${newbie ? '</div>' : `<button class="primary" id="goCreate">${practice ? 'Start practice' : 'Create table'}</button>`}
     <div class="err" id="homeErr"></div>
     <button class="linkbtn" id="backHome">Back</button>`);
   const sync = () => {
@@ -489,7 +498,9 @@ function createSheet(practice) {
     document.querySelectorAll('#segC button').forEach(b => b.classList.toggle('on', (b.dataset.c === '1') === homeCoach));
     document.querySelectorAll('#segS button').forEach(b => b.classList.toggle('on', (b.dataset.s === '1') === homeSwap));
     if ($('swapField')) $('swapField').hidden = homePub;
+    if ($('simpleNote')) $('simpleNote').textContent = `${homeN} players · Classic · ${homeL === 6 ? 'Quick (6 hands)' : homeL === 10 ? 'Normal (10 hands)' : 'Full game'}`;
   };
+  if ($('moreOpts')) $('moreOpts').onclick = () => { const b = $('optsBox'); b.hidden = !b.hidden; $('moreOpts').textContent = b.hidden ? 'More options ▾' : 'Fewer options ▴'; };
   homePub = !practice;
   homeCoach = !store.get('rb-coached'); // on until the player has finished one guided hand
   if ($('segS')) $('segS').onclick = e => { const b = e.target.closest('button'); if (b) { homeSwap = b.dataset.s === '1'; sync(); } };
@@ -497,7 +508,9 @@ function createSheet(practice) {
   sync();
   $('segP').onclick = e => { const b = e.target.closest('button'); if (b) { homePub = b.dataset.p === '1'; sync(); } };
   $('segN').onclick = e => { const b = e.target.closest('button'); if (b) { homeN = +b.dataset.n; sync(); } };
-  $('segJ').onclick = e => { const b = e.target.closest('button'); if (b) { homeJ = b.dataset.j === '1'; sync(); } };
+  $('segJ').onclick = e => { const b = e.target.closest('button'); if (!b) return;
+    if (newbie && b.dataset.j === '1') { $('homeErr').textContent = `Joker mode is locked. ${lockTxt}.`; return; }
+    homeJ = b.dataset.j === '1'; sync(); };
   $('segL').onclick = e => { const b = e.target.closest('button'); if (b) { homeL = +b.dataset.l; sync(); } };
   $('goCreate').onclick = () => { if (takeName()) { ac(); createTable(practice); } };
   $('backHome').onclick = closeModal;

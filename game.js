@@ -17,6 +17,7 @@ const TARGET = 52;
 const SPEED = Number(process.env.RB_SPEED) || 1; // test hook: 0.1 runs ten times faster
 const PACE = { bot: 800 * SPEED, trick: 1300 * SPEED, trump: 1800 * SPEED, deal: 700 * SPEED };
 const TURN_MS = { bid: 20000, trump: 20000, play: 8000 };
+const BEGINNER_MS = { bid: 30000, trump: 30000, play: 15000 }; // guests and players with under 5 games; never auto-away for missed turns
 const HIDE_AWAY_MS = 10000, AWAY_SWAP_MS = +process.env.RB_AWAY_SWAP_MS || 180000; // away after 10s out of the app; seat to the waiting list after 3 min away
 const HAND_END_MS = 9000 * SPEED;
 
@@ -459,7 +460,8 @@ class Table {
       return this.sleep(PACE.bot).then(() => fallback());
     }
     const guided = this.guidedOn();
-    const ms = TURN_MS[kind];
+    const newbie = !!(this.isBeginner && this.isBeginner(this.seats[seat].pid));
+    const ms = newbie ? BEGINNER_MS[kind] : TURN_MS[kind]; // beginners get more time
     G.deadline = guided ? 0 : Date.now() + ms; // guided practice: no turn timer
     if (guided) { try { askView = { ...askView, hint: this.coachHint(seat, kind) }; } catch (e) { console.error('coach', e); } }
     return new Promise((resolve, reject) => {
@@ -468,7 +470,7 @@ class Table {
       const pl = this.players.get(this.seats[seat].pid);
       const timer = guided ? null : setTimeout(() => {
         finish(fallback());
-        if (pl && (pl.missed = (pl.missed || 0) + 1) >= 2) this.setAway(this.seats[seat].pid, true, 'missed');
+        if (pl && (pl.missed = (pl.missed || 0) + 1) >= 2 && !newbie) this.setAway(this.seats[seat].pid, true, 'missed');
       }, ms);
       this.pending = {
         seat, kind, askView,

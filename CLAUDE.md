@@ -118,6 +118,12 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Server keeps the XP/coins/stats a guest would have earned (`guestPending`, per pid, 3 hours) and sends `guestGain` after each hand; on sign-in (`signedIn` -> `takeGuestGain`) they are added to the profile and a `profile` event with `saved: true` shows "Saved to your profile".
 - Client (`nudgeHTML`/`bindNudge`): blue banner on the hand result sheet after the guest's first hand of a game ("+N XP this hand", Sign in / Later), skipped in guided practice until hand 2; once more on the game over sheet ("You earned N XP and N coins"). At most 3 games per phone (`rb-nudge`). Tested: web sign-in redirect mid-game returns to the same seat; in the app the browser opens on top and the existing auto-away covers turns.
 
+## Beginners (Nov 18 2026, on pending-updates until deploy)
+- Beginner = guest, or signed in with under 5 finished games (`BEGINNER_GAMES`, `isBeginner` in server.js and app.js). Manager chose: Joker unlocks after 5 games and needs sign-in.
+- Create sheet for beginners: name + summary line + Create/Start, everything else under "More options"; Joker button locked (🔒, note "Sign in and play 5 games to unlock" / "N to go"); Quick (6 hands) default. Server also forces joker off for beginner hosts. Joining someone else's Joker table (invite/list) is allowed.
+- Turn timer for beginners `BEGINNER_MS` (card 15s, bid/trump 30s) via `t.isBeginner`; missed turns never make a beginner away (leaving the app still does).
+- Open tables list: "🌱 Beginners" tag when every real player is a beginner, else "Level N+" (highest level); beginners see beginner tables first.
+
 ## Render environment (names only)
 SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TURN_USER, TURN_PASS, optional CONTACT_EMAIL. Never print or store their values.
 

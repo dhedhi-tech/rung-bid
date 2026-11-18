@@ -136,7 +136,11 @@ function takeGuestGain(pid, profile) {
   if (!p || Date.now() - p.at > GUEST_KEEP_MS || !(p.xp || p.coins)) return null;
   return A.award(profile, p.xp, p.coins, p.stats);
 }
+// Beginners: guests, or signed in with fewer than 5 finished games. Classic only (Joker locked), longer turn timer, no auto-away
+const BEGINNER_GAMES = 5;
+const isBeginner = p => { const a = pidAuth.get(p); return !a || (a.profile.games || 0) < BEGINNER_GAMES; };
 function wireProgress(t) {
+  t.isBeginner = isBeginner;
   t.onGameStart = () => S.logGame({ kind: 'start', ...tableInfo(t) });
   t.levelOf = p => { const a = pidAuth.get(p); return a ? A.levelOf(a.profile.xp) : null; };
   t.avOf = p => { const a = pidAuth.get(p); return a ? A.avOf(a.profile) : null; };
@@ -172,7 +176,7 @@ io.on('connection', socket => {
     if (tables.size > 500) return reply(cb, 'Server is busy. Try again in a minute.');
     const code = newCode();
     const guided = !!(opts && opts.guided);
-    const t = new Table(code, { n, joker: !!(opts && opts.joker), hostId: pid, limit: opts && Number(opts.limit), pub: !!(opts && opts.pub) && !guided, swap: !!(opts && opts.swap) && !guided, region: opts && ['pk', 'in', 'bd'].includes(opts.region) ? opts.region : 'pk' }, io);
+    const t = new Table(code, { n, joker: !!(opts && opts.joker) && !isBeginner(pid), hostId: pid, limit: opts && Number(opts.limit), pub: !!(opts && opts.pub) && !guided, swap: !!(opts && opts.swap) && !guided, region: opts && ['pk', 'in', 'bd'].includes(opts.region) ? opts.region : 'pk' }, io);
     t.guided = guided;
     wireProgress(t);
     tables.set(code, t);
@@ -217,11 +221,15 @@ io.on('connection', socket => {
       if (!t.pub || t.phase === 'over' || !t.humansConnected()) continue;
       const free = t.seats.filter(s => s.bot).length;
       const host = t.players.get(t.hostId);
+      const hs = t.seats.filter(s => !s.bot && s.pid);
+      const lv = hs.map(s => { const a = pidAuth.get(s.pid); return a ? A.levelOf(a.profile.xp) : 1; });
       list.push({ code: t.code, host: host ? host.name : 'Player', n: t.n, joker: t.joker, limit: t.limit, free,
+        beginners: hs.length > 0 && hs.every(s => isBeginner(s.pid)), lvl: lv.length ? Math.max(...lv) : 1,
         names: t.seats.filter(s => !s.bot && s.pid !== t.hostId).map(s => s.name).slice(0, 3),
         humans: t.seats.filter(s => !s.bot).length, playing: t.phase === 'game', hand: t.G ? t.G.handNo : 0, mine: false });
     }
-    list.sort((a, b) => (b.mine - a.mine) || (a.playing - b.playing) || (b.humans - a.humans));
+    const newbie = isBeginner(pid);
+    list.sort((a, b) => (b.mine - a.mine) || (newbie ? (!!b.beginners - !!a.beginners) : 0) || (a.playing - b.playing) || (b.humans - a.humans));
     reply(cb, null, { list: list.slice(0, 20) });
   });
 
