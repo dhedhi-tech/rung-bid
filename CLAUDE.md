@@ -102,7 +102,7 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Trick score in the middle of the table (`#tscore`, in `renderTricks`): our team big in orange as won/needed, opponents small in blue. Header line 2 shows only "<team> need N". Manager tried "US/THEM" labels and declined them.
 
 ## Small notes (Nov 2026)
-- Keep-awake: while a table is open the client fetches /health every 4 min (Render free plan sleeps after 15 min without normal HTTP requests; socket traffic does not count). Also `.github/workflows/keep-awake.yml` (GitHub Actions, added Nov 14 2026) visits /health every 5 min so the server stays awake with nobody playing; delete it after moving to the paid plan. Real fix: Render $7 plan.
+- Keep-awake: while a table is open the client fetches /health every 4 min (Render free plan sleeps after 15 min without normal HTTP requests; socket traffic does not count). With nobody playing, an external cron-job.org job (manager's account, set up Nov 18 2026) visits https://www.pattaparty.com/health every 5 min; turn it off after moving to the paid plan. The old GitHub Actions pinger (keep-awake.yml) was removed Nov 18: GitHub ran it only every 40 min to 9 hours, so the server kept sleeping. Real fix: Render $7 plan.
 - Admin "What people play": table size x Joker table (each column adds up to 100%) and "Game length chosen" table, both from `game_log` (last 30 days), computed in `stats.js` (`countModes`).
 - Not built yet (idea only): tracking players joining/leaving mid-game for admin stats.
 
