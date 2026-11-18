@@ -17,7 +17,7 @@
   const suitTxt = s => `${SYM[s]} ${SNAME[s]}`;
   const mate = () => (S.n === 4 ? 'partner' : 'teammate');
   const team = () => (S.n === 4 ? 'Your partner sits opposite you.' : 'Every second player is on your team.');
-  // Urdu (اردو button in the tip window, saved in rb-coach-lang). Game words as card players say them: رنگ = trump, ہاتھ = trick, بازی = hand, بولی = bid
+  // Urdu (اردو button in the tip window, saved in rb-coach-lang). Game words as card players say them: ترپ = trump, ہاتھ = trick, بازی = hand, بولی = bid
   const UNAME = { S: 'حکم', H: 'پان', D: 'اینٹ', C: 'چڑیا' };
   const cardU = c => (isJ(c) ? 'جوکر' : '<bdi dir="ltr">' + RL(c.r) + SYM[c.s] + '</bdi>'); // keeps K♦ the right way round in Urdu text
   const suitU = s => `${SYM[s]} ${UNAME[s]}`;
@@ -131,18 +131,18 @@
     const s = a.hint.s, of = (S.hand || []).filter(c => c.s === s), hi = of.filter(c => c.r >= 12);
     return T(`You hold the highest bid, so you choose <b>trump</b>. Coach pick: <b>${suitTxt(s)}</b>. You have ${of.length} of them${hi.length ? ' including ' + hi.map(cardName).join(' ') : ''}. More trumps (and high ones) means more tricks for your team.` +
       (a.current ? ' You can keep the same trump or change it.' : ''),
-      `سب سے بڑی بولی آپ کی ہے، اس لیے <b>رنگ</b> آپ چنیں گے۔ کوچ کی رائے: <b>${suitU(s)}</b>۔ آپ کے پاس اس کے ${of.length} پتے ہیں${hi.length ? '، جن میں ' + hi.map(cardU).join(' ') + ' بھی ہیں' : ''}۔ جتنے زیادہ (اور بڑے) رنگ کے پتے، اتنے زیادہ ہاتھ۔` +
-      (a.current ? ' آپ وہی رنگ رکھ سکتے ہیں یا بدل سکتے ہیں۔' : ''));
+      `سب سے بڑی بولی آپ کی ہے، اس لیے <b>ترپ</b> آپ چنیں گے۔ کوچ کی رائے: <b>${suitU(s)}</b>۔ آپ کے پاس اس کے ${of.length} پتے ہیں${hi.length ? '، جن میں ' + hi.map(cardU).join(' ') + ' بھی ہیں' : ''}۔ جتنے زیادہ (اور بڑے) ترپ کے پتے، اتنے زیادہ ہاتھ۔` +
+      (a.current ? ' آپ وہی ترپ رکھ سکتے ہیں یا بدل سکتے ہیں۔' : ''));
   }
   function playTip(a, once = true) {
     const h = a.hint, c = (S.hand || []).find(x => x.id === h.id), L = S.leadSuit ? suitTxt(S.leadSuit) : '', LU = S.leadSuit ? suitU(S.leadSuit) : '';
     const why = {
-      leadTrump: T('Leading a high trump pulls out the opponents\' trumps.', 'رنگ کا بڑا پتا پہلے چلنے سے مخالفوں کے رنگ نکل جاتے ہیں۔'),
+      leadTrump: T('Leading a high trump pulls out the opponents\' trumps.', 'ترپ کا بڑا پتا پہلے چلنے سے مخالفوں کے ترپ نکل جاتے ہیں۔'),
       leadBoss: T('It is the highest card left in its suit, so nobody can beat it.', 'یہ اپنی قسم کا سب سے بڑا بچا ہوا پتا ہے، اس سے بڑا کسی کے پاس نہیں۔'),
       leadLow: T('Lead a low card and save your high cards for later.', 'چھوٹا پتا چلیں اور بڑے پتے بعد کے لیے بچائیں۔'),
       joker: T('The other team is winning this trick. Your Joker flips it to your team!', 'یہ ہاتھ دوسری ٹیم جیت رہی ہے۔ آپ کا جوکر اسے آپ کی ٹیم کی طرف پلٹ دے گا!'),
       partnerWins: T(`Your ${mate()} is already winning this trick, so play your lowest card.`, `یہ ہاتھ آپ کا ${mateU()} جیت رہا ہے، اس لیے اپنا سب سے چھوٹا پتا ڈالیں۔`),
-      cut: T(`You have no ${L} left, so cut with a trump. Any trump beats the other suits.`, `آپ کے پاس ${LU} نہیں بچا، اس لیے رنگ سے کاٹیں۔ رنگ کا ہر پتا باقی سب قسموں سے بڑا ہے۔`),
+      cut: T(`You have no ${L} left, so cut with a trump. Any trump beats the other suits.`, `آپ کے پاس ${LU} نہیں بچا، اس لیے ترپ سے کاٹیں۔ ترپ کا ہر پتا باقی سب قسموں سے بڑا ہے۔`),
       win: T('This card beats everything played so far.', 'یہ پتا اب تک ڈالے گئے سب پتوں سے بڑا ہے۔'),
       cantWin: T(`You must follow ${L}, but you can't win this one, so play your lowest.`, `آپ کو ${LU} ہی ڈالنا ہے، لیکن یہ ہاتھ آپ نہیں جیت سکتے، اس لیے سب سے چھوٹا ڈالیں۔`),
       throwLow: T(`You have no ${L} and can't win this trick, so throw away a low card.`, `آپ کے پاس ${LU} نہیں اور یہ ہاتھ جیت نہیں سکتے، اس لیے کوئی چھوٹا پتا پھینک دیں۔`),
@@ -218,7 +218,7 @@
       say('start', T(`<b>Welcome to guided practice!</b> I'll help you through your first game. You sit at the bottom. ${team()} <b class="pn ta">Orange</b> names are your team, <b class="pn tb">blue</b> are opponents. The bots wait for you, so take your time.`,
         `<b>گائیڈڈ پریکٹس میں خوش آمدید!</b> پہلی گیم میں میں آپ کی مدد کروں گا۔ آپ نیچے بیٹھے ہیں۔ ${teamU()} <b class="pn ta">نارنجی</b> نام آپ کی ٹیم ہیں، <b class="pn tb">نیلے</b> مخالف۔ بوٹس آپ کا انتظار کرتے ہیں، آرام سے کھیلیں۔`));
       say('deals', T('Cards come in 3 deals: 5, then 4, then 4 (13 each). After every deal there is a round of bidding. The highest bidder picks <b>trump</b>, the strongest suit for this hand.',
-        'پتے 3 بار بٹتے ہیں: 5، پھر 4، پھر 4 (ہر ایک کو 13)۔ ہر بار کے بعد بولی لگتی ہے۔ سب سے بڑی بولی والا <b>رنگ</b> (ٹرمپ) چنتا ہے، یعنی اس بازی کی سب سے طاقتور قسم۔'));
+        'پتے 3 بار بٹتے ہیں: 5، پھر 4، پھر 4 (ہر ایک کو 13)۔ ہر بار کے بعد بولی لگتی ہے۔ سب سے بڑی بولی والا <b>ترپ</b> چنتا ہے، یعنی اس بازی کی سب سے طاقتور قسم۔'));
       if (S.n > 4) say('decks', T(`With ${S.n} players there are <b>2 decks</b>, so every card is there twice${S.n === 6 ? ' (the 2s, 3s and 4s are taken out)' : ''}. If two identical cards land in one trick, the one played <b>last</b> wins. So a second A♠ beats the first A♠!`,
         `${S.n} کھلاڑیوں میں <b>2 گڈیاں</b> ہوتی ہیں، اس لیے ہر پتا دو بار ہے${S.n === 6 ? ' (2، 3 اور 4 نکال دیے جاتے ہیں)' : ''}۔ اگر ایک ہاتھ میں دو ایک جیسے پتے آئیں تو <b>بعد میں</b> ڈالا گیا جیتتا ہے۔ یعنی دوسرا A♠ پہلے A♠ سے بڑا ہے!`));
       if (S.joker) say('jokerMode', T('<b>Joker mode:</b> there is a Joker in the deck, and it can flip a trick to the other team. I\'ll show you how it works.',
@@ -226,12 +226,12 @@
     }
     if ((S.hand || []).some(isJ)) say('gotJoker', T(`You have the <b>Joker</b>! How it works:<br>• You can only play it when you have <b>no cards of the suit led</b>, and you can never lead with it.<br>• It <b>flips the trick</b>: the team that was losing takes it, and you lead next.<br>• Best time: when the other team is about to win a trick.<br>• Don't keep it to the very end. If you must lead and only the Joker is left, the other team gets that trick.`,
       `آپ کے پاس <b>جوکر</b> ہے! یہ ایسے کام کرتا ہے:<br>• یہ صرف تب ڈال سکتے ہیں جب آپ کے پاس <b>چلی گئی قسم کا کوئی پتا نہ ہو</b>، اور اس سے ہاتھ شروع نہیں کر سکتے۔<br>• یہ <b>ہاتھ پلٹ دیتا ہے</b>: ہارنے والی ٹیم ہاتھ لے لیتی ہے، اور اگلی چال آپ کی۔<br>• بہترین وقت: جب دوسری ٹیم ہاتھ جیتنے والی ہو۔<br>• اسے آخر تک نہ رکھیں۔ اگر آپ کو چال چلنی ہو اور صرف جوکر بچا ہو تو وہ ہاتھ دوسری ٹیم کا۔`), { pos: 'top' });
-    if (S.round === 2 && S.gphase !== 'play') say('r2', T('Round 2: 4 more cards each. Bids can now go higher than 7. Whoever takes the bid can also pick a new trump.', 'راؤنڈ 2: سب کو 4 اور پتے۔ اب بولی 7 سے اوپر جا سکتی ہے۔ جو بولی لے وہ نیا رنگ بھی چن سکتا ہے۔'));
+    if (S.round === 2 && S.gphase !== 'play') say('r2', T('Round 2: 4 more cards each. Bids can now go higher than 7. Whoever takes the bid can also pick a new trump.', 'راؤنڈ 2: سب کو 4 اور پتے۔ اب بولی 7 سے اوپر جا سکتی ہے۔ جو بولی لے وہ نیا ترپ بھی چن سکتا ہے۔'));
     if (S.round === 3 && S.gphase !== 'play') say('r3', T('Last 4 cards. This is the final round of bidding, then the play starts.', 'آخری 4 پتے۔ یہ بولی کا آخری راؤنڈ ہے، پھر کھیل شروع۔'));
     if (S.gphase === 'play' && S.bid && !C.shown.has('play' + S.handNo)) {
       const bt = S.bid.seat % 2, v = S.bid.value, nd = need();
       say('play' + S.handNo, T(`Bidding is done. ${teamName(bt)} bid <b>${v}</b> with ${suitTxt(S.trump)} trump, so they must win <b>${nd} tricks</b>${v === 6 ? ' (a bid of 6 still needs 7)' : ''}. ${bt === 0 ? 'The opponents need' : 'Your team needs'} ${14 - nd} to break it. ${esc(nm(S.bid.seat))} ${S.bid.seat === 0 ? 'lead' : 'leads'} the first trick.`,
-        `بولی ختم۔ ${bt === 0 ? 'آپ کی ٹیم' : 'مخالفوں'} نے ${suitU(S.trump)} رنگ کے ساتھ <b>${v}</b> کی بولی لگائی، اس لیے انہیں <b>${nd} ہاتھ</b> جیتنے ہیں${v === 6 ? ' (6 کی بولی پر بھی 7 چاہئیں)' : ''}۔ ${bt === 0 ? 'مخالفوں کو' : 'آپ کی ٹیم کو'} اسے توڑنے کے لیے ${14 - nd} ہاتھ چاہئیں۔ پہلی چال ${S.bid.seat === 0 ? 'آپ چلیں گے' : esc(nm(S.bid.seat)) + ' چلیں گے'}۔`));
+        `بولی ختم۔ ${bt === 0 ? 'آپ کی ٹیم' : 'مخالفوں'} نے ${suitU(S.trump)} ترپ کے ساتھ <b>${v}</b> کی بولی لگائی، اس لیے انہیں <b>${nd} ہاتھ</b> جیتنے ہیں${v === 6 ? ' (6 کی بولی پر بھی 7 چاہئیں)' : ''}۔ ${bt === 0 ? 'مخالفوں کو' : 'آپ کی ٹیم کو'} اسے توڑنے کے لیے ${14 - nd} ہاتھ چاہئیں۔ پہلی چال ${S.bid.seat === 0 ? 'آپ چلیں گے' : esc(nm(S.bid.seat)) + ' چلیں گے'}۔`));
     }
     onAsk();
     mark();
@@ -240,7 +240,7 @@
     if (!S || !C || !on()) return;
     switch (f.type) {
       case 'trump':
-        if (S.round === 1) say('trump', T(`Trump is <b>${suitTxt(f.s)}</b>. For this hand, any ${SYM[f.s]} card beats every card of the other suits.`, `رنگ <b>${suitU(f.s)}</b> ہے۔ اس بازی میں ${SYM[f.s]} کا ہر پتا باقی سب قسموں کے پتوں سے بڑا ہے۔`));
+        if (S.round === 1) say('trump', T(`Trump is <b>${suitTxt(f.s)}</b>. For this hand, any ${SYM[f.s]} card beats every card of the other suits.`, `ترپ <b>${suitU(f.s)}</b> ہے۔ اس بازی میں ${SYM[f.s]} کا ہر پتا باقی سب قسموں کے پتوں سے بڑا ہے۔`));
         break;
       case 'trick': {
         // Two decks: the winning card had an identical twin played earlier in this trick
@@ -248,7 +248,7 @@
         if (wc && !isJ(wc) && tr.slice(0, wi).some(t => t.card.s === wc.s && t.card.r === wc.r)) say('twin', T(`Two <b>${cardName(wc)}</b> in one trick! With 2 decks, the one played <b>last</b> wins, so ${esc(nm(f.showSeat))} ${f.showSeat === 0 ? 'take' : 'takes'} it.`,
           `ایک ہاتھ میں دو <b>${cardU(wc)}</b>! 2 گڈیوں میں <b>بعد والا</b> جیتتا ہے، اس لیے یہ ہاتھ ${f.showSeat === 0 ? 'آپ کا' : esc(nm(f.showSeat)) + ' کا'}۔`));
         if (!f.flipped) say('trick', T(`${f.team === 0 ? '<b>Your team won the trick!</b>' : 'The opponents won that trick.'} The highest card of the suit led wins, unless someone plays a trump. Whoever wins leads the next trick.`,
-          `${f.team === 0 ? '<b>آپ کی ٹیم نے ہاتھ جیت لیا!</b>' : 'یہ ہاتھ مخالفوں نے جیتا۔'} چلی گئی قسم کا سب سے بڑا پتا جیتتا ہے، سوائے اس کے کہ کوئی رنگ ڈال دے۔ جو جیتے وہ اگلی چال چلتا ہے۔`));
+          `${f.team === 0 ? '<b>آپ کی ٹیم نے ہاتھ جیت لیا!</b>' : 'یہ ہاتھ مخالفوں نے جیتا۔'} چلی گئی قسم کا سب سے بڑا پتا جیتتا ہے، سوائے اس کے کہ کوئی ترپ ڈال دے۔ جو جیتے وہ اگلی چال چلتا ہے۔`));
         break;
       }
       case 'joker':
