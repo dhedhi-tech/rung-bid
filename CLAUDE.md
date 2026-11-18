@@ -113,6 +113,10 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Share a sweep / whitewash (Nov 18): when my team makes a clean sweep or a whitewash, the hand result sheet (and the game over sheet if it was the last hand) shows "🧹 Share your clean sweep" / "⚪ Share your whitewash" (`featShare(R)`, `bindShare`). Same picture as the win (`winImage` takes `title`, `sub`), own text and referrer (share_sweep / share_whitewash). Sharing takes the player out of the app; after 10s they are marked away until they return (bots play for them). The game over sheet also lists "Your highlights" (every sweep/whitewash of my team this game, each with Share), kept in `HL` (sessionStorage `rb-hl`, per table code, reset when a new game starts) by `noteHighlight(R)` at the start of `resultScreen`.
 - `play-store/listing.md`: keyword title "Patta Party: Rung Court Piece" + Urdu, Hindi, Bengali listings.
 
+## Guest sign-in nudge (Nov 18 2026, on pending-updates until deploy)
+- Server keeps the XP/coins/stats a guest would have earned (`guestPending`, per pid, 3 hours) and sends `guestGain` after each hand; on sign-in (`signedIn` -> `takeGuestGain`) they are added to the profile and a `profile` event with `saved: true` shows "Saved to your profile".
+- Client (`nudgeHTML`/`bindNudge`): blue banner on the hand result sheet after the guest's first hand of a game ("+N XP this hand", Sign in / Later), skipped in guided practice until hand 2; once more on the game over sheet ("You earned N XP and N coins"). At most 3 games per phone (`rb-nudge`). Tested: web sign-in redirect mid-game returns to the same seat; in the app the browser opens on top and the existing auto-away covers turns.
+
 ## Render environment (names only)
 SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TURN_USER, TURN_PASS, optional CONTACT_EMAIL. Never print or store their values.
 

@@ -119,6 +119,23 @@ function tableInfo(t) {
   const humans = t.seats.filter(s => !s.bot && s.pid);
   return { code: t.code, n: t.n, joker: t.joker, lim: t.limit, humans: humans.length, signed: humans.filter(s => pidAuth.has(s.pid)).length };
 }
+// Guests: XP and coins they would have got are kept for a while, so signing in mid-game still saves this game's progress
+const guestPending = new Map(); // pid -> { xp, coins, stats, at }
+const GUEST_KEEP_MS = 3 * 3600 * 1000;
+function guestGain(t, pid, g) {
+  if (!(A.enabled || A.DEV)) return;
+  const old = guestPending.get(pid), p = old && Date.now() - old.at < GUEST_KEEP_MS ? old : { xp: 0, coins: 0, stats: {} };
+  p.xp += g.xp; p.coins += g.coins; p.at = Date.now();
+  for (const [k, v] of Object.entries(g.stats)) p.stats[k] = (p.stats[k] || 0) + v;
+  guestPending.set(pid, p);
+  if (guestPending.size > 20000) guestPending.delete(guestPending.keys().next().value);
+  for (const { socket, pid: cp } of t.clients.values()) if (cp === pid) socket.emit('guestGain', { xp: g.xp, coins: g.coins, totalXp: p.xp, totalCoins: p.coins });
+}
+function takeGuestGain(pid, profile) {
+  const p = guestPending.get(pid); guestPending.delete(pid);
+  if (!p || Date.now() - p.at > GUEST_KEEP_MS || !(p.xp || p.coins)) return null;
+  return A.award(profile, p.xp, p.coins, p.stats);
+}
 function wireProgress(t) {
   t.onGameStart = () => S.logGame({ kind: 'start', ...tableInfo(t) });
   t.levelOf = p => { const a = pidAuth.get(p); return a ? A.levelOf(a.profile.xp) : null; };
@@ -128,7 +145,8 @@ function wireProgress(t) {
     if (info.over) S.logGame({ kind: 'finish', ...tableInfo(t), hands: t.G.handNo });
     for (const s of info.seats) {
       if (!s.pid) continue;
-      const a = pidAuth.get(s.pid); if (!a) continue;
+      const a = pidAuth.get(s.pid);
+      if (!a) { guestGain(t, s.pid, A.handGains(info, s.seat)); continue; }
       const g = A.handGains(info, s.seat);
       const gain = A.award(a.profile, g.xp, g.coins, g.stats);
       for (const { socket, pid: cp } of t.clients.values()) if (cp === s.pid) socket.emit('profile', { profile: A.view(a.profile), gain });
@@ -248,8 +266,10 @@ io.on('connection', socket => {
     S.playerSeen(pid, true, name, profile.id);
     if (socket.data.app) S.appSeen(pid, profile.id);
     const daily = A.claimDaily(profile);
+    const saved = takeGuestGain(pid, profile);
     if (table) table.broadcast();
     reply(cb, null, { profile: A.view(profile), daily });
+    if (saved) socket.emit('profile', { profile: A.view(profile), gain: saved, saved: true });
   };
   socket.on('auth', async (token, cb) => {
     try { const user = await A.verify(String(token || '')); if (!user) return reply(cb, 'Sign-in expired. Please sign in again.'); await signedIn(user, cb); }

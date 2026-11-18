@@ -599,6 +599,38 @@ function featShare(R) {
 }
 // This game's sweeps / whitewashes by my team, kept for the game over sheet (per table, survives a reload)
 let HL = { key: '', list: [] };
+/* ---------- guests: sign-in nudge on the hand result sheet ---------- */
+// Shown after the guest's first hand of a game, once more at game over, then (after 3 games) not again.
+const G_LOGO = '<svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17.5z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>';
+let GG = { xp: 0, coins: 0, last: null };          // XP/coins a guest would have saved (server keeps them for 3 hours)
+let NUDGE = { code: '', lastHand: 0, hand: 0, over: false, later: false };
+function nudgeGame(R) {
+  if (NUDGE.code !== S.code || R.handNo < NUDGE.lastHand) NUDGE = { code: S.code, lastHand: 0, hand: 0, over: false, later: false };
+  NUDGE.lastHand = R.handNo;
+}
+const nudgeGames = () => +(store.get('rb-nudge') || 0);
+function nudgeHTML(R, over) {
+  if (PROFILE || !AUTH.auth || S.spectator || !GG.last || !me0()) return '';
+  nudgeGame(R);
+  if (!over) {
+    if (NUDGE.hand && NUDGE.hand !== R.handNo) return '';
+    if (!NUDGE.hand) {
+      if (nudgeGames() >= 3 || (S.guided && R.handNo < 2)) return '';
+      NUDGE.hand = R.handNo; store.set('rb-nudge', String(nudgeGames() + 1));
+    }
+    if (NUDGE.later) return '';
+    return `<div class="nudge" id="nudge"><div class="ng-txt"><b>+${GG.last.xp} XP this hand</b><span>Guests don't keep XP and coins. Sign in with Google to save them, this game too.</span></div>
+      <div class="ng-btns"><button class="gbtn" id="ngSign">${G_LOGO}Sign in</button><button class="linkbtn" id="ngLater">Later</button></div></div>`;
+  }
+  if (!NUDGE.hand || (NUDGE.over && NUDGE.over !== R.handNo)) return '';
+  NUDGE.over = R.handNo;
+  return `<div class="nudge" id="nudge"><div class="ng-txt"><b>You earned ${GG.xp} XP${GG.coins ? ` and ${GG.coins} coins` : ''}</b><span>Sign in with Google now to save them to your profile.</span></div>
+    <div class="ng-btns"><button class="gbtn" id="ngSign">${G_LOGO}Sign in</button></div></div>`;
+}
+function bindNudge() {
+  if ($('ngSign')) $('ngSign').onclick = signIn;
+  if ($('ngLater')) $('ngLater').onclick = () => { NUDGE.later = true; const n = $('nudge'); if (n) n.remove(); };
+}
 try { HL = JSON.parse(sessionStorage.getItem('rb-hl')) || HL; } catch (e) {}
 // The winning team as it was when the game ended (players who leave afterwards become bots in S.seats)
 let OVER_TEAM = { key: '', team: [] };
@@ -685,6 +717,7 @@ async function authNow() {
 function gotProfile(p, daily) {
   PROFILE = p;
   if (!myName && p.name) setName(p.name.split(' ')[0]);
+  { const n = $('nudge'); if (n) n.remove(); }
   applyFelt(); renderChip();
   if (modalKind === 'profile') profileSheet();
   // Signed in from the invite popup: go straight to the table
@@ -976,9 +1009,11 @@ function gainToast(text, big) {
   document.body.appendChild(t); setTimeout(() => t.remove(), big ? 3200 : 2600);
 }
 sockReady.push(() => {
-  sock.on('profile', ({ profile, gain }) => {
+  sock.on('guestGain', g => { if (PROFILE) return; GG = { xp: g.totalXp, coins: g.totalCoins, last: g }; });
+  sock.on('profile', ({ profile, gain, saved }) => {
     PROFILE = profile; applyFelt(); renderChip();
-    if (gain && (gain.xp || gain.coins)) setTimeout(() => gainToast(`+${gain.xp} XP${gain.coins ? ` · +${gain.coins} coins` : ''}`), 900);
+    if (saved) { GG = { xp: 0, coins: 0, last: null }; const n = $('nudge'); if (n) n.remove(); }
+    if (gain && (gain.xp || gain.coins)) setTimeout(() => gainToast(`${saved ? 'Saved to your profile · ' : ''}+${gain.xp} XP${gain.coins ? ` · +${gain.coins} coins` : ''}`), saved ? 3400 : 900); // after the daily reward toast
     if (gain && gain.levelUp) setTimeout(() => { gainToast(`<b>Level ${gain.levelUp}!</b><span>+${50} bonus coins</span>`, true); confetti(['#f4a93a', '#fbf7ef', '#82d48e'], 1600, 90); sfx('win'); }, 1800);
   });
 });
@@ -1096,6 +1131,7 @@ function resultScreen() {
       <h2 class="over-title ${S.spectator ? '' : w === 0 ? 'good' : 'bad'}">${iWon ? 'Your team wins!' : `${teamName(w)} ${sv(w, 'wins', 'win')}`}</h2>
       <p class="over-sub">${margin ? `Won by ${margin} point${margin === 1 ? '' : 's'}` : ''}</p></div>${grid}
       ${iWon ? '<button class="share-win" id="shareWin">🏆 Share your win</button>' : ''}
+      ${nudgeHTML(R, true)}
       ${HL.key === S.code && HL.list.length ? `<div class="hl-box"><div class="hl-head">Your highlights</div>${HL.list.map((h, i) => `<div class="hl-row"><span>${h.info.title === 'Clean sweep!' ? '🧹 Clean sweep' : '⚪ Whitewash'} <small>Hand ${h.hand} · ${h.info.title === 'Clean sweep!' ? 'Bid' : 'They bid'} ${esc(h.contract)}</small></span><button class="hl-share" id="hl${i}">Share</button></div>`).join('')}</div>` : ''}
       ${S.isHost ? '<button class="primary" id="againBtn">Play again</button>' : '<p class="hint">Waiting for the host to start a new game.</p>'}
       ${ANDROID_WEB ? `<a class="get-app" href="${playUrl('game_over')}" target="_blank" rel="noopener"><span class="ga-ico">▶</span><span><b>Play in the free app</b><small>Get Patta Party on Google Play</small></span></a>` : ''}
@@ -1110,6 +1146,7 @@ function resultScreen() {
       } finally { if ($('shareWin')) { b.disabled = false; b.textContent = '🏆 Share your win'; } }
     };
     if (HL.key === S.code) HL.list.forEach((h, i) => bindShare('hl' + i, h.info, 'Share'));
+    bindNudge();
     if ($('againBtn')) $('againBtn').onclick = () => send('again');
     $('leaveOver').onclick = leaveTable;
     return;
@@ -1119,8 +1156,10 @@ function resultScreen() {
     ${R.deciderNext ? '<p><b>Scores are level after the last hand.</b> One decider hand to finish the game.</p>' : ''}
     <p>Next dealer: ${colourNames(R.next || '')}. Next hand in <b class="countdown" data-countdown>${Math.ceil((R.endsAt || 0) / 1000)}</b>s.</p>
     ${featShare(R) ? `<button class="share-win" id="shareFeat">${featShare(R).label}</button>` : ''}
+    ${nudgeHTML(R, false)}
     ${S.isHost ? '<button class="primary" id="nextBtn">Deal now</button>' : ''}`);
   if (featShare(R)) bindShare('shareFeat', featShare(R), featShare(R).label);
+  bindNudge();
   if ($('nextBtn')) $('nextBtn').onclick = () => send('next');
 }
 
