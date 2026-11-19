@@ -243,7 +243,7 @@ function skillOf(p) {
   const k = p.equipped && p.equipped.skill;
   return k != null ? k : ((p.games || 0) >= 5 ? 2 : 0);
 }
-function setSkill(p, k) { if (k <= skillOf(p)) return false; p.equipped = { ...(p.equipped || {}), skill: k }; save(p); return true; }
+function setSkill(p, k) { if (k <= skillOf(p)) return false; p.equipped = { ...(p.equipped || {}), skill: k }; if (!p._unsaved) save(p); return true; } // a new guest is saved only once they play
 function view(p) {
   if (!p) return null;
   const L = levelOf(p.xp), base = xpForLevel(L), next = xpForLevel(L + 1);
