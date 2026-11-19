@@ -154,6 +154,15 @@ function levelUp(t, info) {
     for (const { socket, pid: cp } of t.clients.values()) if (cp === s.pid) socket.emit('skill', { skill: want, up: true });
   }
 }
+// First games: only write when a try gets further than any earlier try (started 0, bid 1, trump 2, card 3, hands 4, finished 5)
+const FIRST_RANK = { started: 0, bid: 1, trump: 2, card: 3, hand: 4, finished: 5 };
+const firstBest = new Map();
+function firstStep(pid, rank, hands, patch) {
+  const b = firstBest.get(pid) || { rank: 0, hands: 0 };
+  if (rank < b.rank || (rank === b.rank && hands <= b.hands && rank >= 4)) { S.firstGame(pid, { left_early: false }); return; }
+  firstBest.set(pid, { rank, hands });
+  S.firstGame(pid, { ...patch, left_early: false });
+}
 function wireProgress(t) {
   t.isBeginner = isBeginner;
   t.onGameStart = () => S.logGame({ kind: 'start', ...tableInfo(t) });
@@ -166,9 +175,9 @@ function wireProgress(t) {
     if (t.first && !t.first.done) {
       const F = t.first, p = t.players.get(F.pid), seat = p && p.seat;
       F.rank = Math.max(F.rank, 4);
-      const patch = { step: info.over ? 'finished' : 'hand', hands: t.G.handNo, tutorial: !!t.coachUsed, left_early: false };
+      const patch = { step: info.over ? 'finished' : 'hand', hands: t.G.handNo, tutorial: !!t.coachUsed };
       if (info.over) { F.done = true; patch.finished = true; patch.won = seat != null ? info.gameWinner === seat % 2 : null; }
-      S.firstGame(F.pid, patch);
+      firstStep(F.pid, info.over ? 5 : 4, t.G.handNo, patch);
     }
     for (const s of info.seats) {
       if (!s.pid) continue;
@@ -218,8 +227,12 @@ io.on('connection', socket => {
     // A new player's very first game: record how far they get (admin "First games")
     if (opts && opts.first) {
       t.first = { pid, rank: 0 };
-      S.firstGame(pid, { name: String(name || '').slice(0, 20), uid: ((pidAuth.get(pid) || {}).profile || {}).id || null, app: !!socket.data.app, code, tries: Math.max(1, Math.min(99, +opts.first || 1)),
-        started_at: new Date().toISOString(), step: 'started', hands: 0, lim: t.limit || 0, tutorial: guided, finished: false, won: null, left_early: false });
+      const tries = Math.max(1, Math.min(99, +opts.first || 1));
+      const base = { name: String(name || '').slice(0, 20), uid: ((pidAuth.get(pid) || {}).profile || {}).id || null, app: !!socket.data.app, code, tries, lim: t.limit || 0, tutorial: guided, left_early: false };
+      // A new try keeps the furthest point any earlier try reached (and the first start time)
+      if (tries > 1 && !firstBest.has(pid)) S.firstGet(pid).then(r => { if (r && !firstBest.has(pid)) firstBest.set(pid, { rank: FIRST_RANK[r.step] || 0, hands: r.hands || 0 }); });
+      if (tries === 1) { firstBest.set(pid, { rank: 0, hands: 0 }); S.firstGame(pid, { ...base, started_at: new Date().toISOString(), step: 'started', hands: 0, finished: false, won: null }); }
+      else S.firstGame(pid, base);
     }
     wireProgress(t);
     tables.set(code, t);
@@ -304,7 +317,7 @@ io.on('connection', socket => {
     const err = table.act(pid, msg.kind, val);
     reply(cb, err);
     const F = table.first;
-    if (!err && F && F.pid === pid) { const rank = { bid: 1, trump: 2, play: 3 }[msg.kind] || 0; if (rank > F.rank) { F.rank = rank; S.firstGame(pid, { step: ['started', 'bid', 'trump', 'card'][rank], left_early: false }); } }
+    if (!err && F && F.pid === pid) { const rank = { bid: 1, trump: 2, play: 3 }[msg.kind] || 0; if (rank > F.rank) { F.rank = rank; firstStep(pid, rank, 0, { step: ['started', 'bid', 'trump', 'card'][rank] }); } }
   });
   socket.on('coach', (msg, cb) => { if (table) table.coach(pid, msg); reply(cb); });
   socket.on('hint', cb => { const h = table && table.hint(pid); reply(cb, h ? null : 'No hint', h || {}); });

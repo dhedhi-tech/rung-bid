@@ -71,6 +71,11 @@ function firstGame(pid, patch) {
     .catch(e => { if (!firstWarned) { firstWarned = true; console.error('first games:', e.message, '(run supabase-first.sql in Supabase)'); } });
 }
 
+async function firstGet(pid) {
+  if (!enabled) return firstMem.get(pid) || null;
+  try { const r = await sb(`/rest/v1/first_games?pid=eq.${encodeURIComponent(pid)}&select=step,hands,started_at`); return (r.data || [])[0] || null; } catch (e) { return null; }
+}
+
 // ---- report for the admin page ----
 async function report() {
   if (!enabled) return memReport();
@@ -130,4 +135,4 @@ function memReport() {
   return { daily, top: [], accounts: 0, memory: true, app, modes, first };
 }
 
-module.exports = { enabled, playerSeen, appSeen, logGame, firstGame, report, dayOf, sb };
+module.exports = { enabled, playerSeen, appSeen, logGame, firstGame, firstGet, report, dayOf, sb };
