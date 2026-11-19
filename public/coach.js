@@ -51,14 +51,22 @@
     const b = el();
     if (C && C.open && C.open.end) finished();
     const m = C && C.queue.shift();
-    if (!m) { if (C) C.open = null; b.hidden = true; send('coach', { hold: false }); return; }
+    if (!m) { if (C) C.open = null; b.hidden = true; dim(false); send('coach', { hold: false }); return; }
     C.open = m;
     show(m);
     b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
     if (!m.ask) send('coach', { hold: true }); // the game waits while you read (your own turn has no timer anyway)
   }
+  function dim(on) {
+    let d = $('coachDim');
+    if (!d) { d = document.createElement('div'); d.id = 'coachDim'; d.className = 'coach-dim'; d.hidden = true; document.body.appendChild(d);
+      d.onclick = () => { const ok = $('coachOk'); ok.classList.remove('nudge-ok'); void ok.offsetWidth; ok.classList.add('nudge-ok'); }; } // tapping outside points at the button
+    d.hidden = !on;
+  }
   function show(m) {
     const b = el(), ur = isUr();
+    dim(!m.ask); // a tip that pauses the game dims everything else, so it's clear the game waits for "Got it"
+    $('coachOk').classList.toggle('pulse', !m.ask);
     $('coachTxt').innerHTML = txt(m.html);
     $('coachTxt').dir = ur ? 'rtl' : 'ltr'; $('coachTxt').classList.toggle('ur', ur);
     $('coachLang').textContent = ur ? 'English' : 'اردو';
@@ -76,7 +84,7 @@
   }
   function skip() {
     if (!C) return;
-    C.off = true; C.queue = []; C.open = null; el().hidden = true; mark();
+    C.off = true; C.queue = []; C.open = null; el().hidden = true; dim(false); mark();
     send('coach', { off: true });
   }
   function finished() { store.set('rb-coached', '1'); }
@@ -206,7 +214,7 @@
     if (!C || C.code !== S.code) { reset(S.code); if (store.get('rb-coach') === '0' && store.get('rb-first') === 'done' && S.guided && me0()) { C.off = true; send('coach', { off: true }); } }
     // First game over: from now on the coach is off unless the player turns it on (Tutorial switch)
     if (S.phase === 'over' && !C.over) { C.over = true; if (store.get('rb-coach') == null) store.set('rb-coach', '0'); store.set('rb-first', 'done'); }
-    if (S.phase === 'game' && S.handNo === 1 && C.over) { C.over = false; C.shown = new Set(['start', 'deals', 'decks', 'jokerMode', 'bidRule', 'playRule', 'follow', 'tap', 'end']);
+    if (S.phase === 'game' && S.handNo === 1 && C.over) { C.over = false; C.shown = new Set(['start', 'team', 'deals', 'decks', 'jokerMode', 'bidRule', 'playRule', 'follow', 'tap', 'end']);
       if (store.get('rb-coach') === '0' && S.guided) { C.off = true; send('coach', { off: true }); } }
     if (!on()) {
       const key = askKeyOf();
@@ -215,8 +223,11 @@
     }
     hintBtn().hidden = true; stuckKey = ''; C.hint = null;
     if (S.round === 1) {
-      say('start', T(`<b>Welcome to guided practice!</b> I'll help you through your first game. You sit at the bottom. ${team()} <b class="pn ta">Orange</b> names are your team, <b class="pn tb">blue</b> are opponents. The bots wait for you, so take your time.`,
-        `<b>گائیڈڈ پریکٹس میں خوش آمدید!</b> پہلی گیم میں میں آپ کی مدد کروں گا۔ آپ نیچے بیٹھے ہیں۔ ${teamU()} <b class="pn ta">نارنجی</b> نام آپ کی ٹیم ہیں، <b class="pn tb">نیلے</b> مخالف۔ بوٹس آپ کا انتظار کرتے ہیں، آرام سے کھیلیں۔`));
+      // First tip: short, in both languages at once, so nobody is stuck on a wall of text
+      const hi = `<span class="hi-en">👋 <b>Welcome!</b> I'm your coach. I'll show you what to tap, step by step.</span><span class="hi-ur" dir="rtl">👋 <b>خوش آمدید!</b> میں آپ کا کوچ ہوں۔ میں بتاؤں گا کہاں ٹیپ کرنا ہے۔</span>`;
+      say('start', T(hi, hi));
+      say('team', T(`You sit at the bottom. ${team()} <b class="pn ta">Orange</b> = your team, <b class="pn tb">blue</b> = opponents. Take your time, the bots wait for you.`,
+        `آپ نیچے بیٹھے ہیں۔ ${teamU()} <b class="pn ta">نارنجی</b> = آپ کی ٹیم، <b class="pn tb">نیلے</b> = مخالف۔ آرام سے کھیلیں، بوٹس آپ کا انتظار کرتے ہیں۔`));
       say('deals', T('Cards come in 3 deals: 5, then 4, then 4 (13 each). After every deal there is a round of bidding. The highest bidder picks <b>trump</b>, the strongest suit for this hand.',
         'پتے 3 بار بٹتے ہیں: 5، پھر 4، پھر 4 (ہر ایک کو 13)۔ ہر بار کے بعد بولی لگتی ہے۔ سب سے بڑی بولی والا <b>ترپ</b> چنتا ہے، یعنی اس بازی کی سب سے طاقتور قسم۔'));
       if (S.n > 4) say('decks', T(`With ${S.n} players there are <b>2 decks</b>, so every card is there twice${S.n === 6 ? ' (the 2s, 3s and 4s are taken out)' : ''}. If two identical cards land in one trick, the one played <b>last</b> wins. So a second A♠ beats the first A♠!`,

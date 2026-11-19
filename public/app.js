@@ -1784,7 +1784,18 @@ $('leaveBtn').onclick = () => {
   if (!S) { homeScreen(); return; }
   const b = $('leaveBtn');
   if (!leaveArmed) { leaveArmed = true; b.textContent = 'Tap to leave'; b.classList.add('leave-confirm'); setTimeout(() => { leaveArmed = false; b.textContent = 'Leave'; b.classList.remove('leave-confirm'); }, 3000); return; }
-  leaveArmed = false; b.textContent = 'Leave'; b.classList.remove('leave-confirm'); leaveTable();
+  leaveArmed = false; b.textContent = 'Leave'; b.classList.remove('leave-confirm');
+  // First game: one gentle "are you sure", since new players often leave the coached game by mistake
+  if (S.guided && store.get('rb-first') !== 'done') {
+    openModal('leaveask', `<h2>Leave your first game?</h2><p class="hint">The coach shows you every step. It only takes a few minutes.</p>
+      <p class="hint" dir="rtl" style="text-align:right">کوچ ہر قدم پر مدد کرے گا۔ صرف چند منٹ لگیں گے۔</p>
+      <button class="primary" id="laStay">Keep playing</button><button class="linkbtn" id="laGo">Leave</button>`);
+    document.body.classList.add('asking-leave'); // hide the coach bubble while asking
+    const done = () => { document.body.classList.remove('asking-leave'); closeModal(); };
+    $('laStay').onclick = done; $('laGo').onclick = () => { done(); leaveTable(); };
+    return;
+  }
+  leaveTable();
 };
 window.addEventListener('resize', () => { if (S) { renderHand(); renderSeats(); renderTrickCards(); } });
 document.addEventListener('pointerdown', () => ac(), { once: true });
