@@ -140,22 +140,25 @@ function takeGuestGain(pid, profile) {
 // Skill stage (A.skillOf): 0 beginner, 1 Classic done, 2 Joker done. You move up by winning a game with the tutorial off.
 // Guests: the phone keeps it (rb-skill) and tells us on connect and when it changes.
 const guestSkill = new Map();
-const skillOf = p => { const a = pidAuth.get(p); return a ? A.skillOf(a.profile) : (guestSkill.get(p) || 0); };
+// Guests (not signed in) have a profile too, kept on their phone's player id (A.loadGuest, guest_profiles)
+const pidGuest = new Map();
+const profOf = p => { const a = pidAuth.get(p); return a ? a.profile : pidGuest.get(p) || null; };
+const skillOf = p => { const a = pidAuth.get(p); return a ? A.skillOf(a.profile) : Math.max(guestSkill.get(p) || 0, pidGuest.has(p) ? A.skillOf(pidGuest.get(p)) : 0); };
 const isBeginner = p => skillOf(p) < 1;
 function levelUp(t, info) {
   for (const s of info.seats) {
     if (!s.pid || info.gameWinner !== s.seat % 2 || t.coachUsed) continue;
     const want = t.joker ? 2 : 1, a = pidAuth.get(s.pid), cur = skillOf(s.pid);
     if (want <= cur) continue;
-    if (a) A.setSkill(a.profile, want); else guestSkill.set(s.pid, want);
+    if (a) A.setSkill(a.profile, want); else { guestSkill.set(s.pid, want); if (pidGuest.has(s.pid)) A.setSkill(pidGuest.get(s.pid), want); }
     for (const { socket, pid: cp } of t.clients.values()) if (cp === s.pid) socket.emit('skill', { skill: want, up: true });
   }
 }
 function wireProgress(t) {
   t.isBeginner = isBeginner;
   t.onGameStart = () => S.logGame({ kind: 'start', ...tableInfo(t) });
-  t.levelOf = p => { const a = pidAuth.get(p); return a ? A.levelOf(a.profile.xp) : null; };
-  t.avOf = p => { const a = pidAuth.get(p); return a ? A.avOf(a.profile) : null; };
+  t.levelOf = p => { const pr = profOf(p); return pr ? A.levelOf(pr.xp) : null; };
+  t.avOf = p => { const pr = profOf(p); return pr ? A.avOf(pr) : null; };
   t.idOf = p => { const a = pidAuth.get(p); return a ? a.profile.id : null; };
   t.onHandEnd = info => {
     if (info.over) S.logGame({ kind: 'finish', ...tableInfo(t), hands: t.G.handNo });
@@ -170,7 +173,13 @@ function wireProgress(t) {
     for (const s of info.seats) {
       if (!s.pid) continue;
       const a = pidAuth.get(s.pid);
-      if (!a) { guestGain(t, s.pid, A.handGains(info, s.seat)); continue; }
+      if (!a) {
+        const gp = pidGuest.get(s.pid);
+        if (!gp) { guestGain(t, s.pid, A.handGains(info, s.seat)); continue; }
+        const g = A.handGains(info, s.seat), gain = A.award(gp, g.xp, g.coins, g.stats);
+        for (const { socket, pid: cp } of t.clients.values()) if (cp === s.pid) socket.emit('profile', { profile: A.view(gp), gain });
+        continue;
+      }
       const g = A.handGains(info, s.seat);
       const gain = A.award(a.profile, g.xp, g.coins, g.stats);
       for (const { socket, pid: cp } of t.clients.values()) if (cp === s.pid) socket.emit('profile', { profile: A.view(a.profile), gain });
@@ -314,7 +323,11 @@ io.on('connection', socket => {
     S.playerSeen(pid, true, name, profile.id);
     if (socket.data.app) S.appSeen(pid, profile.id);
     const daily = A.claimDaily(profile);
-    const saved = takeGuestGain(pid, profile);
+    let saved = takeGuestGain(pid, profile);
+    // Everything earned as a guest on this phone moves into the account
+    { let gp = pidGuest.get(pid); if (!gp && A.enabled) { try { gp = await A.loadGuest(pid, name, false); } catch (e) { gp = null; } }
+      if (gp && (gp.xp || gp.games || (gp.owned || []).length > 1 || gp.coins > 50)) { const m = A.mergeGuest(profile, gp); if (m) saved = { xp: (saved ? saved.xp : 0) + m.xp, coins: (saved ? saved.coins : 0) + m.coins }; }
+      pidGuest.delete(pid); }
     if (table) table.broadcast();
     reply(cb, null, { profile: A.view(profile), daily });
     if (saved) socket.emit('profile', { profile: A.view(profile), gain: saved, saved: true });
@@ -327,6 +340,18 @@ io.on('connection', socket => {
     if (!A.DEV || A.enabled) return reply(cb, 'Not available');
     await signedIn({ id: 'dev-' + pid, name: cleanName(nm), avatar: '' }, cb);
   });
+  // Not signed in: load (or make) this phone's guest profile
+  socket.on('guest', async cb => {
+    if (pidAuth.has(pid)) return reply(cb, 'Signed in');
+    try {
+      const g = await A.loadGuest(pid, name); pidGuest.set(pid, g);
+      if (name && name !== 'Player' && g.name !== name) { g.name = name.slice(0, 14); A.save && A.save(g); }
+      if (guestSkill.get(pid)) A.setSkill(g, guestSkill.get(pid)); // stage the phone already reached
+      const daily = g._unsaved ? 0 : A.claimDaily(g); // daily coins once they have played
+      if (table) table.broadcast();
+      reply(cb, null, { profile: A.view(g), daily });
+    } catch (e) { console.error('guest', e.message); reply(cb, 'Could not load your progress'); }
+  });
   socket.on('signout', cb => { if (socket.data.uid) { goOffline(socket.data.uid, socket); socket.data.uid = null; } pidAuth.delete(pid); if (table) table.broadcast(); reply(cb); });
   socket.on('deleteAccount', async cb => {
     const id = socket.data.uid; if (!id) return reply(cb, 'Not signed in');
@@ -338,11 +363,11 @@ io.on('connection', socket => {
     reply(cb);
   });
   socket.on('buy', (item, cb) => {
-    const a = pidAuth.get(pid); if (!a) return reply(cb, 'Sign in to collect coins');
+    const pr = profOf(pid); if (!pr) return reply(cb, 'Please wait a moment and try again'); const a = { profile: pr };
     const err = A.buy(a.profile, String(item)); reply(cb, err, { profile: A.view(a.profile) });
   });
   socket.on('setPic', async (val, cb) => {
-    const a = pidAuth.get(pid); if (!a) return reply(cb, 'Sign in to choose a picture');
+    const pr = profOf(pid); if (!pr) return reply(cb, 'Please wait a moment and try again'); const a = { profile: pr };
     const now = Date.now(); if (socket.data.lastPic && now - socket.data.lastPic < 1500) return reply(cb, 'Slow down a little'); socket.data.lastPic = now;
     const err = await A.setPic(a.profile, val);
     if (!err && table) table.broadcast();
@@ -433,7 +458,7 @@ io.on('connection', socket => {
     } catch (e) { console.error('report', e.message); done.delete(key); reply(cb, 'Could not send the report. Try again in a minute.'); }
   });
   socket.on('equip', (item, cb) => {
-    const a = pidAuth.get(pid); if (!a) return reply(cb, 'Sign in first');
+    const pr = profOf(pid); if (!pr) return reply(cb, 'Please wait a moment and try again'); const a = { profile: pr };
     const err = A.equip(a.profile, String(item)); reply(cb, err, { profile: A.view(a.profile) });
   });
 

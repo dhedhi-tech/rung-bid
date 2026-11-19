@@ -506,7 +506,7 @@ function takeName() {
 }
 // Beginners (guest, or under 5 games): Joker locked, setup shows only name + Start, the rest under "More options"
 // Skill stage: 0 beginner (Classic with bots), 1 Classic done, 2 Joker done. Up by winning a game with the tutorial off (server sends 'skill').
-const mySkill = () => Math.max(PROFILE && PROFILE.skill != null ? PROFILE.skill : 0, +(store.get('rb-skill') || 0));
+const mySkill = () => Math.max(PROFILE && PROFILE.skill != null ? PROFILE.skill : 0, GPROF && GPROF.skill != null ? GPROF.skill : 0, +(store.get('rb-skill') || 0));
 const isBeginner = () => mySkill() < 1;
 const COACH_FIELD = '<div class="field"><span>🎓 Coach tips</span><div class="seg text" id="segC"><button data-c="1">On</button><button data-c="0">Off</button></div></div>';
 // Coach default: on for the first game; afterwards what the player last chose (rb-coach)
@@ -579,6 +579,15 @@ function joinSheet() {
 /* ---------- accounts: sign in, profile, levels, coins ---------- */
 let FRQ = 0; // friend requests waiting
 let AUTH = { auth: false }, PROFILE = null, sbClient = null, sbToken = null;
+// Guests keep a profile too (XP, level, coins, themes, picture) on this phone; signing in moves it into the account
+let GPROF = null;
+const ME = () => PROFILE || GPROF;
+const setMe = p => { if (p && p.guest) GPROF = p; else PROFILE = p; };
+async function loadGuest() {
+  if (PROFILE || !sock.connected) return;
+  const r = await send('guest');
+  if (r && r.ok && !PROFILE) { GPROF = r.profile; applyFelt(); renderChip(); if (r.daily) setTimeout(() => gainToast(`Daily reward · +${r.daily} coins`), 600); }
+}
 // Running inside the Patta Party Android app (the app adds "PattaPartyApp" to the user agent)
 const NATIVE_APP = /PattaPartyApp/.test(navigator.userAgent || '');
 const APP_AUTH_URL = 'com.dhedhitech.pattaparty://auth';
@@ -684,12 +693,12 @@ function nudgeHTML(R, over) {
       NUDGE.hand = R.handNo; store.set('rb-nudge', String(nudgeGames() + 1));
     }
     if (NUDGE.later) return '';
-    return `<div class="nudge" id="nudge"><div class="ng-txt"><b>+${GG.last.xp} XP this hand</b><span>Guests don't keep XP and coins. Sign in with Google to save them, this game too.</span></div>
+    return `<div class="nudge" id="nudge"><div class="ng-txt"><b>+${GG.last.xp} XP this hand</b><span>${GPROF ? 'Saved on this phone. Sign in with Google to keep it safe, even on a new phone.' : 'Guests don\'t keep XP and coins. Sign in with Google to save them, this game too.'}</span></div>
       <div class="ng-btns"><button class="gbtn" id="ngSign">${G_LOGO}Sign in</button><button class="linkbtn" id="ngLater">Later</button></div></div>`;
   }
   if (!NUDGE.hand || (NUDGE.over && NUDGE.over !== R.handNo)) return '';
   NUDGE.over = R.handNo;
-  return `<div class="nudge" id="nudge"><div class="ng-txt"><b>You earned ${GG.xp} XP${GG.coins ? ` and ${GG.coins} coins` : ''}</b><span>Sign in with Google now to save them to your profile.</span></div>
+  return `<div class="nudge" id="nudge"><div class="ng-txt"><b>You earned ${GG.xp} XP${GG.coins ? ` and ${GG.coins} coins` : ''}</b><span>${GPROF ? 'Sign in with Google so your progress is safe on any phone.' : 'Sign in with Google now to save them to your profile.'}</span></div>
     <div class="ng-btns"><button class="gbtn" id="ngSign">${G_LOGO}Sign in</button></div></div>`;
 }
 function bindNudge() {
@@ -770,17 +779,17 @@ async function initAuth() {
 function setToken(t) {
   if (t === sbToken) return;
   sbToken = t;
-  if (t) authNow(); else { PROFILE = null; applyFelt(); renderChip(); }
+  if (t) authNow(); else { PROFILE = null; applyFelt(); renderChip(); loadGuest(); }
 }
 async function authNow() {
   if (!sock.connected) return;
   let r = null;
   if (sbToken) r = await send('auth', sbToken);
   else if (AUTH.dev && store.get('rb-dev')) r = await send('devLogin', store.get('rb-dev'));
-  if (r && r.ok) gotProfile(r.profile, r.daily);
+  if (r && r.ok) gotProfile(r.profile, r.daily); else loadGuest();
 }
 function gotProfile(p, daily) {
-  PROFILE = p;
+  PROFILE = p; GPROF = null;
   { const local = +(store.get('rb-skill') || 0); // progress made as a guest moves into the account
     if (local > (p.skill || 0)) { p.skill = local; send('skill', local); } else store.set('rb-skill', String(p.skill || 0)); }
   if (!myName && p.name) setName(p.name.split(' ')[0]);
@@ -810,7 +819,7 @@ function signIn() {
 async function signOut() {
   if (sbClient) { try { await sbClient.auth.signOut(); } catch (e) {} }
   store.set('rb-dev', ''); sbToken = null; PROFILE = null;
-  send('signout'); applyFelt(); renderChip(); closeModal();
+  await send('signout'); applyFelt(); renderChip(); closeModal(); loadGuest();
 }
 // Country from the phone's time zone, so bots get local names (India, Bangladesh; everyone else Pakistani names)
 function myRegion() {
@@ -828,9 +837,10 @@ function avatarHTML(p, cls = '', team = '') {
 function renderChip() {
   renderInvAuth();
   const el = $('wChip'); if (!el) return;
-  if (PROFILE) {
-    const pct = Math.round(100 * PROFILE.levelXp / PROFILE.levelNeed);
-    el.innerHTML = `<button class="pchip" id="pchip">${avatarHTML(PROFILE)}<span class="pc-text"><b>${esc(PROFILE.name)}</b><span class="pc-lvl">Level ${PROFILE.level}<i style="--p:${pct}%"></i></span></span><span class="pc-coins">● ${PROFILE.coins}</span>${FRQ ? `<span class="fr-badge">${FRQ}</span>` : ''}</button>`;
+  const MEP = ME();
+  if (MEP) {
+    const pct = Math.round(100 * MEP.levelXp / MEP.levelNeed);
+    el.innerHTML = `<button class="pchip" id="pchip">${avatarHTML(MEP.guest ? { ...MEP, name: myName || MEP.name } : MEP)}<span class="pc-text"><b>${esc(MEP.guest ? (myName || MEP.name) : MEP.name)}</b><span class="pc-lvl">Level ${MEP.level}<i style="--p:${pct}%"></i></span></span><span class="pc-coins">● ${MEP.coins}</span>${FRQ ? `<span class="fr-badge">${FRQ}</span>` : ''}</button>`;
     $('pchip').onclick = profileSheet;
   } else if (AUTH.auth) {
     el.innerHTML = `<button class="gbtn" id="gSignIn"><svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17.5z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>Sign in with Google</button>
@@ -839,8 +849,8 @@ function renderChip() {
   } else el.innerHTML = '';
 }
 function profileSheet() {
-  if (!PROFILE) return;
-  const P = PROFILE, pct = Math.round(100 * P.levelXp / P.levelNeed);
+  if (!ME()) return;
+  const P = ME(), pct = Math.round(100 * P.levelXp / P.levelNeed), guest = !!P.guest;
   const rate = P.games ? Math.round(100 * P.wins / P.games) + '%' : '–';
   const store_ = P.store.map(it => {
     const on = P.equipped && P.equipped.felt === it.id;
@@ -848,7 +858,7 @@ function profileSheet() {
       : it.locked ? `<span class="st-lock">Level ${it.level}</span>` : `<button class="secondary st-btn" data-buy="${it.id}"><span class="coin">●</span> ${it.price}</button>`;
     return `<div class="st-item"><span class="swatch" data-sw="${it.id}"></span><span class="st-name">${esc(it.name)}</span>${btn}</div>`;
   }).join('');
-  openModal('profile', `<div class="prof-head"><button class="av-edit" id="avEdit" aria-label="Change picture">${avatarHTML(P, 'big')}<span>Change</span></button><div><h2>${esc(P.name)}</h2><span class="pc-coins">● ${P.coins} coins</span></div></div>
+  openModal('profile', `<div class="prof-head"><button class="av-edit" id="avEdit" aria-label="Change picture">${avatarHTML(guest ? { ...P, name: myName || P.name } : P, 'big')}<span>Change</span></button><div><h2>${esc(guest ? (myName || P.name) : P.name)}</h2><span class="pc-coins">● ${P.coins} coins</span></div></div>
     <div class="lvlbar"><div class="lvl-top"><b>Level ${P.level}</b><span>${P.levelXp} / ${P.levelNeed} XP</span></div><div class="lvl-track"><i style="width:${pct}%"></i></div></div>
     <div class="res-grid">
       <div><span>Games</span><b>${P.games}</b></div><div><span>Wins</span><b>${P.wins} · ${rate}</b></div>
@@ -858,19 +868,22 @@ function profileSheet() {
     <div class="eyebrow">Table themes</div>
     <div class="store" id="storeList">${store_}</div>
     <p class="hint">Earn XP every hand and coins for every game. Bigger wins earn more.</p>
-    <button class="secondary fr-open" id="frOpen">👥 Friends${FRQ ? ` <span class="fr-badge in">${FRQ} new</span>` : ''}</button>
+    ${guest ? `<div class="guest-save"><b>Saved on this phone</b><span>Sign in with Google to keep it safe if you change phone, and to add friends and join the leaderboard.</span>${AUTH.auth ? `<button class="gbtn" id="gpSign">${G_LOGO}Sign in with Google</button>` : ''}</div>`
+      : `<button class="secondary fr-open" id="frOpen">👥 Friends${FRQ ? ` <span class="fr-badge in">${FRQ} new</span>` : ''}</button>`}
     <button class="primary" id="profClose">Done</button>
-    <button class="linkbtn" id="signOutBtn">Sign out</button>
-    <button class="linkbtn del-acc" id="delAccBtn">Delete my account</button>`);
+    ${guest ? '' : `<button class="linkbtn" id="signOutBtn">Sign out</button>
+    <button class="linkbtn del-acc" id="delAccBtn">Delete my account</button>`}`);
   $('profClose').onclick = closeModal;
-  $('signOutBtn').onclick = signOut;
-  $('delAccBtn').onclick = deleteAccountSheet;
+  if ($('signOutBtn')) $('signOutBtn').onclick = signOut;
+  if ($('delAccBtn')) $('delAccBtn').onclick = deleteAccountSheet;
+  if ($('gpSign')) $('gpSign').onclick = signIn;
   $('avEdit').onclick = picSheet;
-  $('frOpen').onclick = () => friendsSheet('profile');
+  if ($('frOpen')) $('frOpen').onclick = () => friendsSheet('profile');
   $('storeList').onclick = async e => {
     const b = e.target.closest('button'); if (!b) return;
     const r = b.dataset.buy ? await send('buy', b.dataset.buy) : await send('equip', b.dataset.equip);
-    if (r && r.ok) { PROFILE = r.profile; applyFelt(); renderChip(); profileSheet(); if (b.dataset.buy) sfx('win'); }
+    if (r && r.ok) { setMe(r.profile); applyFelt(); renderChip(); profileSheet(); if (b.dataset.buy) sfx('win'); }
+    else if (r && r.error) flash(r.error);
   };
 }
 function deleteAccountSheet() {
@@ -889,18 +902,18 @@ function deleteAccountSheet() {
 // Choose a profile picture: Google photo, a ready-made avatar, or an uploaded photo
 const AVATARS = ['🦁', '🐯', '🦊', '🐼', '🐨', '🐸', '🦉', '🐺', '🐻', '🦄', '🐵', '🐲', '🦅', '🐬', '🐝', '🌹'];
 function picSheet() {
-  if (!PROFILE) return;
-  const cur = PROFILE.pic || '';
+  if (!ME()) return;
+  const P = ME(), cur = P.pic || '';
   openModal('pic', `<div class="eyebrow">Profile picture</div><h2>Choose your picture</h2>
     <div class="pic-grid" id="picGrid">
-      ${PROFILE.avatar ? `<button data-pic="" class="${cur === '' ? 'on' : ''}"><img class="avatar big" src="${esc(PROFILE.avatar)}" alt="" referrerpolicy="no-referrer"><small>Google</small></button>` : ''}
+      ${P.avatar ? `<button data-pic="" class="${cur === '' ? 'on' : ''}"><img class="avatar big" src="${esc(P.avatar)}" alt="" referrerpolicy="no-referrer"><small>Google</small></button>` : ''}
       ${Array.from({ length: 12 }, (_, i) => `<button data-pic="a:${i}" class="${cur === 'a:' + i ? 'on' : ''}"><img class="avatar char big" src="/avatars/${i}.svg" alt=""></button>`).join('')}
       ${AVATARS.map((e, i) => `<button data-pic="e:${i}" class="${cur === 'e:' + i ? 'on' : ''}"><span class="avatar emo big">${e}</span></button>`).join('')}
     </div>
     <label class="secondary pic-up">${cur === 'u' ? 'Upload a new photo' : 'Upload your photo'}<input type="file" id="picFile" accept="image/*" hidden></label>
     <div class="err" id="picErr"></div>
     <button class="linkbtn" id="picBack">Back</button>`);
-  const save = async val => { const r = await send('setPic', val); if (r && r.ok) { PROFILE = r.profile; renderChip(); profileSheet(); } else if (r && r.error && $('picErr')) $('picErr').textContent = r.error; };
+  const save = async val => { const r = await send('setPic', val); if (r && r.ok) { setMe(r.profile); renderChip(); profileSheet(); } else if (r && r.error && $('picErr')) $('picErr').textContent = r.error; };
   $('picGrid').onclick = e => { const b = e.target.closest('button[data-pic]'); if (b) save(b.dataset.pic); };
   $('picBack').onclick = profileSheet;
   $('picFile').onchange = async e => {
@@ -1070,7 +1083,7 @@ async function playerCard(realSeat) {
   const fb = document.querySelector('.fr-btn[data-fr]');
   if (fb) fb.onclick = async () => { fb.disabled = true; const r = await send(fb.dataset.fr === 'accept' ? 'friend:accept' : 'friend:add', c.fid); if (r && r.ok) playerCard(realSeat); else fb.disabled = false; };
 }
-function applyFelt() { document.documentElement.dataset.felt = PROFILE && PROFILE.equipped ? PROFILE.equipped.felt || 'green' : 'green'; }
+function applyFelt() { const P = ME(); document.documentElement.dataset.felt = P && P.equipped ? P.equipped.felt || 'green' : 'green'; }
 function gainToast(text, big) {
   const t = document.createElement('div'); t.className = 'gain' + (big ? ' big' : ''); t.innerHTML = text;
   document.body.appendChild(t); setTimeout(() => t.remove(), big ? 3200 : 2600);
@@ -1079,7 +1092,10 @@ sockReady.push(() => {
   sock.on('skill', ({ skill, up }) => { store.set('rb-skill', String(Math.max(skill, +(store.get('rb-skill') || 0)))); if (PROFILE) PROFILE.skill = skill; if (up) LEVELUP = { skill, code: S && S.code }; });
   sock.on('guestGain', g => { if (PROFILE) return; GG = { xp: g.totalXp, coins: g.totalCoins, last: g }; });
   sock.on('profile', ({ profile, gain, saved }) => {
-    PROFILE = profile; applyFelt(); renderChip();
+    if (profile && profile.guest && PROFILE) return;
+    if (profile) profile.skill = Math.max(profile.skill || 0, +(store.get('rb-skill') || 0));
+    setMe(profile); applyFelt(); renderChip();
+    if (profile && profile.guest && gain) GG = { xp: (GG.xp || 0) + gain.xp, coins: (GG.coins || 0) + gain.coins, last: gain, total: profile.xp };
     if (saved) { GG = { xp: 0, coins: 0, last: null }; const n = $('nudge'); if (n) n.remove(); }
     if (gain && (gain.xp || gain.coins)) setTimeout(() => gainToast(`${saved ? 'Saved to your profile · ' : ''}+${gain.xp} XP${gain.coins ? ` · +${gain.coins} coins` : ''}`), saved ? 3400 : 900); // after the daily reward toast
     if (gain && gain.levelUp) setTimeout(() => { gainToast(`<b>Level ${gain.levelUp}!</b><span>+${50} bonus coins</span>`, true); confetti(['#f4a93a', '#fbf7ef', '#82d48e'], 1600, 90); sfx('win'); }, 1800);

@@ -71,14 +71,53 @@ async function load(user) {
   cache.set(user.id, p);
   return p;
 }
+// Guests (not signed in) get the same kind of profile, keyed by the phone's player id, in guest_profiles (supabase-guests.sql)
+const tableOf = p => (p._guest ? 'guest_profiles' : 'profiles');
+async function loadGuest(pid, name, create = true) {
+  const key = 'g:' + pid;
+  if (cache.has(key)) return cache.get(key);
+  const fresh = { id: pid, name: String(name || 'Guest').slice(0, 14), avatar: '', xp: 0, coins: 50, games: 0, wins: 0, hands: 0, hand_wins: 0,
+    bids_made: 0, bids_total: 0, sweeps: 0, last_daily: null, owned: ['green'], equipped: { felt: 'green' } };
+  let p = null;
+  if (enabled) {
+    const rows = await sb(`/rest/v1/guest_profiles?id=eq.${encodeURIComponent(pid)}&select=*`);
+    p = rows && rows[0];
+    if (!p && !create) return null;
+    if (!p) p = { ...fresh, _unsaved: true }; // saved on the first change (e.g. after a hand), so visitors who never play leave no row
+  } else { if (!create) return null; p = fresh; }
+  if (!Array.isArray(p.owned)) p.owned = ['green'];
+  if (!p.equipped || typeof p.equipped !== 'object') p.equipped = { felt: 'green' };
+  p._guest = true;
+  cache.set(key, p);
+  return p;
+}
+// Signing in: everything the guest earned moves into the account, then the guest profile is removed
+function mergeGuest(acct, g) {
+  if (!g) return null;
+  const stats = {}; for (const k of ['games', 'wins', 'hands', 'hand_wins', 'bids_made', 'bids_total', 'sweeps']) if (g[k]) stats[k] = g[k];
+  acct.owned = [...new Set([...(acct.owned || []), ...(g.owned || [])])];
+  const gs = g.equipped && g.equipped.skill;
+  if (gs != null && gs > skillOf(acct)) acct.equipped = { ...(acct.equipped || {}), skill: gs };
+  if (!acct.pic && g.pic) acct.pic = g.pic;
+  const gain = award(acct, g.xp || 0, Math.max(0, (g.coins || 0) - 50), stats); // the 50 starting coins are not counted twice
+  cache.delete('g:' + g.id); clearTimeout(saveTimers.get(g.id)); saveTimers.delete(g.id);
+  if (enabled) sb(`/rest/v1/guest_profiles?id=eq.${encodeURIComponent(g.id)}`, { method: 'DELETE' }).catch(() => {});
+  if (acct.pic && enabled) sb(`/rest/v1/profiles?id=eq.${encodeURIComponent(acct.id)}`, { method: 'PATCH', body: JSON.stringify({ pic: acct.pic }) }).catch(() => {});
+  return gain;
+}
 const saveTimers = new Map();
 function save(p) {
   if (!enabled) return;
   clearTimeout(saveTimers.get(p.id));
   saveTimers.set(p.id, setTimeout(() => {
     saveTimers.delete(p.id);
-    const { id, pic, ...fields } = p; // the picture is saved on its own (see setPic)
-    sb(`/rest/v1/profiles?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(fields) }).catch(e => console.error('save profile', e.message));
+    const { id, pic, _guest, _unsaved, ...fields } = p; // the picture is saved on its own (see setPic)
+    if (_unsaved) { // a new guest's first save: create the row
+      delete p._unsaved;
+      sb('/rest/v1/guest_profiles?on_conflict=id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id, pic: pic || null, ...fields }) }).catch(e => console.error('save guest', e.message));
+      return;
+    }
+    sb(`/rest/v1/${tableOf(p)}?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(fields) }).catch(e => console.error('save profile', e.message));
   }, 800));
 }
 
@@ -99,15 +138,19 @@ async function setPic(p, val) {
   if (!(val === '' || /^a:\d+$/.test(val) && +val.slice(2) < CHARS || /^e:\d+$/.test(val) && AVATARS[+val.slice(2)] || /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(val) && val.length <= 60000)) return 'That picture is not allowed';
   p.pic = val;
   if (enabled) {
-    try { await sb(`/rest/v1/profiles?id=eq.${encodeURIComponent(p.id)}`, { method: 'PATCH', body: JSON.stringify({ pic: val }) }); }
+    if (p._unsaved) { save(p); return null; }
+    try { await sb(`/rest/v1/${tableOf(p)}?id=eq.${encodeURIComponent(p.id)}`, { method: 'PATCH', body: JSON.stringify({ pic: val }) }); }
     catch (e) { console.error('save picture', e.message); return 'Could not save the picture. Try again later.'; }
   }
   return null;
 }
 async function picData(id) {
-  let pic = cache.has(id) ? cache.get(id).pic : null;
+  let pic = cache.has(id) ? cache.get(id).pic : cache.has('g:' + id) ? cache.get('g:' + id).pic : null;
   if (pic == null && enabled && /^[0-9a-f-]{36}$/.test(id)) {
     try { const r = await sb(`/rest/v1/profiles?id=eq.${id}&select=pic`); pic = r && r[0] ? r[0].pic : null; } catch (e) { pic = null; }
+  }
+  if (pic == null && enabled && /^p[a-z0-9]{8,30}$/.test(id)) { // a guest's uploaded photo
+    try { const r = await sb(`/rest/v1/guest_profiles?id=eq.${id}&select=pic`); pic = r && r[0] ? r[0].pic : null; } catch (e) { pic = null; }
   }
   return pic && String(pic).startsWith('data:image/') ? pic : null;
 }
@@ -207,7 +250,7 @@ function view(p) {
   return {
     name: p.name, avatar: p.avatar, av: avOf(p), pic: p.pic && !p.pic.startsWith('data:') ? p.pic : (p.pic ? 'u' : ''), level: L, xp: p.xp, levelXp: p.xp - base, levelNeed: next - base, coins: p.coins,
     games: p.games, wins: p.wins, hands: p.hands, handWins: p.hand_wins, bidsMade: p.bids_made, bidsTotal: p.bids_total, sweeps: p.sweeps,
-    owned: p.owned, equipped: p.equipped, skill: skillOf(p),
+    owned: p.owned, equipped: p.equipped, skill: skillOf(p), guest: !!p._guest,
     store: Object.entries(STORE).map(([id, it]) => ({ id, ...it, owned: p.owned.includes(id), locked: !!(it.level && L < it.level) })),
   };
 }
@@ -241,5 +284,5 @@ function handGains(info, seatIdx) {
 
 module.exports = {
   enabled, DEV, config: () => ({ auth: enabled || DEV, supabaseUrl: enabled ? SB_URL : '', anonKey: enabled ? ANON : '', dev: DEV && !enabled }),
-  verify, load, view, deleteAccount, avOf, leaderboard, people, setPic, picData, AVATARS, award, claimDaily, buy, equip, handGains, levelOf, STORE, XP, COINS, skillOf, setSkill,
+  verify, load, view, deleteAccount, avOf, leaderboard, people, setPic, picData, AVATARS, award, claimDaily, buy, equip, handGains, levelOf, STORE, XP, COINS, skillOf, setSkill, loadGuest, mergeGuest, save,
 };
