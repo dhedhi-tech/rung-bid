@@ -62,6 +62,15 @@ function logGame(row) {
   sb('/rest/v1/game_log', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(r) }).catch(quiet);
 }
 
+// ---- first games: how far a new player gets in their very first game (supabase-first.sql) ----
+const firstMem = new Map(); let firstWarned = false;
+function firstGame(pid, patch) {
+  const row = { pid, ...patch, updated_at: new Date().toISOString() };
+  if (!enabled) { firstMem.set(pid, { ...(firstMem.get(pid) || { started_at: row.updated_at }), ...row }); return; }
+  sb('/rest/v1/first_games?on_conflict=pid', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(row) })
+    .catch(e => { if (!firstWarned) { firstWarned = true; console.error('first games:', e.message, '(run supabase-first.sql in Supabase)'); } });
+}
+
 // ---- report for the admin page ----
 async function report() {
   if (!enabled) return memReport();
@@ -90,7 +99,9 @@ async function report() {
     const since = new Date(Date.now() - 30 * 86400000).toISOString();
     modes = countModes((await sb(`/rest/v1/game_log?select=n,joker,lim&kind=eq.start&at=gte.${since}&limit=50000`)).data || []);
   } catch (e) { modes = null; }
-  return { daily: daily.data || [], top: top.data || [], accounts: total, recent: recent.data || [], app, people, retention, modes };
+  let first = null;
+  try { first = (await sb('/rest/v1/first_games?select=*&order=started_at.desc&limit=40')).data || []; } catch (e) { first = null; }
+  return { daily: daily.data || [], top: top.data || [], accounts: total, recent: recent.data || [], app, people, retention, modes, first };
 }
 function countModes(rows) {
   const m = {}; for (const n of [4, 6, 8]) m[n] = { joker: 0, plain: 0 };
@@ -115,7 +126,8 @@ function memReport() {
   });
   const app = [...mem.app.entries()].map(([k, uid]) => ({ day: k.split('|')[0], pid: k.split('|')[1], uid }));
   const modes = countModes(mem.log.filter(l => l.kind === 'start' && Date.now() - l.at < 30 * 86400000));
-  return { daily, top: [], accounts: 0, memory: true, app, modes };
+  const first = [...firstMem.values()].sort((a, b) => (b.started_at > a.started_at ? 1 : -1));
+  return { daily, top: [], accounts: 0, memory: true, app, modes, first };
 }
 
-module.exports = { enabled, playerSeen, appSeen, logGame, report, dayOf, sb };
+module.exports = { enabled, playerSeen, appSeen, logGame, firstGame, report, dayOf, sb };

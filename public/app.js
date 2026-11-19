@@ -458,10 +458,11 @@ function setSkill(k) {
   store.set('rb-skill', String(k)); if (PROFILE) PROFILE.skill = k;
   if (sock.connected) send('skill', k);
 }
+let FIRST_TRY = 0; // set while starting a new player's first game, so the server records how far they get
 function startFirstGame() {
   ac(); store.set('rb-started', '1');
   const first = store.get('rb-first') !== 'done';
-  if (first) store.set('rb-first', 'started');
+  if (first) { store.set('rb-first', 'started'); FIRST_TRY = (+(store.get('rb-first-tries') || 0)) + 1; store.set('rb-first-tries', String(FIRST_TRY)); }
   if (!myName) setName('Guest ' + (100 + Math.floor(Math.random() * 900))); // they can change it later
   // First game: tutorial on. After that it is off unless the player turned it on (they move up by winning without it)
   homeN = 4; homeJ = false; homeL = 6; homePub = false; homeCoach = first || store.get('rb-coach') === '1';
@@ -1678,7 +1679,8 @@ async function createTable(practice) {
     practice = true; homeN = 4; homePub = false;
     homeCoach = !store.get('rb-jtrain') || store.get('rb-coach') === '1'; store.set('rb-jtrain', '1');
   }
-  const r = await send('create', { n: homeN, joker: homeJ, limit: homeL, pub: homePub, swap: !practice && !homePub && homeSwap, guided: !!(practice && homeCoach), region: myRegion() });
+  const r = await send('create', { n: homeN, joker: homeJ, limit: homeL, pub: homePub, swap: !practice && !homePub && homeSwap, guided: !!(practice && homeCoach), region: myRegion(), first: FIRST_TRY || undefined });
+  FIRST_TRY = 0;
   awaitingCreate = false;
   if (!r || !r.ok) return;
   tableCode = r.code; history.replaceState(null, '', '/?t=' + r.code); store.set('rb-table', r.code);

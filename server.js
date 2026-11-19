@@ -160,6 +160,13 @@ function wireProgress(t) {
   t.onHandEnd = info => {
     if (info.over) S.logGame({ kind: 'finish', ...tableInfo(t), hands: t.G.handNo });
     if (info.over) try { levelUp(t, info); } catch (e) { console.error('skill', e); }
+    if (t.first && !t.first.done) {
+      const F = t.first, p = t.players.get(F.pid), seat = p && p.seat;
+      F.rank = Math.max(F.rank, 4);
+      const patch = { step: info.over ? 'finished' : 'hand', hands: t.G.handNo, tutorial: !!t.coachUsed, left_early: false };
+      if (info.over) { F.done = true; patch.finished = true; patch.won = seat != null ? info.gameWinner === seat % 2 : null; }
+      S.firstGame(F.pid, patch);
+    }
     for (const s of info.seats) {
       if (!s.pid) continue;
       const a = pidAuth.get(s.pid);
@@ -188,7 +195,7 @@ io.on('connection', socket => {
   if (socket.data.app) S.appSeen(pid, null);
 
   const reply = (cb, err, data) => { if (typeof cb === 'function') cb(err ? { error: err } : { ok: true, ...data }); };
-  const leave = () => { socket.data.tableCode = null; if (table) { table.removeClient(socket.id); socket.leave(table.code); table = null; } };
+  const leave = () => { socket.data.tableCode = null; if (table) { if (table.first && table.first.pid === pid && !table.first.done) S.firstGame(pid, { left_early: true }); table.removeClient(socket.id); socket.leave(table.code); table = null; } };
   // removeClient also drops this socket from voice chat and tells the others
 
   socket.on('create', (opts, cb) => {
@@ -199,6 +206,12 @@ io.on('connection', socket => {
     const t = new Table(code, { n, joker: !!(opts && opts.joker) && (skillOf(pid) >= 2 || (skillOf(pid) >= 1 && !(opts && opts.pub))), hostId: pid, limit: opts && Number(opts.limit), pub: !!(opts && opts.pub) && !guided, swap: !!(opts && opts.swap) && !guided, region: opts && ['pk', 'in', 'bd'].includes(opts.region) ? opts.region : 'pk' }, io);
     t.guided = guided;
     t.beginnerTable = isBeginner(pid); // made by a beginner: only these show in a beginner's Open tables list
+    // A new player's very first game: record how far they get (admin "First games")
+    if (opts && opts.first) {
+      t.first = { pid, rank: 0 };
+      S.firstGame(pid, { name: String(name || '').slice(0, 20), uid: ((pidAuth.get(pid) || {}).profile || {}).id || null, app: !!socket.data.app, code, tries: Math.max(1, Math.min(99, +opts.first || 1)),
+        started_at: new Date().toISOString(), step: 'started', hands: 0, lim: t.limit || 0, tutorial: guided, finished: false, won: null, left_early: false });
+    }
     wireProgress(t);
     tables.set(code, t);
     leave(); table = t; socket.data.tableCode = t.code; t.addClient(socket, pid, name);
@@ -279,7 +292,10 @@ io.on('connection', socket => {
     if (msg.kind === 'bid') val = val === null || val === 0 ? null : Number(val);
     if (msg.kind === 'play') val = Number(val);
     if (msg.kind === 'trump') val = String(val);
-    reply(cb, table.act(pid, msg.kind, val));
+    const err = table.act(pid, msg.kind, val);
+    reply(cb, err);
+    const F = table.first;
+    if (!err && F && F.pid === pid) { const rank = { bid: 1, trump: 2, play: 3 }[msg.kind] || 0; if (rank > F.rank) { F.rank = rank; S.firstGame(pid, { step: ['started', 'bid', 'trump', 'card'][rank], left_early: false }); } }
   });
   socket.on('coach', (msg, cb) => { if (table) table.coach(pid, msg); reply(cb); });
   socket.on('hint', cb => { const h = table && table.hint(pid); reply(cb, h ? null : 'No hint', h || {}); });

@@ -42,6 +42,18 @@ td.away3{color:#f4a93a;font-weight:700}td.away7{color:#ff6b6b;font-weight:800}td
 <script>
 const app = document.getElementById('app');
 let key = ''; try { key = sessionStorage.getItem('adminKey') || ''; } catch (e) {}
+// New players' very first game: how far they got (supabase-first.sql)
+function firstGamesHTML(F) {
+  if (F == null) return '<h2>First games</h2><div class="note">Run supabase-first.sql in Supabase to see how far new players get in their first game.</div>';
+  if (!F.length) return '<h2>First games</h2><p class="sub">No new players yet since this was added.</p>';
+  const ago = t => { const m = Math.round((Date.now() - new Date(t)) / 60000); return m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
+  const far = f => f.finished ? (f.won ? '🏆 Finished, won' : '✅ Finished, lost')
+    : f.step === 'hand' ? `Played ${f.hands} of ${f.lim || '?'} hands`
+    : ({ started: 'Saw the cards, never acted', bid: 'Bid, then stopped', trump: 'Chose trump, then stopped', card: 'Played cards in hand 1' })[f.step] || f.step;
+  const mins = f => Math.max(0, Math.round((new Date(f.updated_at) - new Date(f.started_at)) / 60000));
+  return `<h2>First games (new players)</h2><div class="tw"><table><tr><th>Player</th><th>Started</th><th>How far</th><th>Time</th><th>Tutorial</th><th>Tries</th></tr>${F.map(f =>
+    `<tr><td>${esc(f.name || 'Guest')}${f.app ? ' <small>App</small>' : ''}${f.uid ? ' <small>Signed in</small>' : ''}</td><td>${ago(f.started_at)}</td><td>${far(f)}${!f.finished && f.left_early ? ' <small>(left)</small>' : ''}</td><td>${mins(f)} min</td><td>${f.tutorial ? 'On' : 'Off'}</td><td>${f.tries || 1}</td></tr>`).join('')}</table></div>`;
+}
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const num = v => Number(v || 0);
 const sum = (rows, f) => rows.reduce((a, r) => a + num(r[f]), 0);
@@ -94,6 +106,7 @@ function show(j, warn) {
   </div>
   ${(L.waitList || []).length ? `<h2>Tables waiting to start</h2><div class="tw"><table><tr><th>Host</th><th>Table</th><th>Made</th><th>Idle</th><th>Seated</th><th>Online</th></tr>${L.waitList.sort((a, b) => b.ageMin - a.ageMin).map(w =>
     `<tr><td>${esc(w.host)}${w.hostOnline ? '' : ' <small>(offline)</small>'}${w.inApp ? ' <small>App</small>' : ''}</td><td>${w.n}p ${w.joker ? 'Joker' : 'Classic'}${w.pub ? ' · open' : ' · link'}${w.beginner ? ' · 🌱' : ''}</td><td>${w.ageMin} min ago</td><td>${w.idleMin} min</td><td>${w.seated}</td><td>${w.online}</td></tr>`).join('')}</table></div>` : ''}
+  ${firstGamesHTML(j.first)}
   <h2>Today</h2>
   <div class="grid">
     <div class="tile"><b>${num(T.players)}</b><span>players</span></div>
