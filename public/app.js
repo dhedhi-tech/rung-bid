@@ -1396,8 +1396,11 @@ $('hand').addEventListener('click', e => {
   send('act', { kind: 'play', value: id });
 });
 // First run of this version: players from before keep what they had (5+ games: everything; played before: Classic done)
-if (store.get('rb-skill') == null) store.set('rb-skill', String(+(store.get('rb-games-done') || 0) >= 5 ? 2
-  : !store.get('rb-first') && ['rb-started', 'rb-name', 'rb-coached', 'rb-tut-seen'].some(k => store.get(k)) ? 1 : 0));
+// (Nov 19: testers from before the levels, like Alee, get everything incl. Joker, not just Classic)
+{ const old = !store.get('rb-first') && ['rb-started', 'rb-name', 'rb-coached', 'rb-tut-seen', 'rb-games-done'].some(k => store.get(k));
+  if (store.get('rb-skill') == null) store.set('rb-skill', String(old || +(store.get('rb-games-done') || 0) >= 5 ? 2 : 0));
+  else if (old && !store.get('rb-skill-v2') && +store.get('rb-skill') < 2) store.set('rb-skill', '2');
+  store.set('rb-skill-v2', '1'); }
 const sock = io({ auth: { pid, name: myName || 'Player', app: NATIVE_APP ? 1 : 0, skill: +store.get('rb-skill') || 0 }, autoConnect: false });
 sockReady.forEach(f => f());
 
