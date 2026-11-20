@@ -6,6 +6,7 @@ const { Server } = require('socket.io');
 const { Table } = require('./game');
 const A = require('./accounts');
 const S = require('./stats');
+const P = require('./play');
 const R = require('./reports');
 const F = require('./friends');
 // Signed-in players who are online right now: profile id -> Map(socket id -> socket)
@@ -563,7 +564,8 @@ app.get('/admin/data', async (req, res) => {
         ageMin: Math.round((now - (t.createdAt || now)) / 60000), idleMin: Math.round((now - t.lastActive) / 60000) });
     }
   }
-  try { res.json({ live, ...(await S.report()), today: S.dayOf() }); }
+  const play = await Promise.race([P.report(), new Promise(r => setTimeout(() => r({ loading: true }), 8000))]).catch(e => ({ error: e.message }));
+  try { res.json({ live, play, ...(await S.report()), today: S.dayOf() }); }
   catch (e) { console.error('admin report', e.message); res.json({ live, daily: [], top: [], accounts: 0, today: S.dayOf(), error: 'Saved stats could not load. Did you run supabase-stats.sql in Supabase?' }); }
 });
 

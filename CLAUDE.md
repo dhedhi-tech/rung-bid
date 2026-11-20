@@ -148,8 +148,12 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Host's "Start game" button + hint sit in `.start-dock`, sticky at the bottom of the lobby sheet, so it is visible without scrolling even with 8 seats on small phones (tested 360x640).
 - Manager wants the lobby on one screen without scrolling: compact head (code + summary), share row WhatsApp / Copy link / 👥 Friends (link text hidden, shown only if copying fails), seat tiles show only name + You/Sit here/Taken (team by colour, key next to "Pick your seat"), 6p 3 columns, 8p 4 columns, Leave table inside the dock. Fits at 360x640 and 390x844 for 4/6/8, guest and signed in.
 
+## Google Play stats (Nov 20 2026, on pending-updates until deploy)
+- App is in PRODUCTION on Play (manager, Nov 20 2026); the closed-test notes below are history.
+- `play.js`: reads Google's monthly report CSVs (UTF-16) from the Play bucket with a read-only service account (play-reports@rung-bid.iam.gserviceaccount.com, invited in Play Console with "View app information and download bulk reports"). Env `PLAY_SA_KEY` = the JSON key; bucket tried as PLAY_BUCKET, pubsite_prod_rev_<dev id>, pubsite_prod_<dev id> (dev id 9203260132950641138; the Download reports menu was not found in his console). Memory cache 6h. Admin "Google Play" section: installs ever, phones that have it, rating, per day store visits / installed from store / installs / removed, countries. Impressions are not in Google's export. Data is 2-7 days late.
+
 ## Render environment (names only)
-SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TURN_USER, TURN_PASS, optional CONTACT_EMAIL. Never print or store their values.
+SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TURN_USER, TURN_PASS, optional CONTACT_EMAIL, PLAY_SA_KEY (Play reports service account JSON), optional PLAY_BUCKET. Never print or store their values.
 
 ## Next steps (launch plan)
 1. Play developer account applied Oct 25 2026 (personal, developer name Dhedhi Tech), ID check pending. pattaparty.com bought.

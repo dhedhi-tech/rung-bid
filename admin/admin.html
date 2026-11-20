@@ -54,6 +54,25 @@ function firstGamesHTML(F) {
   return `<h2>First games (new players)</h2><div class="tw"><table><tr><th>Player</th><th>Started</th><th>How far</th><th>Time</th><th>Tutorial</th><th>Tries</th></tr>${F.map(f =>
     `<tr><td>${esc(f.name || 'Guest')}${f.app ? ' <small>App</small>' : ''}${f.uid ? ' <small>Signed in</small>' : ''}</td><td>${ago(f.started_at)}</td><td>${far(f)}${!f.finished && f.left_early ? ' <small>(left)</small>' : ''}</td><td>${mins(f)} min</td><td>${f.tutorial ? 'On' : 'Off'}</td><td>${f.tries || 1}</td></tr>`).join('')}</table></div>`;
 }
+// Google Play numbers (play.js): from Google's daily report files, a few days late
+function playHTML(G) {
+  const h = '<h2>Google Play</h2>';
+  if (!G || G.off) return h + '<div class="note">Not connected. Add PLAY_SA_KEY on Render (the service account key).</div>';
+  if (G.loading) return h + '<p class="sub">Loading from Google… refresh in a minute.</p>';
+  if (G.error) return h + '<div class="note">' + esc(G.error) + '</div>';
+  if (!G.days || !G.days.length) return h + '<p class="sub">Connected, but Google has no report files yet. They appear a few days after the first installs.</p>';
+  const f = v => (v == null ? '–' : esc(v));
+  return h + `<p class="sub">From Google's reports, up to ${dd(G.lastDay)} (Google is 2 to 7 days behind).</p>
+  <div class="grid">
+    <div class="tile"><b>${f(G.total)}</b><span>installs ever</span></div>
+    <div class="tile"><b>${f(G.active)}</b><span>phones that have it now</span></div>
+    <div class="tile"><b>${G.rating ? G.rating.toFixed(1) + ' ★' : '–'}</b><span>rating</span></div>
+  </div>
+  <p class="sub">Store visits = people who opened your Play Store page. Got it = of those, how many installed.</p>
+  <div class="tw"><table><tr><th>Day</th><th>Store visits</th><th>Got it</th><th>Installs</th><th>Removed</th></tr>${G.days.map(d =>
+    `<tr><td>${dd(d.day)}</td><td>${f(d.visitors)}</td><td>${f(d.acquisitions)}${d.visitors ? ` <small>(${Math.round(100 * (d.acquisitions || 0) / d.visitors)}%)</small>` : ''}</td><td>${f(d.installs)}</td><td>${f(d.uninstalls)}</td></tr>`).join('')}</table></div>
+  ${G.countries.length ? `<p class="sub">Installs this month by country: ${G.countries.map(c => esc(c.c) + ' ' + c.n).join(' · ')}</p>` : ''}`;
+}
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const num = v => Number(v || 0);
 const sum = (rows, f) => rows.reduce((a, r) => a + num(r[f]), 0);
@@ -107,6 +126,7 @@ function show(j, warn) {
   ${(L.waitList || []).length ? `<h2>Tables waiting to start</h2><div class="tw"><table><tr><th>Host</th><th>Table</th><th>Made</th><th>Idle</th><th>Seated</th><th>Online</th></tr>${L.waitList.sort((a, b) => b.ageMin - a.ageMin).map(w =>
     `<tr><td>${esc(w.host)}${w.hostOnline ? '' : ' <small>(offline)</small>'}${w.inApp ? ' <small>App</small>' : ''}</td><td>${w.n}p ${w.joker ? 'Joker' : 'Classic'}${w.pub ? ' · open' : ' · link'}${w.beginner ? ' · 🌱' : ''}</td><td>${w.ageMin} min ago</td><td>${w.idleMin} min</td><td>${w.seated}</td><td>${w.online}</td></tr>`).join('')}</table></div>` : ''}
   ${firstGamesHTML(j.first)}
+  ${playHTML(j.play)}
   <h2>Today</h2>
   <div class="grid">
     <div class="tile"><b>${num(T.players)}</b><span>players</span></div>
