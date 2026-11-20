@@ -223,7 +223,9 @@
       say('start', T(hi, hi));
       say('team', T(`You sit at the bottom. ${team()} <b class="pn ta">Orange</b> = your team, <b class="pn tb">blue</b> = opponents. Take your time, the bots wait for you.`,
         `آپ نیچے بیٹھے ہیں۔ ${teamU()} <b class="pn ta">نارنجی</b> = آپ کی ٹیم، <b class="pn tb">نیلے</b> = مخالف۔ آرام سے کھیلیں، بوٹس آپ کا انتظار کرتے ہیں۔`));
-      say('deals', T('Cards come in 3 deals: 5, then 4, then 4. You bid after each deal.',
+      if (S.watchBid) { C.watched = true; say('deals', T('Cards come in 3 deals: 5, then 4, then 4.<br>👀 <b>Rounds 1 and 2: just watch</b> how the others bid. In round 3 it is your turn.',
+        'پتے 3 بار بٹتے ہیں: 5، پھر 4، پھر 4۔<br>👀 <b>راؤنڈ 1 اور 2: صرف دیکھیں</b> کہ باقی کیسے بولی لگاتے ہیں۔ راؤنڈ 3 میں آپ کی باری۔')); }
+      else say('deals', T('Cards come in 3 deals: 5, then 4, then 4. You bid after each deal.',
         'پتے 3 بار بٹتے ہیں: 5، پھر 4، پھر 4۔ ہر بار کے بعد بولی ہوتی ہے۔'));
       if (S.n > 4) say('decks', T(`With ${S.n} players there are <b>2 decks</b>, so every card is there twice${S.n === 6 ? ' (the 2s, 3s and 4s are taken out)' : ''}. If two identical cards land in one trick, the one played <b>last</b> wins. So a second A♠ beats the first A♠!`,
         `${S.n} کھلاڑیوں میں <b>2 گڈیاں</b> ہوتی ہیں، اس لیے ہر پتا دو بار ہے${S.n === 6 ? ' (2، 3 اور 4 نکال دیے جاتے ہیں)' : ''}۔ اگر ایک ہاتھ میں دو ایک جیسے پتے آئیں تو <b>بعد میں</b> ڈالا گیا جیتتا ہے۔ یعنی دوسرا A♠ پہلے A♠ سے بڑا ہے!`));
@@ -232,8 +234,10 @@
     }
     if ((S.hand || []).some(isJ)) say('gotJoker', T(`You have the <b>Joker</b>! How it works:<br>• You can only play it when you have <b>no cards of the suit led</b>, and you can never lead with it.<br>• It <b>flips the trick</b>: the team that was losing takes it, and you lead next.<br>• Best time: when the other team is about to win a trick.<br>• Don't keep it to the very end. If you must lead and only the Joker is left, the other team gets that trick.`,
       `آپ کے پاس <b>جوکر</b> ہے! یہ ایسے کام کرتا ہے:<br>• یہ صرف تب ڈال سکتے ہیں جب آپ کے پاس <b>چلی گئی قسم کا کوئی پتا نہ ہو</b>، اور اس سے ہاتھ شروع نہیں کر سکتے۔<br>• یہ <b>ہاتھ پلٹ دیتا ہے</b>: ہارنے والی ٹیم ہاتھ لے لیتی ہے، اور اگلی چال آپ کی۔<br>• بہترین وقت: جب دوسری ٹیم ہاتھ جیتنے والی ہو۔<br>• اسے آخر تک نہ رکھیں۔ اگر آپ کو چال چلنی ہو اور صرف جوکر بچا ہو تو وہ ہاتھ دوسری ٹیم کا۔`), { pos: 'top' });
-    if (S.round === 2 && S.gphase !== 'play') say('r2', T('Round 2: 4 more cards. Bid again (now up to 13).', 'راؤنڈ 2: 4 اور پتے۔ پھر سے بولی (اب 13 تک)۔'));
-    if (S.round === 3 && S.gphase !== 'play') say('r3', T('Last 4 cards. Last chance to bid.', 'آخری 4 پتے۔ بولی کا آخری موقع۔'));
+    if (S.round === 2 && S.gphase !== 'play') say('r2', S.watchBid ? T('Round 2: 4 more cards. 👀 Keep watching. Next round you bid.', 'راؤنڈ 2: 4 اور پتے۔ 👀 دیکھتے رہیں۔ اگلے راؤنڈ میں آپ بولی لگائیں گے۔')
+      : T('Round 2: 4 more cards. Bid again (now up to 13).', 'راؤنڈ 2: 4 اور پتے۔ پھر سے بولی (اب 13 تک)۔'));
+    if (S.round === 3 && S.gphase !== 'play') say('r3', C.watched && S.handNo === 1 ? T('Last 4 cards. <b>Now it is your turn to bid!</b>', 'آخری 4 پتے۔ <b>اب آپ کی بولی کی باری!</b>')
+      : T('Last 4 cards. Last chance to bid.', 'آخری 4 پتے۔ بولی کا آخری موقع۔'));
     if (S.gphase === 'play' && S.bid && !C.shown.has('play' + S.handNo)) {
       const bt = S.bid.seat % 2, v = S.bid.value, nd = need();
       say('play' + S.handNo, bt === 0 ? T(`Bidding done. Your team must win <b>${nd} tricks</b>.`, `بولی ختم۔ آپ کی ٹیم کو <b>${nd} ہاتھ</b> جیتنے ہیں۔`)

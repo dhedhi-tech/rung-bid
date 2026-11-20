@@ -288,6 +288,7 @@ class Table {
 
   // ---------- pacing ----------
   sleep(ms) {
+    if (this.G && this.G.rigged) ms *= 1.5; // first coached hand: a little slower, so a new player can follow
     return new Promise((res, rej) => setTimeout(() => this.alive ? res() : rej(new Abort()), ms)).then(() => this.coachWait());
   }
 
@@ -322,12 +323,25 @@ class Table {
     if (msg.on) { if (!this.pub) { this.guided = true; this.coachUsed = true; this.broadcast(); } return; } // coach back on (private tables; works while you play alone with bots)
     this.setHold(!!msg.hold);
   }
+  // First coached hand: bots keep the bidding small so the new player can take it in round 3.
+  // Only opponents bid in rounds 1-2 (max 7); in round 3 every bot passes and the new player (last to bid) decides.
+  firstBotBid(seat, r) {
+    const G = this.G;
+    if (!G.rigged || G.newbie == null || G.newbie < 0) return this.botBid(seat, r);
+    if (r === 3 || seat % 2 === G.newbie % 2) return null;
+    const v = this.botBid(seat, r);
+    return v && v <= 7 ? v : null;
+  }
   // What the bots would do in this seat, with a short reason code for the coach bubble
   coachHint(seat, kind) {
     const G = this.G, hand = G.players[seat].hand;
     if (kind === 'bid') {
       const keep = G.supportSeat; let v = this.botBid(seat, G.round), safe = false; G.supportSeat = keep;
-      if (G.rigged && v) {
+      // New player's first bid (round 3 of the first hand, after watching): always bid, just over the current bid (max 8)
+      if (G.rigged && G.round === 3 && seat === G.newbie && !(G.bid && G.bid.seat % 2 === seat % 2)) {
+        const cur = G.bid ? G.bid.value : 5;
+        if (cur < 8) v = cur + 1;
+      } else if (G.rigged && v) {
         // Winning first hand: bid safely. Never over your own partner, and no higher than needed (max 8)
         const cur = G.bid ? G.bid.value : 5;
         v = G.bid && G.bid.seat % 2 === seat % 2 ? null : Math.min(v, Math.max(7, cur + 1));
@@ -397,7 +411,7 @@ class Table {
     if (!G) return v;
     Object.assign(v, {
       handNo: G.handNo, decider: !!(this.limit && G.handNo > this.limit), dealer: rot(G.dealer), score: G.score * flip, won: [G.won[base % 2], G.won[1 - base % 2]],
-      round: G.round, gphase: G.phase, active: rot(G.active),
+      round: G.round, gphase: G.phase, active: rot(G.active), watchBid: !!(G.rigged && G.newbie === me && G.round < 3), // first hand: watching rounds 1-2
       bid: G.bid ? { value: G.bid.value, seat: rot(G.bid.seat) } : null,
       trump: G.trump, leadSuit: G.leadSuit,
       tricksWon: [G.tricksWon[base % 2], G.tricksWon[1 - base % 2]],
@@ -765,6 +779,7 @@ class Table {
   // The player gets the top trump-suit cards and aces (and a joker in their first 5 cards in Joker mode); partners get most of the other good cards.
   rigDeck() {
     const G = this.G, n = G.n, h = this.seats.findIndex((_, i) => this.isHuman(i)); if (h < 0) return;
+    G.dealer = h; G.newbie = h; // the new player deals, so they bid last in every round
     const T = SUITS[Math.floor(Math.random() * 4)];
     const val = c => (isJ(c) ? 100 : (c.s === T ? 50 : 0) + c.r);
     const pool = shuffle(G.deck.slice()).sort((a, b) => val(b) - val(a));
@@ -801,17 +816,19 @@ class Table {
     const G = this.G, start = (G.dealer + 1) % G.n;
     for (let i = 0; i < k; i++) for (let j = 0; j < G.n; j++) G.players[(start + j) % G.n].hand.push(G.deck.pop());
     this.broadcast(); this.fx('deal');
-    await this.sleep(PACE.deal);
+    await this.sleep(PACE.deal + (G.rigged ? k * 300 * SPEED : 0)); // first hand: the app deals your cards one by one
   }
   async biddingRound(r) {
     const G = this.G, start = (G.dealer + 1) % G.n, before = G.bid ? G.bid.value : 0, maxV = r === 1 ? 7 : 13;
     const raised = new Set(), out = new Set(); // who bid in this round, and who then dropped out
+    const watcher = G.rigged && r < 3 ? G.newbie : -1; // first coached hand: the new player watches rounds 1 and 2, then bids in round 3
     const turn = async seat => {
+      if (seat === watcher) { G.hist.push({ r, seat, v: null, watch: true }); G.acts[seat] = 'Watch'; this.broadcast(); return seat; }
       G.main = `Waiting for {n${seat}} to bid`;
       const cur = G.bid ? G.bid.value : 5;
       // The current holder may raise their own bid too (for example to change trump)
       const options = []; for (let v = Math.max(6, cur + 1); v <= maxV; v++) options.push(v);
-      const v = await this.ask(seat, 'bid', { kind: 'bid', round: r, options }, () => this.botBid(seat, r),
+      const v = await this.ask(seat, 'bid', { kind: 'bid', round: r, options }, () => this.firstBotBid(seat, r),
         val => val === 0 || val === null || options.includes(val));
       const val = v || null;
       G.hist.push({ r, seat, v: val });
@@ -974,7 +991,7 @@ class Table {
     });
     G.players.forEach(p => { p.hand = []; p.tricks = 0; });
     G.deck = shuffle(buildDeck(G.n, G.joker));
-    G.rigged = false;
+    G.rigged = false; G.newbie = -1;
     if (this.guidedOn() && G.handNo === 1 && !this.coachGames) this.rigDeck(); // winning first hand, first game only
     this.log(`{v${G.dealer}:deal:deals}`);
     const plan = [5, 4, 4];

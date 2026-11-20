@@ -98,7 +98,9 @@ const sockReady = []; // socket listeners registered once the connection object 
 /* ---------- state ---------- */
 let S = null;              // latest view from the server
 let deadlineAt = 0, deadlineTotal = 1;
-let prevHandIds = new Set(), newIds = null;
+let prevHandIds = new Set(), newIds = null; // newIds: id -> order the card was dealt
+// First coached hand: deal your cards one by one, slowly (manager, Nov 21 2026)
+const slowDeal = () => !!(S && S.guided && S.handNo === 1 && store.get('rb-first') !== 'done');
 let selected = null, sweepTo = null, lastAskKey = '';
 let modalKind = null, leaveArmed = false, shownHand = null, shownHost = null;
 
@@ -211,7 +213,7 @@ function renderSeats() {
     if (S.phase !== 'lobby') {
       if (i === S.dealer) chips += `<span class="chip dealer"><span class="long">Dealer</span><span class="short">D</span></span>`;
       if (S.bid && S.bid.seat === i) chips += `<span class="chip holder ${t}">Bid ${S.bid.value}${S.trump ? ' ' + SYM[S.trump] : ''}</span>`;
-      else if (S.gphase === 'bid' && S.acts && S.acts[i] !== undefined) chips += S.acts[i] === 'Pass' ? `<span class="chip pass">Pass</span>` : `<span class="chip bid">${S.acts[i]}</span>`;
+      else if (S.gphase === 'bid' && S.acts && S.acts[i] !== undefined) chips += S.acts[i] === 'Pass' ? `<span class="chip pass">Pass</span>` : S.acts[i] === 'Watch' ? `<span class="chip pass">👀 Watching</span>` : `<span class="chip bid">${S.acts[i]}</span>`;
       if (S.gphase === 'play' || S.gphase === 'done') chips += `<span class="chip tricks">${S.tricks[i]} won</span>`;
     }
     const cnt = S.counts ? S.counts[i] : 0;
@@ -230,7 +232,7 @@ function renderSeats() {
       let badge = '';
       if (S.phase !== 'lobby') {
         if (S.bid && S.bid.seat === i) badge = `<span class="cb holder ${t}">${S.bid.value}${S.trump ? SYM[S.trump] : ''}</span>`;
-        else if (S.gphase === 'bid' && S.acts && S.acts[i] !== undefined) badge = S.acts[i] === 'Pass' ? `<span class="cb pass">–</span>` : `<span class="cb bid">${S.acts[i]}</span>`;
+        else if (S.gphase === 'bid' && S.acts && S.acts[i] !== undefined) badge = S.acts[i] === 'Pass' ? `<span class="cb pass">–</span>` : S.acts[i] === 'Watch' ? `<span class="cb pass">👀</span>` : `<span class="cb bid">${S.acts[i]}</span>`;
       }
       const won = (S.gphase === 'play' || S.gphase === 'done') && S.tricks[i] ? `<span class="cb won">${S.tricks[i]}</span>` : '';
       const dealer = S.phase !== 'lobby' && i === S.dealer ? `<span class="cb dealer">D</span>` : '';
@@ -271,7 +273,7 @@ function renderHand() {
   el.innerHTML = hand.map((c, i) => {
     const isNew = newIds && newIds.has(c.id);
     const cls = [legal && legal.has(c.id) ? 'legal' : '', selected === c.id ? 'sel' : '', isNew ? 'in' : ''].join(' ');
-    return cardHTML(c, cls).replace('class="card', 'style="' + fan(i) + 'left:' + (start + i * step) + 'px;animation-delay:' + (isNew ? i * 25 : 0) + 'ms;z-index:' + i + '" class="card');
+    return cardHTML(c, cls).replace('class="card', 'style="' + fan(i) + 'left:' + (start + i * step) + 'px;animation-delay:' + (isNew ? (slowDeal() ? newIds.get(c.id) * 300 : i * 25) : 0) + 'ms;z-index:' + i + '" class="card');
   }).join('');
   newIds = null;
 }
@@ -1258,7 +1260,10 @@ function render() {
   if (!S) return;
   const handIds = new Set((S.hand || []).map(c => c.id));
   const added = [...handIds].filter(id => !prevHandIds.has(id));
-  if (added.length && added.length < handIds.size + 1) newIds = new Set(added);
+  if (added.length && added.length < handIds.size + 1) {
+    newIds = new Map(added.map((id, k) => [id, k]));
+    if (slowDeal() && added.length <= 5) added.forEach((_, k) => setTimeout(() => sfx('deal'), k * 300));
+  }
   prevHandIds = handIds;
   if (S.deadline) { deadlineAt = Date.now() + S.deadline; deadlineTotal = S.gphase === 'play' ? 8000 : 20000; } else deadlineAt = 0;
   if (!S.ask || S.ask.kind !== 'play') selected = null;
@@ -1330,7 +1335,7 @@ function showJoker(seat, second) {
 function onFx(f) {
   if (!S || !tableCode || (S.code && S.code !== tableCode)) return;
   switch (f.type) {
-    case 'deal': sfx('deal'); break;
+    case 'deal': if (!slowDeal()) sfx('deal'); break; // slow first deal plays one sound per card
     case 'watch': toast(f.text); sfx('pop'); break;
     case 'bid': sfx('bid', f.v); break;
     case 'support': sfx('support'); break;
