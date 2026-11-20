@@ -143,7 +143,14 @@ function sizeCards() {
   const base = Math.round(Math.max(46, Math.min(78, w * 0.11, window.innerHeight * 0.12)));
   const cw = Math.round(Math.max(base, Math.min(84, w * 0.14, window.innerHeight * 0.13))); // hand cards a bit bigger (fan)
   document.documentElement.style.setProperty('--cw', cw + 'px');
-  document.documentElement.style.setProperty('--tw', Math.round(base * (S && S.n === 8 ? 0.95 : S && S.n === 6 ? 1.05 : 1.15)) + 'px'); // played cards in the middle (bigger since Nov 13)
+  // Wide, short screens (laptops): keep the table a normal oval, not a flat strip, and size the played cards
+  // by the table's height too, so they stay on the felt instead of piling onto each other (Nov 20 2026)
+  const tb = $('table'), th = tb ? tb.clientHeight : 0;
+  if (tb) { tb.style.width = '100%'; tb.style.marginInline = 'auto'; tb.style.maxWidth = th ? Math.round(th * 1.9) + 'px' : ''; }
+  let tw = base * (S && S.n === 8 ? 0.95 : S && S.n === 6 ? 1.05 : 1.15); // played cards in the middle (bigger since Nov 13)
+  if (th) tw = Math.min(tw, th * (S && S.n > 4 ? 0.16 : 0.19));
+  document.documentElement.style.setProperty('--tw', Math.round(Math.max(36, tw)) + 'px');
+  document.documentElement.style.setProperty('--annS', th ? Math.min(1, Math.max(0.6, th / 480)).toFixed(2) : 1); // middle TRUMP card smaller on short tables
   return cw;
 }
 const sv = (t, one, many) => (teamName(t) === 'Opponents' ? many : one);

@@ -110,6 +110,9 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Status line under the table (`.status`: main text, log, team tricks strip) is hidden. A turn bubble sits above the active seat (`.turn-bub`: "Your turn" orange, "Playing…"/"Bidding…" white).
 - Trick score in the middle of the table (`#tscore`, in `renderTricks`): our team big in orange as won/needed, opponents small in blue. Header line 2 shows only "<team> need N". Manager tried "US/THEM" labels and declined them.
 
+## Wide/short screens (Nov 20 2026, on pending-updates until deploy)
+- A friend on the website said cards piled on each other and the table looked odd: on laptops (e.g. 1280x650) the table became a flat strip and played cards overflowed it. `sizeCards` now caps the table width at 1.9x its height (centered) and the played-card size `--tw` at 19% of the table height (16% for 6/8p); the middle TRUMP card scales with `--annS` (table height / 480, 0.6 to 1). Phones barely change.
+
 ## Small notes (Nov 2026)
 - Keep-awake: while a table is open the client fetches /health every 4 min (Render free plan sleeps after 15 min without normal HTTP requests; socket traffic does not count). With nobody playing, an external cron-job.org job (manager's account, set up Nov 18 2026) visits https://www.pattaparty.com/health every 5 min; turn it off after moving to the paid plan. The old GitHub Actions pinger (keep-awake.yml) was removed Nov 18: GitHub ran it only every 40 min to 9 hours, so the server kept sleeping. Real fix: Render $7 plan.
 - Admin "What people play": table size x Joker table (each column adds up to 100%) and "Game length chosen" table, both from `game_log` (last 30 days), computed in `stats.js` (`countModes`).
