@@ -222,6 +222,8 @@ function renderSeats() {
       + (p.lvl ? `<span class="lvl-badge" title="Level ${p.lvl}">${p.lvl}</span>` : '')
       + (p.voice ? `<span class="vmic" title="${p.voice.muted ? 'Mic off' : 'In voice chat'}">${p.voice.muted ? '🔇' : '🎙'}</span>` : '');
     const active = S.active === i && S.phase === 'game';
+    // Watching: a Sit button right under each bot seat (manager, Nov 21 2026; was a list of names at the bottom)
+    const sit = !me0() && p.bot && !S.dup && (S.phase === 'game' || S.phase === 'over') ? `<button class="sit-btn" data-take="${p.real}">Sit</button>` : '';
     const tmr = active && deadlineAt ? `<span class="tmr" data-tmr><i></i></span>` : '';
     const talking = p.voice && !p.voice.muted && (talkers.has(p.voice.sid) || (i === 0 && me0() && V.talking));
     const bidding = active && (S.gphase === 'bid' || S.gphase === 'trump');
@@ -238,10 +240,10 @@ function renderSeats() {
       const dealer = S.phase !== 'lobby' && i === S.dealer ? `<span class="cb dealer">D</span>` : '';
       const who = p.bot ? `<span class="cb who" title="Bot">🤖</span>` : !p.connected ? `<span class="cb who away" title="Away">💤</span>` : '';
       const face = p.av ? avatarHTML({ name: p.name, av: p.av }, 'c-av', t) : `<span class="avatar c-av">${esc((i === 0 && me0() ? 'You' : p.name)[0].toUpperCase())}</span>`;
-      html += `<div class="seat compact ${t} ${active ? 'active' : ''} ${bidding ? 'bidding' : ''} ${spot ? 'spot' : ''} ${talking ? 'speaking' : ''} ${!p.bot && !p.connected ? 'offline' : ''}" data-seat="${i}" data-real="${p.real}" style="left:${pos.x}%;top:${pos.y}%">${spot ? '<span class="spot-light"></span>' : ''}<span class="c-face">${face}${badge}${dealer}${won}${who}</span><span class="c-name">${esc(i === 0 && me0() ? 'You' : p.name)}</span>${tmr}${active ? `<span class="turn-bub ${i === 0 && me0() ? 'mine' : ''}">${i === 0 && me0() ? 'Your turn' : bidding ? 'Bidding…' : 'Playing…'}</span>` : ''}</div>`;
+      html += `<div class="seat compact ${t} ${active ? 'active' : ''} ${bidding ? 'bidding' : ''} ${spot ? 'spot' : ''} ${talking ? 'speaking' : ''} ${!p.bot && !p.connected ? 'offline' : ''}" data-seat="${i}" data-real="${p.real}" style="left:${pos.x}%;top:${pos.y}%">${spot ? '<span class="spot-light"></span>' : ''}<span class="c-face">${face}${badge}${dealer}${won}${who}</span><span class="c-name">${esc(i === 0 && me0() ? 'You' : p.name)}</span>${sit}${tmr}${active ? `<span class="turn-bub ${i === 0 && me0() ? 'mine' : ''}">${i === 0 && me0() ? 'Your turn' : bidding ? 'Bidding…' : 'Playing…'}</span>` : ''}</div>`;
       continue;
     }
-    html += `<div class="seat ${t} ${active ? 'active' : ''} ${bidding ? 'bidding' : ''} ${spot ? 'spot' : ''} ${talking ? 'speaking' : ''} ${!p.bot && !p.connected ? 'offline' : ''}" data-seat="${i}" data-real="${p.real}" style="left:${pos.x}%;top:${pos.y}%;transform-origin:${pos.x < 30 ? 'left' : pos.x > 70 ? 'right' : 'center'} ${pos.y < 30 ? 'top' : pos.y > 70 ? 'bottom' : 'center'}">${spot ? '<span class="spot-light"></span>' : ''}<div class="s-name">${pic}${esc(i === 0 && me0() ? 'You' : p.name)}${tag}${backs ? ' ' : ''}${backs}</div><span class="s-role">${teamTag(i)}</span><div class="s-row">${chips}</div>${tmr}</div>`;
+    html += `<div class="seat ${t} ${active ? 'active' : ''} ${bidding ? 'bidding' : ''} ${spot ? 'spot' : ''} ${talking ? 'speaking' : ''} ${!p.bot && !p.connected ? 'offline' : ''}" data-seat="${i}" data-real="${p.real}" style="left:${pos.x}%;top:${pos.y}%;transform-origin:${pos.x < 30 ? 'left' : pos.x > 70 ? 'right' : 'center'} ${pos.y < 30 ? 'top' : pos.y > 70 ? 'bottom' : 'center'}">${spot ? '<span class="spot-light"></span>' : ''}<div class="s-name">${pic}${esc(i === 0 && me0() ? 'You' : p.name)}${tag}${backs ? ' ' : ''}${backs}</div><span class="s-role">${teamTag(i)}</span><div class="s-row">${chips}</div>${sit}${tmr}</div>`;
   }
   $('seats').innerHTML = html;
   tickTimers();
@@ -254,7 +256,7 @@ function renderHand() {
       const open = S.seats.map((p, i) => ({ p, i })).filter(x => x.p.bot);
       if (S.dup) { el.innerHTML = `<div class="watchbar"><b>${esc(S.dup.name)}</b> is away. Is that you? <button id="dupClaim">Yes, play here</button></div>`; $('dupClaim').onclick = () => send('claim'); return; }
       const wl = S.phase === 'game' && !open.length ? (S.myWait ? ` You sit on the first free seat (#${S.myWait} in line). <button id="waitBtn" data-w="0">Cancel</button>` : ` <button id="waitBtn" data-w="1">Sit on first available seat</button>`) : '';
-      el.innerHTML = `<div class="watchbar">You're watching.${open.length ? ' Take a bot seat:' : ''} ${open.map(x => `<button data-take="${x.p.real}"><span class="pn ${tcls(x.i)}">${esc(x.p.name)}</span></button>`).join('')}${wl}</div>`;
+      el.innerHTML = `<div class="watchbar">You're watching.${open.length ? ' Tap <b>Sit</b> under a bot to play.' : ''}${wl}</div>`;
       if ($('waitBtn')) $('waitBtn').onclick = e => send('wait', e.currentTarget.dataset.w === '1');
     }
     return;
@@ -1445,6 +1447,7 @@ function openInBrowserHelp(feature) {
 }
 $('reacts').innerHTML = '<span class="voicectl" id="voiceCtl"></span><button class="vbtn chatbtn" id="chatBtn" aria-label="Open chat">💬<span class="lbl"> Chat</span><span class="cbadge" id="chatBadge" hidden></span></button><button class="stk-btn" id="stkBtn" aria-label="Stickers">🎴</button>' + ['👏', '😂', '😮', '🔥', '😢', '🙏'].map(e => `<button data-r="${e}" aria-label="React ${e}">${e}</button>`).join('');
 $('seats').addEventListener('click', e => {
+  const take = e.target.closest('button[data-take]'); if (take) { send('sit', +take.dataset.take); return; }
   const el = e.target.closest('.seat'); if (!el || !S || !S.code || S.phase === 'lobby') return;
   if (modalKind && modalKind !== 'card') return;
   playerCard(+el.dataset.real);

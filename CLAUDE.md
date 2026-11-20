@@ -52,6 +52,7 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Report: reasons list, server `report` event saves reason, both names/pids/account ids and the reported player's last 20 chat lines at that table (`reports.js`, Supabase table from `supabase-reports.sql`), one report per player per table, max 10 per connection. Reporting also mutes. Admin page shows Player reports.
 
 ## Watchers, waiting list, swap (deployed Nov 1)
+- Nov 21 2026 (manager): watchers see a pulsing orange SIT button under each bot seat on the table (`.sit-btn`, `data-take`, click handled on #seats); the bottom bar only says "You're watching. Tap Sit under a bot to play." (bot name buttons removed).
 - Tap the 👀 count in the header to see watcher names (and waiting #).
 - Open tables list now shows full public tables too ("Full", "Watch").
 - Waiting list: `table.waitList` (pids). Watchers tap "Sit on first available seat" (no bot seat free) to join the line; no one is added without tapping. When a player leaves mid-game (`stand`), the first connected person in line takes the seat (`fillFromWait`).
