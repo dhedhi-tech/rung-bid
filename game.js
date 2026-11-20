@@ -345,7 +345,7 @@ class Table {
     else {
       const res = this.trickResult(), cur = this.currentWinner();
       const wins = res.team !== team && !res.flipped && this.beats(card, cur.card);
-      if (res.team === team) why = 'partnerWins';
+      if (res.team === team) why = !res.flipped && this.beats(card, cur.card) ? 'secure' : 'partnerWins'; // taking over a beatable card
       else if (wins && card.s === T && G.leadSuit !== T) why = 'cut';
       else if (wins) why = 'win';
       else why = card.s === G.leadSuit ? 'cantWin' : 'throwLow';

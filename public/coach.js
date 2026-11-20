@@ -116,54 +116,48 @@
   new MutationObserver(mark).observe($('panelBody'), { childList: true });
 
   /* ---------- tips for your turn (English + Urdu) ---------- */
+  // Short tips: what to tap first (big), one short reason after. New players left when the tips were walls of text.
+  const head = (en, ur) => T(`<span class="tip-do">👇 ${en}</span>`, `<span class="tip-do">👇 ${ur}</span>`);
+  const join = (...xs) => T(xs.map(x => x.en).join(' '), xs.map(x => x.ur).join(' '));
   function bidTip(a) {
-    const h = a.hint, hand = S.hand || [];
-    const of = hand.filter(c => c.s === h.suit), hi = of.filter(c => c.r >= 12);
-    const best = `Your strongest suit is ${suitTxt(h.suit)} (${of.length} card${of.length === 1 ? '' : 's'}${hi.length ? ', with ' + hi.map(cardName).join(' ') : ''}).`;
-    const bestU = `آپ کی سب سے مضبوط قسم ${suitU(h.suit)} ہے (${of.length} پتے${hi.length ? '، ' + hi.map(cardU).join(' ') : ''})۔`;
-    const J = hand.some(isJ);
-    let en = h.v ? `Coach pick: <b>bid ${h.v}</b>. ${best}${J ? ' Your Joker adds an extra trick too.' : ''} With your team's help that should be enough.`
-      : h.partnerHolds ? `Coach pick: <b>Pass</b>. Your ${mate()} already holds the bid, so let them keep it.`
-      : h.safe ? `Coach pick: <b>Pass</b>. Going this high is risky. Let them have it and break their bid instead: that scores double for your team.`
-      : h.oppHolds ? `Coach pick: <b>Pass</b>. Your hand isn't strong enough to go higher. You can still break their bid when you play, and that scores double for your team.`
-      : `Coach pick: <b>Pass</b>. ${best} That's an average hand, so let others bid. You can still bid in the next rounds.`;
-    let ur = h.v ? `کوچ کی رائے: <b>${h.v} کی بولی لگائیں</b>۔ ${bestU}${J ? ' آپ کا جوکر بھی ایک ہاتھ اور دلائے گا۔' : ''} ٹیم کی مدد سے اتنا کافی ہونا چاہیے۔`
-      : h.partnerHolds ? `کوچ کی رائے: <b>پاس</b>۔ بولی آپ کے ${mateU()} کے پاس ہے، انہیں رکھنے دیں۔`
-      : h.safe ? `کوچ کی رائے: <b>پاس</b>۔ اتنی اونچی بولی خطرناک ہے۔ انہیں لینے دیں اور کھیل میں ان کی بولی توڑیں: اس پر آپ کی ٹیم کو دگنے نمبر ملتے ہیں۔`
-      : h.oppHolds ? `کوچ کی رائے: <b>پاس</b>۔ آپ کے پتے اتنے مضبوط نہیں کہ اور اوپر جائیں۔ کھیلتے وقت آپ ان کی بولی توڑ سکتے ہیں، اس پر آپ کی ٹیم کو دگنے نمبر ملتے ہیں۔`
-      : `کوچ کی رائے: <b>پاس</b>۔ ${bestU} یہ عام سے پتے ہیں، دوسروں کو بولی لگانے دیں۔ اگلے راؤنڈ میں آپ پھر بولی لگا سکتے ہیں۔`;
-    if (!C.shown.has('bidRule')) { C.shown.add('bidRule'); en = 'Your turn to bid. A bid is how many of the 13 tricks your team promises to win. ' + en; ur = 'آپ کی بولی کی باری ہے۔ بولی کا مطلب ہے کہ 13 میں سے کتنے ہاتھ آپ کی ٹیم جیتے گی۔ ' + ur; }
-    return T(en + ' The glowing button is my pick, but the choice is yours.', ur + ' چمکتا ہوا بٹن میری رائے ہے، لیکن فیصلہ آپ کا ہے۔');
+    const h = a.hint, J = (S.hand || []).some(isJ);
+    const what = h.v ? head(`Tap <b>${h.v}</b>`, `<b>${h.v}</b> پر ٹیپ کریں`) : head('Tap <b>Pass</b>', '<b>پاس</b> پر ٹیپ کریں');
+    const why = h.v ? T(`Your ${suitTxt(h.suit)} cards are strong.${J ? ' Your Joker helps too.' : ''}`, `آپ کے ${suitU(h.suit)} کے پتے مضبوط ہیں۔${J ? ' جوکر بھی مدد کرے گا۔' : ''}`)
+      : h.partnerHolds ? T(`Your ${mate()} has the bid.`, `بولی آپ کے ${mateU()} کے پاس ہے۔`)
+      : h.safe ? T('Too risky. Break their bid instead.', 'بہت خطرہ ہے۔ ان کی بولی توڑیں۔')
+      : h.oppHolds ? T('Your cards are not strong enough.', 'آپ کے پتے اتنے مضبوط نہیں۔')
+      : T('Average cards. You can bid next round.', 'عام سے پتے ہیں۔ اگلے راؤنڈ میں بولی لگا سکتے ہیں۔');
+    let rule = T('', '');
+    if (!C.shown.has('bidRule')) { C.shown.add('bidRule'); rule = T('Bid = how many tricks (out of 13) your team will win.', 'بولی = آپ کی ٹیم 13 میں سے کتنے ہاتھ جیتے گی۔'); }
+    return join(what, rule, why);
   }
   function trumpTip(a) {
-    const s = a.hint.s, of = (S.hand || []).filter(c => c.s === s), hi = of.filter(c => c.r >= 12);
-    return T(`You hold the highest bid, so you choose <b>trump</b>. Coach pick: <b>${suitTxt(s)}</b>. You have ${of.length} of them${hi.length ? ' including ' + hi.map(cardName).join(' ') : ''}. More trumps (and high ones) means more tricks for your team.` +
-      (a.current ? ' You can keep the same trump or change it.' : ''),
-      `سب سے بڑی بولی آپ کی ہے، اس لیے <b>ترپ</b> آپ چنیں گے۔ کوچ کی رائے: <b>${suitU(s)}</b>۔ آپ کے پاس اس کے ${of.length} پتے ہیں${hi.length ? '، جن میں ' + hi.map(cardU).join(' ') + ' بھی ہیں' : ''}۔ جتنے زیادہ (اور بڑے) ترپ کے پتے، اتنے زیادہ ہاتھ۔` +
-      (a.current ? ' آپ وہی ترپ رکھ سکتے ہیں یا بدل سکتے ہیں۔' : ''));
+    const s = a.hint.s, n = (S.hand || []).filter(c => c.s === s).length;
+    return join(head(`Tap <b>${suitTxt(s)}</b>`, `<b>${suitU(s)}</b> پر ٹیپ کریں`),
+      T(`You won the bid, so you pick <b>trump</b>. You have ${n} ${SNAME[s]}.`, `بولی آپ کی ہے، اس لیے <b>ترپ</b> آپ چنیں گے۔ آپ کے پاس ${n} ${UNAME[s]} ہیں۔`));
   }
   function playTip(a, once = true) {
     const h = a.hint, c = (S.hand || []).find(x => x.id === h.id), L = S.leadSuit ? suitTxt(S.leadSuit) : '', LU = S.leadSuit ? suitU(S.leadSuit) : '';
     const why = {
-      leadTrump: T('Leading a high trump pulls out the opponents\' trumps.', 'ترپ کا بڑا پتا پہلے چلنے سے مخالفوں کے ترپ نکل جاتے ہیں۔'),
-      leadBoss: T('It is the highest card left in its suit, so nobody can beat it.', 'یہ اپنی قسم کا سب سے بڑا بچا ہوا پتا ہے، اس سے بڑا کسی کے پاس نہیں۔'),
-      leadLow: T('Lead a low card and save your high cards for later.', 'چھوٹا پتا چلیں اور بڑے پتے بعد کے لیے بچائیں۔'),
-      joker: T('The other team is winning this trick. Your Joker flips it to your team!', 'یہ ہاتھ دوسری ٹیم جیت رہی ہے۔ آپ کا جوکر اسے آپ کی ٹیم کی طرف پلٹ دے گا!'),
-      partnerWins: T(`Your ${mate()} is already winning this trick, so play your lowest card.`, `یہ ہاتھ آپ کا ${mateU()} جیت رہا ہے، اس لیے اپنا سب سے چھوٹا پتا ڈالیں۔`),
-      cut: T(`You have no ${L} left, so cut with a trump. Any trump beats the other suits.`, `آپ کے پاس ${LU} نہیں بچا، اس لیے ترپ سے کاٹیں۔ ترپ کا ہر پتا باقی سب قسموں سے بڑا ہے۔`),
-      win: T('This card beats everything played so far.', 'یہ پتا اب تک ڈالے گئے سب پتوں سے بڑا ہے۔'),
-      cantWin: T(`You must follow ${L}, but you can't win this one, so play your lowest.`, `آپ کو ${LU} ہی ڈالنا ہے، لیکن یہ ہاتھ آپ نہیں جیت سکتے، اس لیے سب سے چھوٹا ڈالیں۔`),
-      throwLow: T(`You have no ${L} and can't win this trick, so throw away a low card.`, `آپ کے پاس ${LU} نہیں اور یہ ہاتھ جیت نہیں سکتے، اس لیے کوئی چھوٹا پتا پھینک دیں۔`),
+      leadTrump: T('A high trump pulls out their trumps.', 'بڑا ترپ چلنے سے مخالفوں کے ترپ نکل جاتے ہیں۔'),
+      leadBoss: T('Nobody can beat it.', 'اس سے بڑا پتا کسی کے پاس نہیں۔'),
+      leadLow: T('Keep your high cards for later.', 'بڑے پتے بعد کے لیے بچائیں۔'),
+      joker: T('Your Joker flips this trick to your team!', 'آپ کا جوکر یہ ہاتھ آپ کی ٹیم کی طرف پلٹ دے گا!'),
+      partnerWins: T(`Your ${mate()} is winning, so play low.`, `آپ کا ${mateU()} جیت رہا ہے، اس لیے چھوٹا پتا ڈالیں۔`),
+      secure: T("Your team is winning, but others can still beat it. This card makes it safe.", 'آپ کی ٹیم جیت رہی ہے، لیکن دوسرے ابھی بڑا پتا ڈال سکتے ہیں۔ یہ پتا ہاتھ پکا کر دے گا۔'),
+      cut: T(`No ${L} left, so cut with trump. Trump beats the other suits.`, `${LU} نہیں بچا، اس لیے ترپ سے کاٹیں۔ ترپ باقی سب سے بڑا ہے۔`),
+      win: T('It beats every card played so far.', 'یہ اب تک کے سب پتوں سے بڑا ہے۔'),
+      cantWin: T("You can't win this one, so play your lowest.", 'یہ ہاتھ نہیں جیت سکتے، اس لیے سب سے چھوٹا ڈالیں۔'),
+      throwLow: T(`No ${L} and you can't win, so throw a low card.`, `${LU} نہیں اور جیت نہیں سکتے، اس لیے چھوٹا پتا پھینک دیں۔`),
     }[h.why] || T('', '');
     let pre = T('', '');
     const add = (k, x) => { if (!once || !C.shown.has(k)) { if (once) C.shown.add(k); pre = T(pre.en + x.en, pre.ur + x.ur); } };
-    add('playRule', !S.leadSuit ? T('You lead this trick, so you can play any card. ', 'یہ ہاتھ آپ شروع کریں گے، کوئی بھی پتا چل سکتے ہیں۔ ')
-      : T('Glowing cards are the ones you can play. ', 'چمکتے ہوئے پتے ہی آپ چل سکتے ہیں۔ '));
-    if (S.leadSuit && (S.hand || []).some(x => x.s === S.leadSuit)) add('follow', T(`You have ${L}, so you must follow that suit. `, `آپ کے پاس ${LU} ہے، اس لیے وہی ڈالنا ہوگا۔ `));
-    let tap = T('', '');
-    if (coarse && once && !C.shown.has('tap')) { C.shown.add('tap'); tap = T(' Tap a card twice to play it.', ' پتا چلنے کے لیے اس پر دو بار ٹیپ کریں۔'); }
-    return T(pre.en + `Coach pick: <b>${c ? cardName(c) : 'the glowing card'}</b>. ` + why.en + tap.en,
-      pre.ur + `کوچ کی رائے: <b>${c ? cardU(c) : 'چمکتا ہوا پتا'}</b>۔ ` + why.ur + tap.ur);
+    add('playRule', !S.leadSuit ? T('You start this trick: any card is OK.', 'یہ ہاتھ آپ شروع کریں گے، کوئی بھی پتا چل سکتا ہے۔')
+      : T('', ''));
+    if (S.leadSuit && (S.hand || []).some(x => x.s === S.leadSuit)) add('follow', T(`You have ${L}, so you must play ${L}.`, `آپ کے پاس ${LU} ہے، اس لیے وہی ڈالنا ہوگا۔`));
+    const what = c ? head(`Tap <b>${cardName(c)}</b>${coarse ? ' twice' : ''}`, `<b>${cardU(c)}</b> پر ${coarse ? 'دو بار ' : ''}ٹیپ کریں`)
+      : head(`Tap the glowing card${coarse ? ' twice' : ''}`, `چمکتے پتے پر ${coarse ? 'دو بار ' : ''}ٹیپ کریں`);
+    return join(what, pre, why);
   }
   const askKeyOf = () => { const a = S.ask; return a ? a.kind + ':' + S.round + ':' + (S.hist || []).length + ':' + (S.trick || []).length + ':' + (S.hand || []).length : ''; };
   function onAsk() {
@@ -228,8 +222,8 @@
       say('start', T(hi, hi));
       say('team', T(`You sit at the bottom. ${team()} <b class="pn ta">Orange</b> = your team, <b class="pn tb">blue</b> = opponents. Take your time, the bots wait for you.`,
         `آپ نیچے بیٹھے ہیں۔ ${teamU()} <b class="pn ta">نارنجی</b> = آپ کی ٹیم، <b class="pn tb">نیلے</b> = مخالف۔ آرام سے کھیلیں، بوٹس آپ کا انتظار کرتے ہیں۔`));
-      say('deals', T('Cards come in 3 deals: 5, then 4, then 4 (13 each). After every deal there is a round of bidding. The highest bidder picks <b>trump</b>, the strongest suit for this hand.',
-        'پتے 3 بار بٹتے ہیں: 5، پھر 4، پھر 4 (ہر ایک کو 13)۔ ہر بار کے بعد بولی لگتی ہے۔ سب سے بڑی بولی والا <b>ترپ</b> چنتا ہے، یعنی اس بازی کی سب سے طاقتور قسم۔'));
+      say('deals', T('Cards come in 3 deals: 5, then 4, then 4. You bid after each deal.',
+        'پتے 3 بار بٹتے ہیں: 5، پھر 4، پھر 4۔ ہر بار کے بعد بولی ہوتی ہے۔'));
       if (S.n > 4) say('decks', T(`With ${S.n} players there are <b>2 decks</b>, so every card is there twice${S.n === 6 ? ' (the 2s, 3s and 4s are taken out)' : ''}. If two identical cards land in one trick, the one played <b>last</b> wins. So a second A♠ beats the first A♠!`,
         `${S.n} کھلاڑیوں میں <b>2 گڈیاں</b> ہوتی ہیں، اس لیے ہر پتا دو بار ہے${S.n === 6 ? ' (2، 3 اور 4 نکال دیے جاتے ہیں)' : ''}۔ اگر ایک ہاتھ میں دو ایک جیسے پتے آئیں تو <b>بعد میں</b> ڈالا گیا جیتتا ہے۔ یعنی دوسرا A♠ پہلے A♠ سے بڑا ہے!`));
       if (S.joker) say('jokerMode', T('<b>Joker mode:</b> there is a Joker in the deck, and it can flip a trick to the other team. I\'ll show you how it works.',
@@ -237,12 +231,12 @@
     }
     if ((S.hand || []).some(isJ)) say('gotJoker', T(`You have the <b>Joker</b>! How it works:<br>• You can only play it when you have <b>no cards of the suit led</b>, and you can never lead with it.<br>• It <b>flips the trick</b>: the team that was losing takes it, and you lead next.<br>• Best time: when the other team is about to win a trick.<br>• Don't keep it to the very end. If you must lead and only the Joker is left, the other team gets that trick.`,
       `آپ کے پاس <b>جوکر</b> ہے! یہ ایسے کام کرتا ہے:<br>• یہ صرف تب ڈال سکتے ہیں جب آپ کے پاس <b>چلی گئی قسم کا کوئی پتا نہ ہو</b>، اور اس سے ہاتھ شروع نہیں کر سکتے۔<br>• یہ <b>ہاتھ پلٹ دیتا ہے</b>: ہارنے والی ٹیم ہاتھ لے لیتی ہے، اور اگلی چال آپ کی۔<br>• بہترین وقت: جب دوسری ٹیم ہاتھ جیتنے والی ہو۔<br>• اسے آخر تک نہ رکھیں۔ اگر آپ کو چال چلنی ہو اور صرف جوکر بچا ہو تو وہ ہاتھ دوسری ٹیم کا۔`), { pos: 'top' });
-    if (S.round === 2 && S.gphase !== 'play') say('r2', T('Round 2: 4 more cards each. Bids can now go higher than 7. Whoever takes the bid can also pick a new trump.', 'راؤنڈ 2: سب کو 4 اور پتے۔ اب بولی 7 سے اوپر جا سکتی ہے۔ جو بولی لے وہ نیا ترپ بھی چن سکتا ہے۔'));
-    if (S.round === 3 && S.gphase !== 'play') say('r3', T('Last 4 cards. This is the final round of bidding, then the play starts.', 'آخری 4 پتے۔ یہ بولی کا آخری راؤنڈ ہے، پھر کھیل شروع۔'));
+    if (S.round === 2 && S.gphase !== 'play') say('r2', T('Round 2: 4 more cards. Bid again (now up to 13).', 'راؤنڈ 2: 4 اور پتے۔ پھر سے بولی (اب 13 تک)۔'));
+    if (S.round === 3 && S.gphase !== 'play') say('r3', T('Last 4 cards. Last chance to bid.', 'آخری 4 پتے۔ بولی کا آخری موقع۔'));
     if (S.gphase === 'play' && S.bid && !C.shown.has('play' + S.handNo)) {
       const bt = S.bid.seat % 2, v = S.bid.value, nd = need();
-      say('play' + S.handNo, T(`Bidding is done. ${teamName(bt)} bid <b>${v}</b> with ${suitTxt(S.trump)} trump, so they must win <b>${nd} tricks</b>${v === 6 ? ' (a bid of 6 still needs 7)' : ''}. ${bt === 0 ? 'The opponents need' : 'Your team needs'} ${14 - nd} to break it. ${esc(nm(S.bid.seat))} ${S.bid.seat === 0 ? 'lead' : 'leads'} the first trick.`,
-        `بولی ختم۔ ${bt === 0 ? 'آپ کی ٹیم' : 'مخالفوں'} نے ${suitU(S.trump)} ترپ کے ساتھ <b>${v}</b> کی بولی لگائی، اس لیے انہیں <b>${nd} ہاتھ</b> جیتنے ہیں${v === 6 ? ' (6 کی بولی پر بھی 7 چاہئیں)' : ''}۔ ${bt === 0 ? 'مخالفوں کو' : 'آپ کی ٹیم کو'} اسے توڑنے کے لیے ${14 - nd} ہاتھ چاہئیں۔ پہلی چال ${S.bid.seat === 0 ? 'آپ چلیں گے' : esc(nm(S.bid.seat)) + ' چلیں گے'}۔`));
+      say('play' + S.handNo, bt === 0 ? T(`Bidding done. Your team must win <b>${nd} tricks</b>.`, `بولی ختم۔ آپ کی ٹیم کو <b>${nd} ہاتھ</b> جیتنے ہیں۔`)
+        : T(`Bidding done. Opponents need ${nd} tricks. Win <b>${14 - nd}</b> to break their bid.`, `بولی ختم۔ مخالفوں کو ${nd} ہاتھ چاہئیں۔ <b>${14 - nd}</b> ہاتھ جیت کر ان کی بولی توڑیں۔`));
     }
     onAsk();
     mark();
