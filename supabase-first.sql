@@ -20,3 +20,6 @@ create table if not exists public.first_games (
 alter table public.first_games enable row level security;
 -- Only the game server (service key) can read or write it
 revoke all on public.first_games from anon, authenticated;
+
+-- Nov 20 2026: how they left, what was on screen, where they went next
+alter table public.first_games add column if not exists left_how text, add column if not exists last_seen text, add column if not exists then_joined text;

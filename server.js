@@ -156,13 +156,20 @@ function levelUp(t, info) {
   }
 }
 // First games: only write when a try gets further than any earlier try (started 0, bid 1, trump 2, card 3, hands 4, finished 5)
+// What a new player was looking at: last coach tip + the game step (and whether it was their turn)
+function firstWhere(t) {
+  const F = t.first, G = t.G, p = t.players.get(F.pid), P = t.pending;
+  const step = t.phase !== 'game' ? t.phase : G ? `hand ${G.handNo}, ${G.phase}${G.phase === 'bid' ? ' round ' + G.round : ''}` : '';
+  const turn = P && p && P.seat === p.seat ? `, their turn (${P.kind})` : '';
+  return `${F.last ? 'tip: ' + F.last + ' · ' : ''}${step}${turn}`.slice(0, 120);
+}
 const FIRST_RANK = { started: 0, bid: 1, trump: 2, card: 3, hand: 4, finished: 5 };
 const firstBest = new Map();
 function firstStep(pid, rank, hands, patch) {
   const b = firstBest.get(pid) || { rank: 0, hands: 0 };
   if (rank < b.rank || (rank === b.rank && hands <= b.hands && rank >= 4)) { S.firstGame(pid, { left_early: false }); return; }
   firstBest.set(pid, { rank, hands });
-  S.firstGame(pid, { ...patch, left_early: false });
+  S.firstGame(pid, { ...patch, left_early: false, left_how: null });
 }
 function wireProgress(t) {
   t.isBeginner = isBeginner;
@@ -214,7 +221,8 @@ io.on('connection', socket => {
   if (socket.data.app) S.appSeen(pid, null);
 
   const reply = (cb, err, data) => { if (typeof cb === 'function') cb(err ? { error: err } : { ok: true, ...data }); };
-  const leave = () => { socket.data.tableCode = null; if (table) { if (table.first && table.first.pid === pid && !table.first.done) S.firstGame(pid, { left_early: true }); table.removeClient(socket.id); socket.leave(table.code); table = null; } };
+  // First game: note how they left (Leave button, app closed / internet lost, another table) and the last tip or step on screen
+  const leave = (how) => { socket.data.tableCode = null; if (table) { if (table.first && table.first.pid === pid && !table.first.done) S.firstGame(pid, { left_early: true, left_how: how || null, last_seen: firstWhere(table) }); table.removeClient(socket.id); socket.leave(table.code); table = null; } };
   // removeClient also drops this socket from voice chat and tells the others
 
   socket.on('create', (opts, cb) => {
@@ -237,7 +245,7 @@ io.on('connection', socket => {
     }
     wireProgress(t);
     tables.set(code, t);
-    leave(); table = t; socket.data.tableCode = t.code; t.addClient(socket, pid, name);
+    leave('made another table'); table = t; socket.data.tableCode = t.code; t.addClient(socket, pid, name);
     t.sit(pid, 0);
     reply(cb, null, { code });
   });
@@ -246,7 +254,11 @@ io.on('connection', socket => {
     if (typeof cb !== 'function' && typeof opts === 'function') [cb, opts] = [opts, cb];
     const t = tables.get(String(code || '').toUpperCase());
     if (!t) return reply(cb, 'This table has closed. Ask your friend for a new link, or create your own table.');
-    leave(); table = t; socket.data.tableCode = t.code;
+    const via = String((opts && opts.via) || 'link').slice(0, 20);
+    if (!(table && table === t)) leave('joined another table (' + via + ')');
+    // A new player who left their first game: note where they went next (link, open tables list, code…)
+    if (firstBest.has(pid) && !(t.first && t.first.pid === pid)) S.firstGame(pid, { then_joined: `${t.n}p ${t.joker ? 'Joker' : 'Classic'} via ${via}, ${t.phase === 'game' ? 'game running' : 'before start'}, ${((k) => k + (k === 1 ? ' person' : ' people'))([...t.players.values()].filter(p => p.seat != null && !p.bot).length)} seated` });
+    table = t; socket.data.tableCode = t.code;
     // Already seated here from another phone or app? Same Google account: move the seat here. Same name: ask first.
     const acct = pidAuth.get(pid);
     const sameAcct = acct ? t.seats.findIndex(s => !s.bot && s.pid && s.pid !== pid && pidAuth.has(s.pid) && pidAuth.get(s.pid).profile.id === acct.profile.id) : -1;
@@ -320,13 +332,16 @@ io.on('connection', socket => {
     const F = table.first;
     if (!err && F && F.pid === pid) { const rank = { bid: 1, trump: 2, play: 3 }[msg.kind] || 0; if (rank > F.rank) { F.rank = rank; firstStep(pid, rank, 0, { step: ['started', 'bid', 'trump', 'card'][rank] }); } }
   });
-  socket.on('coach', (msg, cb) => { if (table) table.coach(pid, msg); reply(cb); });
+  socket.on('coach', (msg, cb) => {
+    if (msg && msg.seen) { const F = table && table.first; if (F && F.pid === pid && !F.done) F.last = String(msg.seen).slice(0, 30); return reply(cb); } // first game: last tip shown
+    if (table) table.coach(pid, msg); reply(cb);
+  });
   socket.on('hint', cb => { const h = table && table.hint(pid); reply(cb, h ? null : 'No hint', h || {}); });
   socket.on('setLimit', (lim, cb) => { if (!table) return reply(cb, 'Not at a table'); reply(cb, table.setLimit(pid, Number(lim))); });
   socket.on('next', cb => { if (table) table.dealNow(pid); reply(cb); });
   socket.on('again', cb => { if (!table) return reply(cb, 'Not at a table'); reply(cb, table.playAgain(pid)); });
   // Leave on purpose: free the seat and forget this table, so it no longer shows as "Your game"
-  socket.on('leaveTable', cb => { const t = table; if (t) t.stand(pid); leave(); if (t) t.forget(pid); reply(cb); });
+  socket.on('leaveTable', cb => { const t = table; if (t) t.stand(pid); leave('Leave button'); if (t) t.forget(pid); reply(cb); });
   // ---- accounts ----
   const signedIn = async (user, cb) => {
     const profile = await A.load(user);
@@ -527,7 +542,7 @@ io.on('connection', socket => {
     io.to(msg.to).emit('voice:signal', { from: socket.id, data: msg.data });
   });
 
-  socket.on('disconnect', () => { if (socket.data.uid) goOffline(socket.data.uid, socket); leave(); });
+  socket.on('disconnect', () => { if (socket.data.uid) goOffline(socket.data.uid, socket); leave('closed the app or lost internet'); });
 });
 
 // ---- private admin page: set ADMIN_PASS on Render, then open /admin ----

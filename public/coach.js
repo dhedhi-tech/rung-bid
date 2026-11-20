@@ -44,7 +44,7 @@
   function say(key, html, opt = {}) {
     if (!C || C.shown.has(key)) return;
     C.shown.add(key);
-    C.queue.push({ html, pos: opt.pos || 'hand', ask: !!opt.ask, end: !!opt.end, hintTip: !!opt.hintTip });
+    C.queue.push({ key, html, pos: opt.pos || 'hand', ask: !!opt.ask, end: !!opt.end, hintTip: !!opt.hintTip });
     if (!C.open) next();
   }
   function next() {
@@ -54,6 +54,7 @@
     if (!m) { if (C) C.open = null; b.hidden = true; dim(false); send('coach', { hold: false }); return; }
     C.open = m;
     show(m);
+    send('coach', { seen: m.key }); // admin First games: last tip a new player saw
     b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
     if (!m.ask) send('coach', { hold: true }); // the game waits while you read (your own turn has no timer anyway)
   }
