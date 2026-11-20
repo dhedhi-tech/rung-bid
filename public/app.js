@@ -644,7 +644,7 @@ async function winImage(info) {
   return new Promise(res => c.toBlob(res, 'image/png'));
 }
 async function shareWin(info) {
-  const text = `${info.text || `🏆 We won at Patta Party${info.margin ? ` by ${info.margin} point${info.margin === 1 ? '' : 's'}` : ''}!`} Think you can beat us? Get Patta Party free on Google Play: https://play.google.com/store/apps/details?id=com.dhedhitech.pattaparty&referrer=utm_source%3D${info.ref || 'share_win'}`;
+  const text = `${info.text || `🏆 We won at Patta Party${info.margin ? ` by ${info.margin} point${info.margin === 1 ? '' : 's'}` : ''}!`} Think you can beat us? Play Patta Party free: https://www.pattaparty.com/get?ref=${info.ref || 'share_win'}`; // opens the app if installed, else Play Store (Android) or the website
   const blob = await winImage(info);
   if (NATIVE_APP) {
     const Sh = capPlugin('Share'), Fs = capPlugin('Filesystem');
@@ -1854,6 +1854,7 @@ if (NATIVE_APP) { const A = capPlugin('App'); if (A) A.addListener('backButton',
 function appGameLink(url) {
   let u; try { u = new URL(url); } catch (e) { return; }
   if (u.protocol !== 'https:' || !/^(www\.)?pattaparty\.com$/.test(u.hostname)) return;
+  if (u.pathname === '/get') return; // a shared win link: just open the app where it is
   const to = 'https://' + location.host + u.pathname + u.search;
   if (to !== location.href) location.href = to;
 }

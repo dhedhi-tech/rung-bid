@@ -65,6 +65,14 @@ app.get('/pic/:id', async (req, res) => {
 });
 app.get('/config', (_req, res) => { res.set('Cache-Control', 'no-cache'); res.json(A.config()); });
 app.get('/health', (_req, res) => res.json({ ok: true, tables: tables.size }));
+// Shared win / sweep links (Nov 21 2026): one link for everyone. With the app installed, Android opens it in the app
+// (App Links cover every path on www.pattaparty.com); otherwise Android phones go to the Play Store, everything else to the website.
+app.get('/get', (req, res) => {
+  const ua = String(req.headers['user-agent'] || ''), ref = String(req.query.ref || 'share').replace(/[^a-z_]/gi, '').slice(0, 30) || 'share';
+  if (/PattaPartyApp/.test(ua)) return res.redirect(302, '/');
+  if (/Android/i.test(ua)) return res.redirect(302, 'https://play.google.com/store/apps/details?id=com.dhedhitech.pattaparty&referrer=' + encodeURIComponent('utm_source=' + ref));
+  res.redirect(302, '/?ref=' + ref);
+});
 
 const tables = new Map();
 
