@@ -750,6 +750,7 @@ function maybeAskReview(key, iWon) {
   reviewCounted = key;
   const games = Number(store.get('rb-games-done') || 0) + 1;
   store.set('rb-games-done', String(games));
+  if (pushAskOnce()) return; // first game over: ask for notifications (not the review too)
   if (Date.now() - Number(store.get('rb-review-at') || 0) < 30 * 24 * 3600 * 1000) return;
   if (!((iWon && games >= 2) || games >= 3)) return;
   const R = capPlugin('InAppReview'); if (!R) return; // older app versions don't have it
@@ -1000,13 +1001,13 @@ async function inviteSheet() {
   const fr = r.list.filter(f => f.status === 'friend' && !f.here), on = fr.filter(f => f.online);
   if (!fr.length) { $('invList').innerHTML = `<div class="sub-muted">No friends to invite yet. Tap a player at the table and choose Add friend, or share the WhatsApp link.</div>`; return; }
   $('invList').innerHTML = (on.length > 1 ? `<button class="secondary" id="invAll">Invite all online friends (${on.length})</button>` : '')
-    + fr.map(f => `<div class="fr-row">${avatarHTML({ name: f.name, av: f.av || null })}<span class="lb-name"><b>${esc(f.name)}</b><small>${f.online ? '<i class="on-dot"></i>Online' : 'Offline · share the WhatsApp link instead'}</small></span><span class="fr-acts">${f.online ? `<button class="mini ok" data-inv="${esc(f.id)}">Invite</button>` : ''}</span></div>`).join('');
+    + fr.map(f => `<div class="fr-row">${avatarHTML({ name: f.name, av: f.av || null })}<span class="lb-name"><b>${esc(f.name)}</b><small>${f.online ? '<i class="on-dot"></i>Online' : f.push ? 'Offline · gets a notification' : 'Offline · share the WhatsApp link instead'}</small></span><span class="fr-acts">${f.online ? `<button class="mini ok" data-inv="${esc(f.id)}">Invite</button>` : f.push ? `<button class="mini ok" data-inv="${esc(f.id)}">🔔 Notify</button>` : ''}</span></div>`).join('');
   $('invList').onclick = async e => {
     const b = e.target.closest('button'); if (!b) return;
     const ids = b.id === 'invAll' ? on.map(f => f.id) : [b.dataset.inv];
     b.disabled = true;
     const res = await send('invite', ids);
-    if (res && res.ok) { b.textContent = 'Invited ✔'; if (b.id === 'invAll') $('invList').querySelectorAll('[data-inv]').forEach(x => { x.disabled = true; x.textContent = 'Invited ✔'; }); }
+    if (res && res.ok) { b.textContent = b.textContent.includes('Notify') ? 'Notified ✔' : 'Invited ✔'; if (b.id === 'invAll') $('invList').querySelectorAll('[data-inv]').forEach(x => { x.disabled = true; x.textContent = 'Invited ✔'; }); }
     else b.disabled = false;
   };
 }
@@ -1754,6 +1755,7 @@ sock.on('connect', async () => {
   clearTimeout(waking); $('conn').hidden = true;
   await authNow();
   sendSource();
+  if (PUSH_TOKEN) sock.emit('pushToken', PUSH_TOKEN);
   if (tableCode && myName && !invitePending) joinTable();
   else if (!tableCode) loadRooms();
 });
@@ -1864,6 +1866,23 @@ function appBack() {
   else { const A = capPlugin('App'); if (A && A.exitApp) A.exitApp(); }
 }
 if (NATIVE_APP) { const A = capPlugin('App'); if (A) A.addListener('backButton', appBack); }
+// Push notifications (app with the PushNotifications plugin; needs Firebase in the app build).
+// Asked once, after the first finished game, never on first open. Tapping a notification opens its link (table invite).
+function pushPlugin() { return NATIVE_APP ? capPlugin('PushNotifications') : null; }
+function pushInit() {
+  const P = pushPlugin(); if (!P) return;
+  P.addListener('registration', t => { if (t && t.value) { PUSH_TOKEN = t.value; if (sock.connected) sock.emit('pushToken', t.value); } });
+  P.addListener('registrationError', () => {});
+  P.addListener('pushNotificationActionPerformed', a => { const u = a && a.notification && a.notification.data && a.notification.data.url; if (u) appGameLink(u); });
+  P.checkPermissions().then(r => { if (r && r.receive === 'granted') P.register().catch(() => {}); }).catch(() => {});
+}
+let PUSH_TOKEN = null;
+function pushAskOnce() {
+  const P = pushPlugin(); if (!P || store.get('rb-push-asked')) return false;
+  store.set('rb-push-asked', '1');
+  setTimeout(() => P.requestPermissions().then(r => { if (r && r.receive === 'granted') P.register().catch(() => {}); }).catch(() => {}), 1500);
+  return true;
+}
 // Game links (e.g. a WhatsApp table invite) that open the app: load that page inside the app
 function appGameLink(url) {
   let u; try { u = new URL(url); } catch (e) { return; }
@@ -1879,5 +1898,6 @@ if (NATIVE_APP) {
     if (A.getLaunchUrl) A.getLaunchUrl().then(r => { if (r && r.url && !sessionStorage.getItem('rb-launch')) { try { sessionStorage.setItem('rb-launch', '1'); } catch (e) {} appGameLink(r.url); } }).catch(() => {});
   }
 }
+pushInit();
 sock.connect();
 initAuth();

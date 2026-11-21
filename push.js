@@ -63,6 +63,13 @@ function seen(pid) {
   S.sb(`/rest/v1/push_tokens?pid=eq.${encodeURIComponent(pid)}`, { method: 'PATCH', body: JSON.stringify({ last_seen: new Date().toISOString(), pushes_since_seen: 0 }) }).catch(quiet);
 }
 
+// Which of these accounts can get a notification (have the app with notifications allowed)
+async function reachable(uids) {
+  if (!enabled() || !uids.length) return new Set();
+  try { return new Set(((await S.sb(`/rest/v1/push_tokens?select=uid&uid=in.(${uids.map(encodeURIComponent).join(',')})`)).data || []).map(r => r.uid)); }
+  catch (e) { quiet(e); return new Set(); }
+}
+
 // ---- friend invite to someone whose app is closed ----
 async function invite(uids, from, code, n, joker) {
   if (!enabled() || !uids.length) return 0;
@@ -99,4 +106,4 @@ async function reminders() {
 }
 setInterval(() => reminders().catch(e => console.error('push reminders', e.message)), 10 * 60 * 1000).unref();
 
-module.exports = { enabled, saveToken, linkUid, seen, invite, reminders, sendOne };
+module.exports = { enabled, reachable, saveToken, linkUid, seen, invite, reminders, sendOne };

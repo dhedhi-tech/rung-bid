@@ -455,10 +455,11 @@ io.on('connection', socket => {
     try {
       const l = await F.links(me), ids = [...l.keys()];
       const ppl = await A.people(ids);
+      const canPush = await PUSH.reachable(ids.filter(id => !online.has(id) && l.get(id).status === 'accepted'));
       const list = ppl.map(p => {
         const lk = l.get(p.id), on = online.get(p.id);
         let at = null; if (on) for (const sk of on.values()) if (sk.data.tableCode) at = sk.data.tableCode;
-        return { ...p, status: lk.status === 'accepted' ? 'friend' : lk.mine ? 'sent' : 'incoming', online: !!on, here: !!(table && at === table.code) };
+        return { ...p, status: lk.status === 'accepted' ? 'friend' : lk.mine ? 'sent' : 'incoming', online: !!on, push: !on && canPush.has(p.id), here: !!(table && at === table.code) };
       });
       list.sort((a, b) => (b.online - a.online) || a.name.localeCompare(b.name));
       reply(cb, null, { list });
