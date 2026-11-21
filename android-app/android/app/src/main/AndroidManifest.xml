@@ -37,6 +37,10 @@
             </intent-filter>
         </activity>
 
+        <!-- Push notifications: small white icon and colour -->
+        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_notify" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/notify_color" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -54,4 +58,6 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Short buzz on your turn -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Notifications (friend invites, daily coins); Android 13+ asks the player -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

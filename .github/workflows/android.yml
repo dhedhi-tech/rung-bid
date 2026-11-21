@@ -25,18 +25,29 @@ jobs:
         working-directory: android-app
     steps:
       - uses: actions/checkout@v4
+      # Notifications need Firebase's google-services.json; without it the app would crash when asking
+      # for notifications, so no app is built until the file is in android-app/android/app/
+      - name: Check Firebase file
+        id: fb
+        run: |
+          if [ -s android/app/google-services.json ]; then echo "ok=1" >> "$GITHUB_OUTPUT"
+          else echo "::warning::android-app/android/app/google-services.json is missing, app not built"; fi
       - uses: actions/setup-node@v4
+        if: steps.fb.outputs.ok == '1'
         with:
           node-version: 22
       - uses: actions/setup-java@v4
+        if: steps.fb.outputs.ok == '1'
         with:
           distribution: temurin
           java-version: 21
       - run: npm ci
+        if: steps.fb.outputs.ok == '1'
       - run: npx cap sync android
+        if: steps.fb.outputs.ok == '1'
 
       - name: Unlock upload key
-        if: env.UPLOAD_KEY_PASSWORD != ''
+        if: steps.fb.outputs.ok == '1' && env.UPLOAD_KEY_PASSWORD != ''
         run: |
           openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in upload-key.jks.enc -out "$RUNNER_TEMP/upload.jks" -pass env:UPLOAD_KEY_PASSWORD
           echo "KEYSTORE_FILE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
@@ -45,10 +56,12 @@ jobs:
           echo "KEY_ALIAS=upload" >> "$GITHUB_ENV"
 
       - name: Build app bundle
+        if: steps.fb.outputs.ok == '1'
         working-directory: android-app/android
         run: chmod +x gradlew && ./gradlew --no-daemon bundleRelease assembleRelease
 
       - name: Publish to Releases
+        if: steps.fb.outputs.ok == '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

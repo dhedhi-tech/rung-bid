@@ -9,6 +9,7 @@ const S = require('./stats');
 const P = require('./play');
 const R = require('./reports');
 const F = require('./friends');
+const PUSH = require('./push');
 // Signed-in players who are online right now: profile id -> Map(socket id -> socket)
 const online = new Map();
 const goOnline = (id, socket) => { if (!online.has(id)) online.set(id, new Map()); online.get(id).set(socket.id, socket); };
@@ -226,7 +227,12 @@ io.on('connection', socket => {
     const a = pidAuth.get(pid); if (a) A.setSkill(a.profile, k); else guestSkill.set(pid, Math.max(guestSkill.get(pid) || 0, k));
     reply(cb, null, { skill: skillOf(pid) });
   });
-  if (socket.data.app) S.appSeen(pid, null);
+  if (socket.data.app) { S.appSeen(pid, null); PUSH.seen(pid); }
+  // Push notifications: the app sends its Firebase token (after the player allows notifications)
+  socket.on('pushToken', (t, cb) => {
+    if (!socket.data.app || typeof t !== 'string' || t.length < 20 || t.length > 4096) return reply(cb, 'bad');
+    PUSH.saveToken(pid, socket.data.uid || null, t); reply(cb, null, {});
+  });
   // Install source (Play install referrer from the app, or ?ref= on the website), once per phone
   socket.on('source', (o, cb) => {
     if (!o || typeof o !== 'object') return reply(cb, 'bad');
@@ -361,7 +367,7 @@ io.on('connection', socket => {
     const profile = await A.load(user);
     if (socket.data.uid && socket.data.uid !== profile.id) goOffline(socket.data.uid, socket);
     pidAuth.set(pid, { profile });
-    socket.data.uid = profile.id; goOnline(profile.id, socket);
+    socket.data.uid = profile.id; goOnline(profile.id, socket); if (socket.data.app) PUSH.linkUid(pid, profile.id);
     F.links(profile.id).then(l => socket.emit('friend:count', [...l.values()].filter(x => x.status === 'pending' && !x.mine).length)).catch(() => {});
     S.playerSeen(pid, true, name, profile.id);
     if (socket.data.app) S.appSeen(pid, profile.id);
@@ -395,7 +401,7 @@ io.on('connection', socket => {
       reply(cb, null, { profile: A.view(g), daily });
     } catch (e) { console.error('guest', e.message); reply(cb, 'Could not load your progress'); }
   });
-  socket.on('signout', cb => { if (socket.data.uid) { goOffline(socket.data.uid, socket); socket.data.uid = null; } pidAuth.delete(pid); if (table) table.broadcast(); reply(cb); });
+  socket.on('signout', cb => { if (socket.data.uid) { goOffline(socket.data.uid, socket); socket.data.uid = null; if (socket.data.app) PUSH.linkUid(pid, null); } pidAuth.delete(pid); if (table) table.broadcast(); reply(cb); });
   socket.on('deleteAccount', async cb => {
     const id = socket.data.uid; if (!id) return reply(cb, 'Not signed in');
     const err = await A.deleteAccount(id); if (err) return reply(cb, err);
@@ -464,10 +470,14 @@ io.on('connection', socket => {
     const now = Date.now(); if (socket.data.lastInvite && now - socket.data.lastInvite < 3000) return reply(cb, 'Slow down a little'); socket.data.lastInvite = now;
     try {
       const l = await F.links(me);
-      const targets = (Array.isArray(ids) ? ids.map(String) : [...l.keys()]).filter(id => l.get(id) && l.get(id).status === 'accepted' && online.has(id)).slice(0, 50);
+      const friends = (Array.isArray(ids) ? ids.map(String) : [...l.keys()]).filter(id => l.get(id) && l.get(id).status === 'accepted');
+      const targets = friends.filter(id => online.has(id)).slice(0, 50);
       const from = pidAuth.get(pid).profile;
       for (const id of targets) emitTo(id, 'invite', { from: from.name, av: A.avOf(from), code: table.code, n: table.n, joker: table.joker, playing: table.phase === 'game' });
-      reply(cb, null, { sent: targets.length });
+      // Friends whose app is closed get a notification instead (only when picked by name, not "invite all")
+      let pushed = 0;
+      if (Array.isArray(ids)) pushed = await PUSH.invite(friends.filter(id => !online.has(id)).slice(0, 20), from.name, table.code, table.n, table.joker);
+      reply(cb, null, { sent: targets.length + pushed });
     } catch (e) { friendErr(e, cb); }
   });
   // Player card: tap a seat to see that player's profile
