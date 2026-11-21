@@ -1737,9 +1737,23 @@ function leaveTable() {
   $('trick').innerHTML = ''; hidePanel(); homeScreen();
   boot();
 }
+// Where this player came from, sent once per phone (admin "Where new players came from"):
+// app = Google Play install referrer (app with the InstallRef plugin); website = ?ref= from a /get share link
+const urlRef = (new URLSearchParams(location.search).get('ref') || '').replace(/[^a-z_]/gi, '').slice(0, 30);
+async function sendSource() {
+  if (store.get('rb-src-sent')) return;
+  let body = null;
+  if (NATIVE_APP) {
+    const ir = capPlugin('InstallRef'); if (!ir) return; // older app version
+    try { const r = await ir.get(); if (!r || (r.ref === '' && !r.at)) return; body = { app: 1, ref: String(r.ref || '').slice(0, 300), at: +r.at || 0 }; } catch (e) { return; }
+  } else if (urlRef) body = { app: 0, ref: 'utm_source=' + urlRef, at: 0 };
+  if (!body) return;
+  sock.emit('source', body, r => { if (r && r.ok) store.set('rb-src-sent', '1'); });
+}
 sock.on('connect', async () => {
   clearTimeout(waking); $('conn').hidden = true;
   await authNow();
+  sendSource();
   if (tableCode && myName && !invitePending) joinTable();
   else if (!tableCode) loadRooms();
 });

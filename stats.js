@@ -76,6 +76,20 @@ async function firstGet(pid) {
   try { const r = await sb(`/rest/v1/first_games?pid=eq.${encodeURIComponent(pid)}&select=step,hands,started_at`); return (r.data || [])[0] || null; } catch (e) { return null; }
 }
 
+// ---- install source: where a new player came from (supabase-source.sql) ----
+// ref is the raw Play referrer, e.g. "utm_source=share_win" or "utm_source=google-play&utm_medium=organic"
+const srcMem = new Map(); let srcWarned = false;
+function parseRef(ref) {
+  const q = new URLSearchParams(String(ref || '')), src = (q.get('utm_source') || '').slice(0, 40), med = (q.get('utm_medium') || '').slice(0, 40);
+  return { source: src || (ref ? 'other' : 'unknown'), medium: med || null };
+}
+function sourceSeen(pid, o) {
+  const row = { pid, app: !!o.app, ref: o.ref || '', ...parseRef(o.ref), installed_at: o.at ? new Date(o.at * 1000).toISOString() : null };
+  if (!enabled) { if (!srcMem.has(pid)) srcMem.set(pid, { ...row, at: new Date().toISOString() }); return; }
+  sb('/rest/v1/install_sources?on_conflict=pid', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(row) })
+    .catch(e => { if (!srcWarned) { srcWarned = true; console.error('install sources:', e.message, '(run supabase-source.sql in Supabase)'); } });
+}
+
 // ---- report for the admin page ----
 async function report() {
   if (!enabled) return memReport();
@@ -106,7 +120,14 @@ async function report() {
   } catch (e) { modes = null; }
   let first = null;
   try { first = (await sb('/rest/v1/first_games?select=*&order=started_at.desc&limit=40')).data || []; } catch (e) { first = null; }
-  return { daily: daily.data || [], top: top.data || [], accounts: total, recent: recent.data || [], app, people, retention, modes, first };
+  let sources = null;
+  try {
+    const since = new Date(Date.now() - 30 * 864e5).toISOString();
+    const rows = (await sb(`/rest/v1/install_sources?select=pid,app,source,medium,at&at=gte.${since}&order=at.desc&limit=2000`)).data || [];
+    sources = countSources(rows);
+    if (first) { const by = new Map(rows.map(r => [r.pid, r])); for (const f of first) { const r = by.get(f.pid); if (r) f.source = srcLabel(r); } }
+  } catch (e) { sources = null; }
+  return { daily: daily.data || [], top: top.data || [], accounts: total, recent: recent.data || [], app, people, retention, modes, first, sources };
 }
 function countModes(rows) {
   const m = {}; for (const n of [4, 6, 8]) m[n] = { joker: 0, plain: 0 };
@@ -132,7 +153,26 @@ function memReport() {
   const app = [...mem.app.entries()].map(([k, uid]) => ({ day: k.split('|')[0], pid: k.split('|')[1], uid }));
   const modes = countModes(mem.log.filter(l => l.kind === 'start' && Date.now() - l.at < 30 * 86400000));
   const first = [...firstMem.values()].sort((a, b) => (b.started_at > a.started_at ? 1 : -1));
-  return { daily, top: [], accounts: 0, memory: true, app, modes, first };
+  for (const f of first) { const r = srcMem.get(f.pid); if (r) f.source = srcLabel(r); }
+  return { daily, top: [], accounts: 0, memory: true, app, modes, first, sources: countSources([...srcMem.values()]) };
 }
 
-module.exports = { enabled, playerSeen, appSeen, logGame, firstGame, firstGet, report, dayOf, sb };
+// Plain names for the admin page
+function srcLabel(r) {
+  const s = r.source, m = r.medium;
+  if (s === 'google-play' && m === 'organic') return 'Play Store search / browse';
+  if (s === 'google-play') return 'Play Store' + (m ? ' (' + m + ')' : '');
+  if (s === 'share_win') return 'Shared win';
+  if (s === 'share_sweep') return 'Shared sweep';
+  if (s === 'share_whitewash') return 'Shared whitewash';
+  if (s === 'website') return 'Website' + (m ? ' (' + m.replace(/_/g, ' ') + ')' : '');
+  if (s === 'unknown') return 'Not from Play';
+  return s + (m ? ' / ' + m : '');
+}
+function countSources(rows) {
+  const c = {};
+  for (const r of rows) { const k = (r.app ? '' : 'Web: ') + srcLabel(r); c[k] = (c[k] || 0) + 1; }
+  return Object.entries(c).sort((a, b) => b[1] - a[1]).map(([label, n]) => ({ label, n }));
+}
+
+module.exports = { enabled, sourceSeen, playerSeen, appSeen, logGame, firstGame, firstGet, report, dayOf, sb };

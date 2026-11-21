@@ -227,6 +227,12 @@ io.on('connection', socket => {
     reply(cb, null, { skill: skillOf(pid) });
   });
   if (socket.data.app) S.appSeen(pid, null);
+  // Install source (Play install referrer from the app, or ?ref= on the website), once per phone
+  socket.on('source', (o, cb) => {
+    if (!o || typeof o !== 'object') return reply(cb, 'bad');
+    S.sourceSeen(pid, { app: !!o.app, ref: String(o.ref || '').slice(0, 300), at: +o.at || 0 });
+    reply(cb, null, {});
+  });
 
   const reply = (cb, err, data) => { if (typeof cb === 'function') cb(err ? { error: err } : { ok: true, ...data }); };
   // First game: note how they left (Leave button, app closed / internet lost, another table) and the last tip or step on screen

@@ -159,6 +159,10 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - App is in PRODUCTION on Play (manager, Nov 20 2026); the closed-test notes below are history.
 - `play.js`: reads Google's monthly report CSVs (UTF-16) from the Play bucket with a read-only service account (play-reports@rung-bid.iam.gserviceaccount.com, invited in Play Console with "View app information and download bulk reports"). Env `PLAY_SA_KEY` = the JSON key; bucket tried as PLAY_BUCKET, pubsite_prod_rev_<dev id>, pubsite_prod_<dev id> (dev id 9203260132950641138; the Download reports menu was not found in his console). Memory cache 6h. Admin "Google Play" section: installs ever, phones that have it, rating, per day store visits / installed from store / installs / removed, countries. Impressions are not in Google's export. Data is 2-7 days late.
 
+## Install source (Nov 21 2026, on pending-updates until deploy + new app build)
+- Manager wanted to know how new players found the game. App: local Capacitor plugin `InstallRef` (android-app/.../InstallRefPlugin.java, registered in MainActivity, lib com.android.installreferrer 2.2) returns the Play install referrer once (cached in SharedPreferences). Web: `?ref=` from /get share links.
+- Client `sendSource()` on socket connect, once per phone (`rb-src-sent`) -> socket `source` -> `S.sourceSeen` -> Supabase `install_sources` (supabase-source.sql; NOT yet run, needs the manager's OK). Admin: "Where new players came from" (last 30 days) + "Came from:" line under First games rows. Only installs made with the new app version are covered; plain Play links (no referrer) show as Play Store search.
+
 ## Render environment (names only)
 SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TURN_USER, TURN_PASS, optional CONTACT_EMAIL, PLAY_SA_KEY (Play reports service account JSON), optional PLAY_BUCKET. Never print or store their values.
 
