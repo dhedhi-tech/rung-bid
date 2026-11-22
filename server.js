@@ -64,7 +64,8 @@ app.get('/pic/:id', async (req, res) => {
   res.set('Cache-Control', req.query.v ? 'public, max-age=604800, immutable' : 'public, max-age=3600'); res.type(m[1]).send(Buffer.from(m[2], 'base64'));
 });
 app.get('/config', (_req, res) => { res.set('Cache-Control', 'no-cache'); res.json(A.config()); });
-app.get('/health', (_req, res) => res.json({ ok: true, tables: tables.size }));
+// playing = games running with a real player connected and seated. Checked before every deploy (a deploy ends running games).
+app.get('/health', (_req, res) => res.json({ ok: true, tables: tables.size, playing: [...tables.values()].filter(t => t.phase === 'game' && [...t.players.values()].some(p => p.connected && p.seat != null && !(t.seats[p.seat] || {}).bot)).length }));
 // Shared win / sweep links (Nov 21 2026): one link for everyone. With the app installed, Android opens it in the app
 // (App Links cover every path on www.pattaparty.com); otherwise Android phones go to the Play Store, everything else to the website.
 app.get('/get', (req, res) => {
