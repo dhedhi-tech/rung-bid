@@ -66,14 +66,27 @@ function logGame(row) {
 const firstMem = new Map(); let firstWarned = false;
 function firstGame(pid, patch) {
   const row = { pid, ...patch, updated_at: new Date().toISOString() };
+  firstNone.delete(pid);
   if (!enabled) { firstMem.set(pid, { ...(firstMem.get(pid) || { started_at: row.updated_at }), ...row }); return; }
   sb('/rest/v1/first_games?on_conflict=pid', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(row) })
     .catch(e => { if (!firstWarned) { firstWarned = true; console.error('first games:', e.message, '(run supabase-first.sql in Supabase)'); } });
 }
 
+// After the first game: when a new player was last seen and what they did (opened the app, joined a table, played a hand…)
+// Only players who have a first_games row; the rest are remembered here so we stop asking.
+const firstNone = new Set();
+function firstSeen(pid, did, extra) {
+  if (!pid || firstNone.has(pid)) return;
+  const row = { last_at: new Date().toISOString(), last_did: String(did || '').slice(0, 120), ...(extra || {}) };
+  if (!enabled) { const r = firstMem.get(pid); if (r) Object.assign(r, row); else firstNone.add(pid); return; }
+  sb(`/rest/v1/first_games?pid=eq.${encodeURIComponent(pid)}&select=pid`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) })
+    .then(r => { if (!(r.data || []).length) { firstNone.add(pid); if (firstNone.size > 50000) firstNone.clear(); } })
+    .catch(e => { if (!firstWarned) { firstWarned = true; console.error('first games:', e.message, '(run supabase-first.sql in Supabase)'); } });
+}
+
 async function firstGet(pid) {
   if (!enabled) return firstMem.get(pid) || null;
-  try { const r = await sb(`/rest/v1/first_games?pid=eq.${encodeURIComponent(pid)}&select=step,hands,started_at`); return (r.data || [])[0] || null; } catch (e) { return null; }
+  try { const r = await sb(`/rest/v1/first_games?pid=eq.${encodeURIComponent(pid)}&select=step,hands,started_at,play_secs`); return (r.data || [])[0] || null; } catch (e) { return null; }
 }
 
 // ---- install source: where a new player came from (supabase-source.sql) ----
@@ -120,6 +133,12 @@ async function report() {
   } catch (e) { modes = null; }
   let first = null;
   try { first = (await sb('/rest/v1/first_games?select=*&order=started_at.desc&limit=40')).data || []; } catch (e) { first = null; }
+  // Signed in later? Show the account name next to "Guest NNN"
+  try {
+    const ids = [...new Set((first || []).map(f => f.uid).filter(Boolean))];
+    if (ids.length) { const pr = (await sb(`/rest/v1/profiles?select=id,name,created_at&id=in.(${ids.map(encodeURIComponent).join(',')})`)).data || [];
+      const by = new Map(pr.map(p => [p.id, p])); for (const f of first) { const p = by.get(f.uid); if (p) { f.acct = p.name; f.acct_at = p.created_at; } } }
+  } catch (e) {}
   let sources = null;
   try {
     const since = new Date(Date.now() - 30 * 864e5).toISOString();
@@ -139,12 +158,12 @@ function countModes(rows) {
 }
 function memReport() {
   const days = new Set([...mem.days.keys(), ...mem.log.map(l => dayOf(l.at))]);
-  const firstSeen = new Map();
-  for (const d of [...mem.days.keys()].sort()) for (const pid of mem.days.get(d).keys()) if (!firstSeen.has(pid)) firstSeen.set(pid, d);
+  const firstDay = new Map();
+  for (const d of [...mem.days.keys()].sort()) for (const pid of mem.days.get(d).keys()) if (!firstDay.has(pid)) firstDay.set(pid, d);
   const daily = [...days].sort().reverse().slice(0, 30).map(day => {
     const m = mem.days.get(day) || new Map(), L = mem.log.filter(l => dayOf(l.at) === day), st = L.filter(l => l.kind === 'start'), fin = L.filter(l => l.kind === 'finish');
     return {
-      day, players: m.size, signed_players: [...m.values()].filter(Boolean).length, new_players: [...m.keys()].filter(p => firstSeen.get(p) === day).length, signups: 0,
+      day, players: m.size, signed_players: [...m.values()].filter(Boolean).length, new_players: [...m.keys()].filter(p => firstDay.get(p) === day).length, signups: 0,
       games_started: st.length, games_finished: fin.length, hands: fin.reduce((a, l) => a + (l.hands || 0), 0),
       joker_games: st.filter(l => l.joker).length, p4: st.filter(l => l.n === 4).length, p6: st.filter(l => l.n === 6).length, p8: st.filter(l => l.n === 8).length,
       bot_games: st.filter(l => l.humans === 1).length,
@@ -175,4 +194,4 @@ function countSources(rows) {
   return Object.entries(c).sort((a, b) => b[1] - a[1]).map(([label, n]) => ({ label, n }));
 }
 
-module.exports = { enabled, sourceSeen, playerSeen, appSeen, logGame, firstGame, firstGet, report, dayOf, sb };
+module.exports = { enabled, sourceSeen, playerSeen, appSeen, logGame, firstGame, firstSeen, firstGet, report, dayOf, sb };

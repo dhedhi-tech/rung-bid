@@ -173,9 +173,14 @@ function firstWhere(t) {
 }
 const FIRST_RANK = { started: 0, bid: 1, trump: 2, card: 3, hand: 4, finished: 5 };
 const firstBest = new Map();
+// Time actually spent inside first-game tries (seconds): earlier tries + the running one. The clock stops when they leave.
+const firstSecs = new Map();
+const firstPlay = t => { const F = t.first; return Math.round((firstSecs.get(F.pid) || 0) + (F.t0 ? (Date.now() - F.t0) / 1000 : 0)); };
+const firstBank = t => { const F = t.first; if (F.t0) { firstSecs.set(F.pid, firstPlay(t)); F.t0 = null; } return firstSecs.get(F.pid) || 0; };
+const tName = t => `${t.n}p ${t.joker ? 'Joker' : 'Classic'}`;
 function firstStep(pid, rank, hands, patch) {
   const b = firstBest.get(pid) || { rank: 0, hands: 0 };
-  if (rank < b.rank || (rank === b.rank && hands <= b.hands && rank >= 4)) { S.firstGame(pid, { left_early: false }); return; }
+  if (rank < b.rank || (rank === b.rank && hands <= b.hands && rank >= 4)) { S.firstGame(pid, { left_early: false, ...(patch.play_secs != null ? { play_secs: patch.play_secs } : {}) }); return; }
   firstBest.set(pid, { rank, hands });
   S.firstGame(pid, { ...patch, left_early: false, left_how: null });
 }
@@ -191,12 +196,13 @@ function wireProgress(t) {
     if (t.first && !t.first.done) {
       const F = t.first, p = t.players.get(F.pid), seat = p && p.seat;
       F.rank = Math.max(F.rank, 4);
-      const patch = { step: info.over ? 'finished' : 'hand', hands: t.G.handNo, tutorial: !!t.coachUsed };
-      if (info.over) { F.done = true; patch.finished = true; patch.won = seat != null ? info.gameWinner === seat % 2 : null; }
+      const patch = { step: info.over ? 'finished' : 'hand', hands: t.G.handNo, tutorial: !!t.coachUsed, play_secs: firstPlay(t) };
+      if (info.over) { F.done = true; patch.finished = true; patch.won = seat != null ? info.gameWinner === seat % 2 : null; patch.play_secs = firstBank(t); }
       firstStep(F.pid, info.over ? 5 : 4, t.G.handNo, patch);
     }
     for (const s of info.seats) {
       if (!s.pid) continue;
+      if (!(t.first && t.first.pid === s.pid && !info.over)) S.firstSeen(s.pid, info.over ? `finished a ${tName(t)} game, ${info.gameWinner === s.seat % 2 ? 'won' : 'lost'}` : `played hand ${t.G.handNo} (${tName(t)})`);
       const a = pidAuth.get(s.pid);
       if (!a) {
         const gp = pidGuest.get(s.pid);
@@ -227,6 +233,7 @@ io.on('connection', socket => {
     reply(cb, null, { skill: skillOf(pid) });
   });
   if (socket.data.app) S.appSeen(pid, null);
+  S.firstSeen(pid, socket.data.app ? 'opened the app' : 'opened the website', name && name !== 'Player' ? { now_name: name } : null);
   // Install source (Play install referrer from the app, or ?ref= on the website), once per phone
   socket.on('source', (o, cb) => {
     if (!o || typeof o !== 'object') return reply(cb, 'bad');
@@ -236,7 +243,7 @@ io.on('connection', socket => {
 
   const reply = (cb, err, data) => { if (typeof cb === 'function') cb(err ? { error: err } : { ok: true, ...data }); };
   // First game: note how they left (Leave button, app closed / internet lost, another table) and the last tip or step on screen
-  const leave = (how) => { socket.data.tableCode = null; if (table) { if (table.first && table.first.pid === pid && !table.first.done) S.firstGame(pid, { left_early: true, left_how: how || null, last_seen: firstWhere(table) }); table.removeClient(socket.id); socket.leave(table.code); table = null; } };
+  const leave = (how) => { socket.data.tableCode = null; if (table) { if (table.first && table.first.pid === pid && !table.first.done) S.firstGame(pid, { left_early: true, left_how: how || null, last_seen: firstWhere(table), play_secs: firstBank(table) }); table.removeClient(socket.id); socket.leave(table.code); table = null; } };
   // removeClient also drops this socket from voice chat and tells the others
 
   socket.on('create', (opts, cb) => {
@@ -249,14 +256,14 @@ io.on('connection', socket => {
     t.beginnerTable = isBeginner(pid); // made by a beginner: only these show in a beginner's Open tables list
     // A new player's very first game: record how far they get (admin "First games")
     if (opts && opts.first) {
-      t.first = { pid, rank: 0 };
+      t.first = { pid, rank: 0, t0: Date.now() };
       const tries = Math.max(1, Math.min(99, +opts.first || 1));
       const base = { name: String(name || '').slice(0, 20), uid: ((pidAuth.get(pid) || {}).profile || {}).id || null, app: !!socket.data.app, code, tries, lim: t.limit || 0, tutorial: guided, left_early: false };
       // A new try keeps the furthest point any earlier try reached (and the first start time)
-      if (tries > 1 && !firstBest.has(pid)) S.firstGet(pid).then(r => { if (r && !firstBest.has(pid)) firstBest.set(pid, { rank: FIRST_RANK[r.step] || 0, hands: r.hands || 0 }); });
-      if (tries === 1) { firstBest.set(pid, { rank: 0, hands: 0 }); S.firstGame(pid, { ...base, started_at: new Date().toISOString(), step: 'started', hands: 0, finished: false, won: null }); }
+      if (tries > 1 && !firstBest.has(pid)) S.firstGet(pid).then(r => { if (r && !firstBest.has(pid)) firstBest.set(pid, { rank: FIRST_RANK[r.step] || 0, hands: r.hands || 0 }); if (r && !firstSecs.has(pid)) firstSecs.set(pid, r.play_secs || 0); });
+      if (tries === 1) { firstBest.set(pid, { rank: 0, hands: 0 }); firstSecs.set(pid, 0); S.firstGame(pid, { ...base, started_at: new Date().toISOString(), step: 'started', hands: 0, finished: false, won: null }); }
       else S.firstGame(pid, base);
-    }
+    } else S.firstSeen(pid, `made a ${tName(t)} table${t.pub ? ' (open)' : ''}`);
     wireProgress(t);
     tables.set(code, t);
     leave('made another table'); table = t; socket.data.tableCode = t.code; t.addClient(socket, pid, name);
@@ -272,6 +279,8 @@ io.on('connection', socket => {
     if (!(table && table === t)) leave('joined another table (' + via + ')');
     // A new player who left their first game: note where they went next (link, open tables list, code…)
     if (firstBest.has(pid) && !(t.first && t.first.pid === pid)) S.firstGame(pid, { then_joined: `${t.n}p ${t.joker ? 'Joker' : 'Classic'} via ${via}, ${t.phase === 'game' ? 'game running' : 'before start'}, ${((k) => k + (k === 1 ? ' person' : ' people'))([...t.players.values()].filter(p => p.seat != null && !p.bot).length)} seated` });
+    if (t.first && t.first.pid === pid && !t.first.done && !t.first.t0) t.first.t0 = Date.now(); // back in their first game: clock runs again
+    if (!(t.first && t.first.pid === pid)) S.firstSeen(pid, `joined a ${tName(t)} table via ${via}${t.phase === 'game' ? ', game running' : ''}`);
     table = t; socket.data.tableCode = t.code;
     // Already seated here from another phone or app? Same Google account: move the seat here. Same name: ask first.
     const acct = pidAuth.get(pid);
@@ -321,6 +330,7 @@ io.on('connection', socket => {
   socket.on('rename', (nm, cb) => {
     name = cleanName(nm);
     S.playerSeen(pid, !!socket.data.uid, name, socket.data.uid);
+    S.firstSeen(pid, 'changed name to ' + name, { now_name: name });
     if (table) { const p = table.players.get(pid); if (p) { p.name = name; if (p.seat != null && !table.seats[p.seat].bot) table.seats[p.seat].name = name; } table.broadcast(); }
     reply(cb);
   });
@@ -364,6 +374,7 @@ io.on('connection', socket => {
     socket.data.uid = profile.id; goOnline(profile.id, socket);
     F.links(profile.id).then(l => socket.emit('friend:count', [...l.values()].filter(x => x.status === 'pending' && !x.mine).length)).catch(() => {});
     S.playerSeen(pid, true, name, profile.id);
+    S.firstSeen(pid, 'signed in as ' + String(profile.name || '').slice(0, 30), { uid: String(profile.id) });
     if (socket.data.app) S.appSeen(pid, profile.id);
     const daily = A.claimDaily(profile);
     let saved = takeGuestGain(pid, profile);
