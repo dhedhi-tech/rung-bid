@@ -45,10 +45,12 @@ let key = ''; try { key = sessionStorage.getItem('adminKey') || ''; } catch (e) 
 // New players' very first game: how far they got (supabase-first.sql)
 // Extra line under a first game: how they left, what was on screen, where they went next (added Nov 20 2026)
 const TIPS = { start: 'Welcome', team: 'Teams', deals: '3 deals', decks: '2 decks', r2: 'Round 2', r3: 'Round 3', askbid: 'Tap a bid', asktrump: 'Pick trump', askplay: 'Play a card', play: 'Bidding done', trump: 'Trump chosen', trick: 'Trick won', end: 'Hand result', twin: 'Same cards', jokerMode: 'Joker mode', gotJoker: 'You have a Joker' };
+const agoT = t => { const m = Math.round((Date.now() - new Date(t)) / 60000); return m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
 function firstMore(f) {
-  if (f.finished || !(f.left_how || f.last_seen || f.then_joined)) return '';
+  if (!f.last_at && (f.finished || !(f.left_how || f.last_seen || f.then_joined))) return '';
   const seen = String(f.last_seen || '').replace(/tip: (\w+)[^ ]*/, (m, k) => 'tip: ' + (TIPS[k] || TIPS[k.replace(/\d+$/, '')] || k));
-  const bits = [f.left_early && f.left_how ? 'Left: ' + esc(f.left_how) : '', seen ? 'On screen: ' + esc(seen) : '', f.then_joined ? 'Then joined: ' + esc(f.then_joined) : ''].filter(Boolean);
+  const lastSeen = f.last_at ? `<b>Last seen ${agoT(f.last_at)}:</b> ${esc(f.last_did || '')}` : '';
+  const bits = [lastSeen, f.finished ? '' : f.left_early && f.left_how ? 'Left: ' + esc(f.left_how) : '', !f.finished && seen ? 'On screen: ' + esc(seen) : '', !f.finished && f.then_joined ? 'Then joined: ' + esc(f.then_joined) : ''].filter(Boolean);
   return `<tr><td colspan="6" class="sub" style="padding-top:0;white-space:normal"><div style="position:sticky;left:12px;max-width:calc(100vw - 70px);line-height:1.45">↳ ${bits.join('<br>')}</div></td></tr>`;
 }
 function firstGamesHTML(F) {
@@ -58,9 +60,11 @@ function firstGamesHTML(F) {
   const far = f => f.finished ? (f.won ? '🏆 Finished, won' : '✅ Finished, lost')
     : f.step === 'hand' ? `Played ${f.hands} of ${f.lim || '?'} hands`
     : ({ started: 'Saw the cards, never acted', bid: 'Bid, then stopped', trump: 'Chose trump, then stopped', card: 'Played cards in hand 1' })[f.step] || f.step;
-  const mins = f => Math.max(0, Math.round((new Date(f.updated_at) - new Date(f.started_at)) / 60000));
-  return `<h2>First games (new players)</h2><div class="tw"><table><tr><th>Player</th><th>Started</th><th>How far</th><th>Time</th><th>Tutorial</th><th>Tries</th></tr>${F.map(f =>
-    `<tr><td>${esc(f.name || 'Guest')}${f.app ? ' <small>App</small>' : ''}${f.uid ? ' <small>Signed in</small>' : ''}</td><td>${ago(f.started_at)}</td><td>${far(f)}${!f.finished && f.left_early ? ' <small>(left)</small>' : ''}</td><td>${mins(f)} min</td><td>${f.tutorial ? 'On' : 'Off'}</td><td>${f.tries || 1}</td></tr>${firstMore(f)}`).join('')}</table></div>`;
+  // Time inside the first game only (clock stops when they leave). Older rows had no clock: shown as –
+  const mins = f => f.play_secs == null ? '–' : f.play_secs < 60 ? f.play_secs + ' sec' : Math.round(f.play_secs / 60) + ' min';
+  const who = f => f.acct ? `${esc(f.name || 'Guest')} <small>= ${esc(f.acct)}</small>` : esc(f.name || 'Guest');
+  return `<h2>First games (new players)</h2><div class="tw"><table><tr><th>Player</th><th>Played</th><th>How far</th><th>Started</th><th>Tutorial</th><th>Tries</th></tr>${F.map(f =>
+    `<tr><td>${who(f)}${f.app ? ' <small>App</small>' : ''}${f.uid && !f.acct ? ' <small>Signed in</small>' : ''}</td><td>${mins(f)}</td><td>${far(f)}${!f.finished && f.left_early ? ' <small>(left)</small>' : ''}</td><td>${ago(f.started_at)}</td><td>${f.tutorial ? 'On' : 'Off'}</td><td>${f.tries || 1}</td></tr>${firstMore(f)}`).join('')}</table></div>`;
 }
 // Google Play numbers (play.js): from Google's daily report files, a few days late
 function playHTML(G) {
