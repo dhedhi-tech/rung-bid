@@ -62,8 +62,9 @@ function firstGamesHTML(F) {
     : ({ started: 'Saw the cards, never acted', bid: 'Bid, then stopped', trump: 'Chose trump, then stopped', card: 'Played cards in hand 1' })[f.step] || f.step;
   // Time inside the first game only (clock stops when they leave). Older rows had no clock: shown as –
   const mins = f => f.play_secs == null ? '–' : f.play_secs < 60 ? f.play_secs + ' sec' : Math.round(f.play_secs / 60) + ' min';
-  // Signed up: show the account name; the guest name they started with stays small underneath
-  const who = f => (f.acct ? esc(f.acct) : esc(f.name || 'Guest')) + (f.app ? ' <small>App</small>' : '') + (f.uid ? ' <small>Signed in</small>' : '') + (f.acct ? `<br><small>was ${esc(f.name || 'Guest')}</small>` : '');
+  // Signed up: account name. Still a guest but changed their name: the new name. The starting guest name stays small underneath
+  const now = f => f.acct || (f.now_name && f.now_name !== f.name ? f.now_name : '');
+  const who = f => (now(f) ? esc(now(f)) : esc(f.name || 'Guest')) + (f.app ? ' <small>App</small>' : '') + (f.uid ? ' <small>Signed in</small>' : '') + (now(f) ? `<br><small>was ${esc(f.name || 'Guest')}</small>` : '');
   return `<h2>First games (new players)</h2><div class="tw"><table><tr><th>Player</th><th>Played</th><th>How far</th><th>Started</th><th>Tutorial</th><th>Tries</th></tr>${F.map(f =>
     `<tr><td>${who(f)}</td><td>${mins(f)}</td><td>${far(f)}${!f.finished && f.left_early ? ' <small>(left)</small>' : ''}</td><td>${ago(f.started_at)}</td><td>${f.tutorial ? 'On' : 'Off'}</td><td>${f.tries || 1}</td></tr>${firstMore(f)}`).join('')}</table></div>`;
 }

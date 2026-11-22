@@ -25,4 +25,4 @@ revoke all on public.first_games from anon, authenticated;
 alter table public.first_games add column if not exists left_how text, add column if not exists last_seen text, add column if not exists then_joined text;
 
 -- Nov 22 2026: real time played in the first game, and when they were last seen and what they did
-alter table public.first_games add column if not exists play_secs int, add column if not exists last_at timestamptz, add column if not exists last_did text;
+alter table public.first_games add column if not exists play_secs int, add column if not exists last_at timestamptz, add column if not exists last_did text, add column if not exists now_name text;

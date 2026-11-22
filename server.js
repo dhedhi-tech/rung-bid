@@ -233,7 +233,7 @@ io.on('connection', socket => {
     reply(cb, null, { skill: skillOf(pid) });
   });
   if (socket.data.app) S.appSeen(pid, null);
-  S.firstSeen(pid, socket.data.app ? 'opened the app' : 'opened the website');
+  S.firstSeen(pid, socket.data.app ? 'opened the app' : 'opened the website', name && name !== 'Player' ? { now_name: name } : null);
 
   const reply = (cb, err, data) => { if (typeof cb === 'function') cb(err ? { error: err } : { ok: true, ...data }); };
   // First game: note how they left (Leave button, app closed / internet lost, another table) and the last tip or step on screen
@@ -324,6 +324,7 @@ io.on('connection', socket => {
   socket.on('rename', (nm, cb) => {
     name = cleanName(nm);
     S.playerSeen(pid, !!socket.data.uid, name, socket.data.uid);
+    S.firstSeen(pid, 'changed name to ' + name, { now_name: name });
     if (table) { const p = table.players.get(pid); if (p) { p.name = name; if (p.seat != null && !table.seats[p.seat].bot) table.seats[p.seat].name = name; } table.broadcast(); }
     reply(cb);
   });
