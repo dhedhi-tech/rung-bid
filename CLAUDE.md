@@ -13,7 +13,7 @@ Live on Render (auto-deploys every push to `main`), accounts in Supabase, code o
 - A push to main restarts the live server and ends every game in progress, so only deploy when no game is in play (see DEPLOY RULE above).
 - Do work on the branch `pending-updates` (create it from main), push that branch, and tell Ansa what is waiting.
 - To deploy: `git checkout main && git merge --ff-only pending-updates && git push origin main`.
-- Before every deploy (manager, Nov 23 2026): open https://www.pattaparty.com/health (WebFetch; the shell can't reach the site). Deploy only if `playing` is 0 (no game with a real player in progress); otherwise wait and check again.
+- Before every deploy: DON'T trust WebFetch of /health (Nov 23 2026 it returned an old cached copy without the `playing` field, and a deploy went out while Google's test robot was mid-game). Read the latest `[live] tables=N playing=M` line from Render app logs (Render MCP list_logs, service srv-db96k3gn74is738jlnog, workspace tea-db968evf3r2c73a91q20, text `[live]`); /health logs it at most once a minute and is hit every 4-5 min (cron + open tables). Deploy only if the newest line is under ~6 min old and playing=0; otherwise wait and check again. Cross-check Supabase game_log: a recent 'start' with no 'finish' = maybe still playing. `[stop] ... playing=N` is logged when a deploy stops the old server.
 - A commit message containing `[skip render]` pushes to main without deploying (use only for notes like this file).
 - Talk to Ansa in simple English (or Roman Urdu), one task at a time, short. Never Devanagari.
 - Show design changes as screenshots (Playwright, Chromium at /opt/pw-browsers or the headless_shell binary). She cannot open downloaded files easily.

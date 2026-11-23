@@ -65,7 +65,15 @@ app.get('/pic/:id', async (req, res) => {
 });
 app.get('/config', (_req, res) => { res.set('Cache-Control', 'no-cache'); res.json(A.config()); });
 // playing = games running with a real player connected and seated. Checked before every deploy (a deploy ends running games).
-app.get('/health', (_req, res) => res.json({ ok: true, tables: tables.size, playing: [...tables.values()].filter(t => t.phase === 'game' && [...t.players.values()].some(p => p.connected && p.seat != null && !(t.seats[p.seat] || {}).bot)).length }));
+// Games with a connected real player. Logged (at most once a minute) so the deploy check can read it from Render's logs:
+// the site can't be fetched reliably from Claude's tools (an old cached /health was returned on Nov 23 2026)
+const playingNow = () => [...tables.values()].filter(t => t.phase === 'game' && [...t.players.values()].some(p => p.connected && p.seat != null && !(t.seats[p.seat] || {}).bot)).length;
+let liveLogAt = 0;
+app.get('/health', (_req, res) => {
+  const playing = playingNow();
+  if (Date.now() - liveLogAt > 60e3) { liveLogAt = Date.now(); console.log(`[live] tables=${tables.size} playing=${playing}`); }
+  res.set('Cache-Control', 'no-store').json({ ok: true, tables: tables.size, playing });
+});
 // Shared win / sweep links (Nov 21 2026): one link for everyone. With the app installed, Android opens it in the app
 // (App Links cover every path on www.pattaparty.com); otherwise Android phones go to the Play Store, everything else to the website.
 app.get('/get', (req, res) => {
@@ -648,3 +656,5 @@ setInterval(() => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log('Patta Party running on port ' + PORT));
+// A deploy stops this server: note how many real games it ended (shows in Render's logs)
+process.on('SIGTERM', () => { console.log(`[stop] tables=${tables.size} playing=${playingNow()}`); process.exit(0); });
