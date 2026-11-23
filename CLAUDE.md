@@ -4,12 +4,13 @@ Online team bidding card game (Rung style) for 4, 6 or 8 players. Created by Ans
 
 ## Handover (Nov 2026)
 - Ansa's brother now manages the project from his own Claude account. Wherever these notes say "Ansa", read "the person managing the project" (her brother), unless he says otherwise.
-- His preferences (asked Nov 10 2026): simple English, short summary first with details only when he asks, screenshots in chat for design changes, never deploy until he says "deploy" (same rules as Ansa below).
+- His preferences (asked Nov 10 2026): simple English, short summary first with details only when he asks, screenshots in chat for design changes.
+- DEPLOY RULE (manager, Nov 23 2026, replaces "wait for deploy"): deploy finished work AUTOMATICALLY, without waiting to be told, once /health shows no game in play (`playing` 0, or `tables` 0). If games are in play, wait and check again, then deploy.
 - Accounts: GitHub collaborator on dhedhi-tech/rung-bid; Render, Supabase, Play Console (tech.dhedhi@gmail.com), Namecheap (pattaparty.com), ExpressTURN, Google Cloud (OAuth) are shared with him by Ansa. Never ask for or store passwords in chat or in this repo.
 Live on Render (auto-deploys every push to `main`), accounts in Supabase, code on GitHub `dhedhi-tech/rung-bid`.
 
 ## Working rules (important)
-- **Never push to `main` unless Ansa says "deploy".** A push to main restarts the live server and ends every game in progress.
+- A push to main restarts the live server and ends every game in progress, so only deploy when no game is in play (see DEPLOY RULE above).
 - Do work on the branch `pending-updates` (create it from main), push that branch, and tell Ansa what is waiting.
 - To deploy: `git checkout main && git merge --ff-only pending-updates && git push origin main`.
 - Before every deploy (manager, Nov 23 2026): open https://www.pattaparty.com/health (WebFetch; the shell can't reach the site). Deploy only if `playing` is 0 (no game with a real player in progress); otherwise wait and check again.
