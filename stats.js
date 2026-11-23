@@ -184,10 +184,11 @@ function memReport() {
 }
 
 // Plain names for the admin page
+const EARLIER = 'Earlier players (updated the app)';
 function srcLabel(r) {
   const s = r.source, m = r.medium;
   // Installed long before the app first reported it: an earlier player who just updated to an app that reports, not a new one
-  if (r.installed_at && r.at && new Date(r.at) - new Date(r.installed_at) > 2 * 864e5) return 'Earlier players (updated the app)';
+  if (r.installed_at && r.at && new Date(r.at) - new Date(r.installed_at) > 2 * 864e5) return EARLIER;
   if (s === '(not set)') return 'Play link without campaign (e.g. testers)';
   if (s === 'google-test') return 'Google test phones (not counted)';
   if (s === 'google-play' && m === 'organic') return 'Play Store search / browse';
@@ -201,7 +202,7 @@ function srcLabel(r) {
 }
 function countSources(rows) {
   const c = {};
-  for (const r of rows) { const k = (r.app ? '' : 'Web: ') + srcLabel(r); c[k] = (c[k] || 0) + 1; }
+  for (const r of rows) { const l = srcLabel(r); if (l === EARLIER) continue; const k = (r.app ? '' : 'Web: ') + l; c[k] = (c[k] || 0) + 1; } // earlier players aren't shown (manager)
   return Object.entries(c).sort((a, b) => b[1] - a[1]).map(([label, n]) => ({ label, n }));
 }
 
