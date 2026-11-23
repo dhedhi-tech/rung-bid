@@ -252,7 +252,13 @@ io.on('connection', socket => {
 
   const reply = (cb, err, data) => { if (typeof cb === 'function') cb(err ? { error: err } : { ok: true, ...data }); };
   // First game: note how they left (Leave button, app closed / internet lost, another table) and the last tip or step on screen
-  const leave = (how) => { socket.data.tableCode = null; if (table) { if (table.first && table.first.pid === pid && !table.first.done) S.firstGame(pid, { left_early: true, left_how: how || null, last_seen: firstWhere(table), play_secs: firstBank(table) }); table.removeClient(socket.id); socket.leave(table.code); table = null; } };
+  // First game: only count it as leaving (and stop the play clock) when no other connection of the same phone is still
+  // at the table. After a network blip the app reconnects on a new connection before the server notices the old one is
+  // dead; that old one closing later used to stop the clock and mark "left" while the player was still playing.
+  const leave = (how) => { socket.data.tableCode = null; if (table) {
+    const other = [...table.clients.entries()].some(([id, c]) => id !== socket.id && c.pid === pid);
+    if (table.first && table.first.pid === pid && !table.first.done && !other) S.firstGame(pid, { left_early: true, left_how: how || null, last_seen: firstWhere(table), play_secs: firstBank(table) });
+    table.removeClient(socket.id); socket.leave(table.code); table = null; } };
   // removeClient also drops this socket from voice chat and tells the others
 
   socket.on('create', (opts, cb) => {
