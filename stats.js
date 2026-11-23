@@ -149,7 +149,7 @@ async function report() {
   let sources = null;
   try {
     const since = new Date(Date.now() - 30 * 864e5).toISOString();
-    const rows = (await sb(`/rest/v1/install_sources?select=pid,app,source,medium,at&at=gte.${since}&order=at.desc&limit=2000`)).data || [];
+    const rows = (await sb(`/rest/v1/install_sources?select=pid,app,source,medium,at,installed_at&at=gte.${since}&order=at.desc&limit=2000`)).data || [];
     sources = countSources(rows);
     if (first) { const by = new Map(rows.map(r => [r.pid, r])); for (const f of first) { const r = by.get(f.pid); if (r) f.source = srcLabel(r); } }
   } catch (e) { sources = null; }
@@ -186,6 +186,9 @@ function memReport() {
 // Plain names for the admin page
 function srcLabel(r) {
   const s = r.source, m = r.medium;
+  // Installed long before the app first reported it: an earlier player who just updated to an app that reports, not a new one
+  if (r.installed_at && r.at && new Date(r.at) - new Date(r.installed_at) > 2 * 864e5) return 'Earlier players (updated the app)';
+  if (s === '(not set)') return 'Play link without campaign (e.g. testers)';
   if (s === 'google-test') return 'Google test phones (not counted)';
   if (s === 'google-play' && m === 'organic') return 'Play Store search / browse';
   if (s === 'google-play') return 'Play Store' + (m ? ' (' + m + ')' : '');
