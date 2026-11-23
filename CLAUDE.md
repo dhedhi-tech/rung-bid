@@ -59,6 +59,7 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Open tables list now shows full public tables too ("Full", "Watch").
 - Waiting list: `table.waitList` (pids). Watchers tap "Sit on first available seat" (no bot seat free) to join the line; no one is added without tapping. When a player leaves mid-game (`stand`), the first connected person in line takes the seat (`fillFromWait`).
 - Swap option (`table.swap`, create sheet "If the bidder fails", link-only tables, not practice): after a failed bid, a human bidder goes to the end of the line and the first in line takes the seat before the next hand (`swapFailedBidder`).
+- Team lock (Nov 24 2026, manager: a player left, sat on the winning team, bid 13, then went back): once a person plays for a team in a game, they can only sit with that team until the game ends (`teamLock`, keys pid + Google account + name; `lockedOut`, `freeSeatFor`). Wait list / swap / away-swap pick the first waiter allowed for that seat. Watchers only see Sit under their own team's bots (`lockTeam` in the view). Reset at each new game.
 - Card play timer 8s (bid/trump 20s). Delete my account (profile sheet, `A.deleteAccount`). Vibration on your turn (needs app 1.0.10, VIBRATE permission).
 
 ## Away (deployed Nov 5)

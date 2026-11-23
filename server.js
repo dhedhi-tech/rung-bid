@@ -314,7 +314,7 @@ io.on('connection', socket => {
     if (((opts && opts.seat === 'auto') || newbieSeat) && t.phase === 'game') {
       const p = t.players.get(pid);
       if (p && p.seat == null) {
-        const free = p.lastSeat != null && t.seats[p.lastSeat].bot ? p.lastSeat : t.seats.findIndex(s => s.bot);
+        const free = p.lastSeat != null && t.seats[p.lastSeat].bot && !t.lockedOut(pid, p.lastSeat) ? p.lastSeat : t.freeSeatFor(pid);
         if (free >= 0) t.sit(pid, free);
       }
     }

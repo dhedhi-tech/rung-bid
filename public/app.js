@@ -223,7 +223,7 @@ function renderSeats() {
       + (p.voice ? `<span class="vmic" title="${p.voice.muted ? 'Mic off' : 'In voice chat'}">${p.voice.muted ? '🔇' : '🎙'}</span>` : '');
     const active = S.active === i && S.phase === 'game';
     // Watching: a Sit button right under each bot seat (manager, Nov 21 2026; was a list of names at the bottom)
-    const sit = !me0() && p.bot && !S.dup && (S.phase === 'game' || S.phase === 'over') ? `<button class="sit-btn" data-take="${p.real}">Sit</button>` : '';
+    const sit = !me0() && p.bot && !S.dup && (S.phase === 'game' || S.phase === 'over') && (S.lockTeam == null || p.real % 2 === S.lockTeam) ? `<button class="sit-btn" data-take="${p.real}">Sit</button>` : '';
     const tmr = active && deadlineAt ? `<span class="tmr" data-tmr><i></i></span>` : '';
     const talking = p.voice && !p.voice.muted && (talkers.has(p.voice.sid) || (i === 0 && me0() && V.talking));
     const bidding = active && (S.gphase === 'bid' || S.gphase === 'trump');
@@ -253,7 +253,7 @@ function renderHand() {
   if (!me0()) {
     el.innerHTML = ''; el.style.height = 'auto';
     if (S.phase === 'game' || S.phase === 'over') {
-      const open = S.seats.map((p, i) => ({ p, i })).filter(x => x.p.bot);
+      const open = S.seats.map((p, i) => ({ p, i })).filter(x => x.p.bot && (S.lockTeam == null || x.p.real % 2 === S.lockTeam));
       if (S.dup) { el.innerHTML = `<div class="watchbar"><b>${esc(S.dup.name)}</b> is away. Is that you? <button id="dupClaim">Yes, play here</button></div>`; $('dupClaim').onclick = () => send('claim'); return; }
       const wl = S.phase === 'game' && !open.length ? (S.myWait ? ` You sit on the first free seat (#${S.myWait} in line). <button id="waitBtn" data-w="0">Cancel</button>` : ` <button id="waitBtn" data-w="1">Sit on first available seat</button>`) : '';
       el.innerHTML = `<div class="watchbar">You're watching.${open.length ? ' Tap <b>Sit</b> under a bot to play.' : ''}${wl}</div>`;

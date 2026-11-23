@@ -131,6 +131,7 @@ class Table {
       const other = this.players.get(s.pid);
       if (other && other.connected) return 'Seat taken';
     }
+    if (this.lockedOut(pid, seat)) return 'You can only sit with your own team until this game ends';
     if (p.seat != null && p.seat !== seat) {
       if (this.phase !== 'lobby') return 'You already have a seat';
       this.freeSeat(p.seat);
@@ -138,6 +139,7 @@ class Table {
     if (s.pid && s.pid !== pid) { const other = this.players.get(s.pid); if (other) other.seat = null; }
     const tookFrom = this.phase !== 'lobby' && s.bot ? s.name : null;
     s.pid = pid; s.bot = false; s.name = p.name; p.seat = seat;
+    if (this.phase === 'game') this.lockTeam(pid, seat);
     this.waitList = this.waitList.filter(x => x !== pid);
     this.checkResume();
     if (tookFrom && !this.quietSit) this.fx('watch', { text: `${p.name} took over ${tookFrom}'s seat`, except: pid });
@@ -150,6 +152,18 @@ class Table {
     const p = this.players.get(pid); if (p && p.seat == null) this.players.delete(pid);
     this.broadcast();
   }
+  // Team lock (Nov 24 2026): once someone plays for a team in a game, they can't come back on the other team
+  // until that game ends (stops: leave, rejoin on the winning team, bid 13, swap back). Keyed by player id,
+  // Google account and name, so a second phone, signing in or re-joining doesn't reset it.
+  lockKeys(pid) {
+    const p = this.players.get(pid), id = this.idOf ? this.idOf(pid) : null, nm = p && String(p.name || '').trim().toLowerCase();
+    return ['p:' + pid, id && 'u:' + id, nm && nm !== 'player' && 'n:' + nm].filter(Boolean);
+  }
+  lockTeam(pid, seat) { if (!this.teamLock) this.teamLock = new Map(); for (const k of this.lockKeys(pid)) if (!this.teamLock.has(k)) this.teamLock.set(k, seat % 2); }
+  lockedTeam(pid) { if (!this.teamLock || this.phase !== 'game') return null; for (const k of this.lockKeys(pid)) if (this.teamLock.has(k)) return this.teamLock.get(k); return null; }
+  lockedOut(pid, seat) { const t = this.lockedTeam(pid); return t != null && seat % 2 !== t; }
+  // First free bot seat this person may take (own team only if locked)
+  freeSeatFor(pid) { return this.seats.findIndex((s, i) => s.bot && !this.lockedOut(pid, i)); }
   // Same person on a second phone or app (e.g. WhatsApp's browser): the seat they could take over
   sameNameSeat(pid) {
     const p = this.players.get(pid); if (!p || p.seat != null) return -1;
@@ -213,7 +227,7 @@ class Table {
   waitingNow() { return this.waitList.filter(id => { const w = this.players.get(id); return w && w.connected && w.seat == null; }); }
   joinWait(pid) {
     const p = this.players.get(pid); if (!p || p.seat != null) return 'You already have a seat';
-    if (this.phase === 'game') { const free = this.seats.findIndex(s => s.bot); if (free >= 0) return this.sit(pid, free); }
+    if (this.phase === 'game') { const free = this.freeSeatFor(pid); if (free >= 0) return this.sit(pid, free); }
     if (!this.waitList.includes(pid)) this.waitList.push(pid);
     this.broadcast(); return null;
   }
@@ -221,7 +235,7 @@ class Table {
   // A seat became a bot seat during a game: the first connected person in line takes it
   fillFromWait(seat, leftName) {
     if (!this.seats[seat].bot) return false;
-    const next = this.waitingNow()[0]; if (!next) return false;
+    const next = this.waitingNow().find(id => !this.lockedOut(id, seat)); if (!next) return false;
     this.quietSit = true; const err = this.sit(next, seat); this.quietSit = false;
     if (!err) this.fx('watch', { text: `${this.players.get(next).name} takes ${leftName}'s seat` });
     return !err;
@@ -229,11 +243,11 @@ class Table {
   // Swap option: the human bidder whose bid failed goes to the end of the line, the first person in line takes the seat
   swapFailedBidder(seat) {
     const s = this.seats[seat]; if (!this.swap || s.bot || !s.pid) return;
-    const next = this.waitingNow()[0]; if (!next) return;
+    const next = this.waitingNow().find(id => !this.lockedOut(id, seat)); if (!next) return;
     const out = s.pid, op = this.players.get(out), np = this.players.get(next); if (!op || !np) return;
     this.waitList = this.waitList.filter(x => x !== next); this.waitList.push(out);
     op.seat = null; op.lastSeat = seat;
-    s.pid = next; s.name = np.name; np.seat = seat;
+    s.pid = next; s.name = np.name; np.seat = seat; this.lockTeam(next, seat);
     this.fx('watch', { text: `${np.name} takes ${op.name}'s seat. ${op.name} joins the waiting list` });
     this.broadcast();
   }
@@ -276,11 +290,11 @@ class Table {
     this.seats.forEach((s, seat) => {
       const p = !s.bot && s.pid && this.players.get(s.pid);
       if (!p || !p.away || !p.awaySince || Date.now() - p.awaySince < AWAY_SWAP_MS) return;
-      const next = this.waitingNow()[0]; if (!next) return;
+      const next = this.waitingNow().find(id => !this.lockedOut(id, seat)); if (!next) return;
       const np = this.players.get(next);
       this.waitList = this.waitList.filter(x => x !== next);
       p.seat = null; p.lastSeat = seat; p.away = null;
-      s.pid = next; s.name = np.name; np.seat = seat;
+      s.pid = next; s.name = np.name; np.seat = seat; this.lockTeam(next, seat);
       this.fx('watch', { text: `${np.name} takes ${p.name}'s seat (away for 3 minutes)` });
     });
     this.checkResume(); this.broadcast();
@@ -404,6 +418,7 @@ class Table {
       lobbyNames: [...this.players.values()].filter(x => x.connected && x.seat == null).map(x => x.name),
       paused: !!this.paused,
       away: me >= 0 && this.players.get(pid) ? this.players.get(pid).away || null : null,
+      lockTeam: this.lockedTeam(pid),
       waiting: this.waitingNow().map(id => this.players.get(id).name), myWait: this.waitingNow().indexOf(pid) + 1, swap: this.swap,
       dup: me < 0 ? (k => (k < 0 ? null : { real: k, name: this.seats[k].name }))(this.sameNameSeat(pid)) : null,
     };
@@ -530,6 +545,7 @@ class Table {
       hist: [], roundTrump: {}, main: '', deadline: 0, over: null, result: null,
     };
     this.phase = 'game'; this.running = true;
+    this.teamLock = new Map(); this.seats.forEach((s, i) => { if (!s.bot && s.pid) this.lockTeam(s.pid, i); });
     this.checkAwaySwap();
     if (this.onGameStart) { try { this.onGameStart(); } catch (e) { console.error('stats', e); } }
     this.run();
