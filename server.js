@@ -212,7 +212,8 @@ function wireProgress(t) {
     }
     for (const s of info.seats) {
       if (!s.pid) continue;
-      if (!(t.first && t.first.pid === s.pid && !info.over)) S.firstSeen(s.pid, info.over ? `finished a ${tName(t)} game, ${info.gameWinner === s.seat % 2 ? 'won' : 'lost'}` : `played hand ${t.G.handNo} (${tName(t)})`);
+      // (skipped only while the first game itself is running; "Play again" on the same table counts again)
+      if (!(t.first && t.first.pid === s.pid && !t.first.done && !info.over)) S.firstSeen(s.pid, info.over ? `finished a ${tName(t)} game, ${info.gameWinner === s.seat % 2 ? 'won' : 'lost'}` : `played hand ${t.G.handNo} (${tName(t)})`);
       const a = pidAuth.get(s.pid);
       if (!a) {
         const gp = pidGuest.get(s.pid);
