@@ -169,6 +169,10 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - Manager wanted to know how new players found the game. App: local Capacitor plugin `InstallRef` (android-app/.../InstallRefPlugin.java, registered in MainActivity, lib com.android.installreferrer 2.2) returns the Play install referrer once (cached in SharedPreferences). Web: `?ref=` from /get share links.
 - Client `sendSource()` on socket connect, once per phone (`rb-src-sent`) -> socket `source` -> `S.sourceSeen` -> Supabase `install_sources` (supabase-source.sql, run by Claude via MCP Nov 23 2026). Admin: "Where new players came from" (last 30 days) + "Came from:" line under First games rows. Only installs made with the new app version are covered; plain Play links (no referrer) show as Play Store search.
 
+## Google test phones (Nov 23 2026)
+- After each app upload, Google's pre-launch robots (Firebase Test Lab) install the new build and play for a few seconds to minutes: on Nov 23 seven fake guests (Guest 412, 408, 502, 551, 904, 815, "ywwqye") 12:35-13:14 PKT, before 1.0.19 went live at 13:24. Left in the old data.
+- App 1.0.20+: InstallRef plugin `testLab()` reads the system setting `firebase.test.lab`; app.js asks before `sock.connect()` (1.5s max), saves `rb-test`, sends `auth.test`. Server `S.markTest(pid)`: playerSeen/appSeen/firstGame/firstSeen skip it, game_log skips tables with only test phones (`realGame`), and one install_sources row with source `google-test` shows as "Google test phones (not counted)" in Where new players came from.
+
 ## Render environment (names only)
 SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TURN_USER, TURN_PASS, optional CONTACT_EMAIL, PLAY_SA_KEY (Play reports service account JSON), optional PLAY_BUCKET. Never print or store their values.
 

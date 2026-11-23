@@ -1,6 +1,7 @@
 package com.dhedhitech.pattaparty;
 
 import android.content.SharedPreferences;
+import android.provider.Settings;
 import com.android.installreferrer.api.InstallReferrerClient;
 import com.android.installreferrer.api.InstallReferrerStateListener;
 import com.android.installreferrer.api.ReferrerDetails;
@@ -47,6 +48,17 @@ public class InstallRefPlugin extends Plugin {
                 call.resolve(result("", 0));
             }
         });
+    }
+
+    // Google's own test phones (Play pre-launch report / Firebase Test Lab) set this system setting.
+    // The game uses it to leave those phones out of the player stats.
+    @PluginMethod
+    public void testLab(PluginCall call) {
+        boolean on = false;
+        try { on = "true".equals(Settings.System.getString(getContext().getContentResolver(), "firebase.test.lab")); } catch (Exception e) { }
+        JSObject o = new JSObject();
+        o.put("testLab", on);
+        call.resolve(o);
     }
 
     private JSObject result(String ref, long at) {

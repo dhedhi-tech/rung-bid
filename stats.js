@@ -25,7 +25,12 @@ const mem = { days: new Map(), log: [], app: new Map() }; // days: day -> Map(pi
 // The typed name is saved too, so one person on a new browser or phone counts once (see the admin_daily view)
 const seen = new Map(); // pid -> 'day|signed|name'
 let noNameCols = false; // supabase-stats.sql not re-run yet: save without name and uid
+// Google's test phones (app tells us, see markTest): never counted in any stats
+const testPids = new Set();
+const markTest = pid => { if (pid) testPids.add(pid); };
+const isTest = pid => testPids.has(pid);
 function playerSeen(pid, signed, name, uid) {
+  if (testPids.has(pid)) return;
   const nm = String(name || '').trim().slice(0, 20), day = dayOf(), key = day + '|' + (signed ? 1 : 0) + '|' + nm, prev = seen.get(pid);
   if (prev === key || (!signed && prev && prev.startsWith(day + '|1|') && prev.endsWith('|' + nm))) return;
   seen.set(pid, key);
@@ -44,6 +49,7 @@ function playerSeen(pid, signed, name, uid) {
 // Players using the Android app: one row per player per day (account id added once they sign in)
 const appSeenMap = new Map(); // pid -> 'day|uid'
 function appSeen(pid, uid) {
+  if (testPids.has(pid)) return;
   const day = dayOf(), key = day + '|' + (uid || ''), prev = appSeenMap.get(pid);
   if (prev === key || (prev && prev.startsWith(day + '|') && prev !== day + '|' && !uid)) return;
   appSeenMap.set(pid, key);
@@ -65,6 +71,7 @@ function logGame(row) {
 // ---- first games: how far a new player gets in their very first game (supabase-first.sql) ----
 const firstMem = new Map(); let firstWarned = false;
 function firstGame(pid, patch) {
+  if (testPids.has(pid)) return;
   const row = { pid, ...patch, updated_at: new Date().toISOString() };
   firstNone.delete(pid);
   if (!enabled) { firstMem.set(pid, { ...(firstMem.get(pid) || { started_at: row.updated_at }), ...row }); return; }
@@ -76,7 +83,7 @@ function firstGame(pid, patch) {
 // Only players who have a first_games row; the rest are remembered here so we stop asking.
 const firstNone = new Set();
 function firstSeen(pid, did, extra) {
-  if (!pid || firstNone.has(pid)) return;
+  if (!pid || firstNone.has(pid) || testPids.has(pid)) return;
   const row = { last_at: new Date().toISOString(), last_did: String(did || '').slice(0, 120), ...(extra || {}) };
   if (!enabled) { const r = firstMem.get(pid); if (r) Object.assign(r, row); else firstNone.add(pid); return; }
   sb(`/rest/v1/first_games?pid=eq.${encodeURIComponent(pid)}&select=pid`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) })
@@ -179,6 +186,7 @@ function memReport() {
 // Plain names for the admin page
 function srcLabel(r) {
   const s = r.source, m = r.medium;
+  if (s === 'google-test') return 'Google test phones (not counted)';
   if (s === 'google-play' && m === 'organic') return 'Play Store search / browse';
   if (s === 'google-play') return 'Play Store' + (m ? ' (' + m + ')' : '');
   if (s === 'share_win') return 'Shared win';
@@ -194,4 +202,4 @@ function countSources(rows) {
   return Object.entries(c).sort((a, b) => b[1] - a[1]).map(([label, n]) => ({ label, n }));
 }
 
-module.exports = { enabled, sourceSeen, playerSeen, appSeen, logGame, firstGame, firstSeen, firstGet, report, dayOf, sb };
+module.exports = { markTest, isTest, enabled, sourceSeen, playerSeen, appSeen, logGame, firstGame, firstSeen, firstGet, report, dayOf, sb };

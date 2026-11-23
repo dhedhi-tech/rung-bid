@@ -195,12 +195,13 @@ function firstStep(pid, rank, hands, patch) {
 }
 function wireProgress(t) {
   t.isBeginner = isBeginner;
-  t.onGameStart = () => S.logGame({ kind: 'start', ...tableInfo(t) });
+  const realGame = () => t.seats.some(s => !s.bot && s.pid && !S.isTest(s.pid)); // tables with only Google test phones aren't logged
+  t.onGameStart = () => { if (realGame()) S.logGame({ kind: 'start', ...tableInfo(t) }); };
   t.levelOf = p => { const pr = profOf(p); return pr ? A.levelOf(pr.xp) : null; };
   t.avOf = p => { const pr = profOf(p); return pr ? A.avOf(pr) : null; };
   t.idOf = p => { const a = pidAuth.get(p); return a ? a.profile.id : null; };
   t.onHandEnd = info => {
-    if (info.over) S.logGame({ kind: 'finish', ...tableInfo(t), hands: t.G.handNo });
+    if (info.over && realGame()) S.logGame({ kind: 'finish', ...tableInfo(t), hands: t.G.handNo });
     if (info.over) try { levelUp(t, info); } catch (e) { console.error('skill', e); }
     if (t.first && !t.first.done) {
       const F = t.first, p = t.players.get(F.pid), seat = p && p.seat;
@@ -232,6 +233,8 @@ io.on('connection', socket => {
   let name = cleanName(socket.handshake.auth && socket.handshake.auth.name);
   let table = null;
   if (!pid) { socket.emit('fatal', 'Missing player id'); socket.disconnect(true); return; }
+  // Google's test phone (the app checks before connecting): kept out of every stat, only counted as a test phone
+  if (socket.handshake.auth && socket.handshake.auth.test) { if (!S.isTest(pid)) { S.markTest(pid); S.sourceSeen(pid, { app: true, ref: 'utm_source=google-test', at: 0 }); } }
   S.playerSeen(pid, false, name);
   socket.data.app = !!(socket.handshake.auth && socket.handshake.auth.app); // opened in the Android app
   { const k = +(socket.handshake.auth && socket.handshake.auth.skill); if (k >= 0 && k <= 2) guestSkill.set(pid, Math.max(guestSkill.get(pid) || 0, k)); }

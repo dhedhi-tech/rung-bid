@@ -1907,5 +1907,15 @@ if (NATIVE_APP) {
     if (A.getLaunchUrl) A.getLaunchUrl().then(r => { if (r && r.url && !sessionStorage.getItem('rb-launch')) { try { sessionStorage.setItem('rb-launch', '1'); } catch (e) {} appGameLink(r.url); } }).catch(() => {});
   }
 }
-sock.connect();
+// Google's test phones (Play pre-launch checks, app 1.0.20+) are left out of the stats: ask the app before connecting
+(async () => {
+  if (store.get('rb-test')) sock.auth.test = 1;
+  else if (NATIVE_APP) {
+    const ir = capPlugin('InstallRef');
+    if (ir && ir.testLab) {
+      try { const r = await Promise.race([ir.testLab(), new Promise(res => setTimeout(() => res(null), 1500))]); if (r && r.testLab) { store.set('rb-test', '1'); sock.auth.test = 1; } } catch (e) {}
+    }
+  }
+  sock.connect();
+})();
 initAuth();
