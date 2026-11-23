@@ -745,6 +745,30 @@ function bindShare(id, info, label) {
 }
 // Google Play in-app review: in the app, after a finished game (a win once 2+ games are done, or the 3rd game). Google decides if the card shows.
 let reviewCounted = '';
+// Our own "Rate us" box on the game over sheet (app only, after a win, 2+ games done, once per 30 days,
+// never on the same day Google's own rating window was asked for, never again after tapping it)
+const PLAY_PAGE = 'https://play.google.com/store/apps/details?id=com.dhedhitech.pattaparty';
+let rateBoxKey = null;
+function rateBoxOn(key, iWon) {
+  if (rateBoxKey === key) return true;
+  if (!NATIVE_APP || !iWon || store.get('rb-rated')) return false;
+  const day = 24 * 3600 * 1000, now = Date.now();
+  if (Number(store.get('rb-games-done') || 0) < 2) return false;
+  if (now - Number(store.get('rb-rate-at') || 0) < 30 * day || now - Number(store.get('rb-review-at') || 0) < day) return false;
+  store.set('rb-rate-at', String(now));
+  rateBoxKey = key;
+  return true;
+}
+const rateBoxHTML = () => `<div class="rate-box" id="rateBox"><div class="rate-q">Enjoying Patta Party?</div><div class="rate-stars">★★★★★</div>
+  <button class="rate-btn" id="rateBtn">⭐ Rate us on Google Play</button><small>Takes 10 seconds. It helps more people find the game.</small></div>`;
+function bindRateBox() {
+  if (!$('rateBtn')) return;
+  $('rateBtn').onclick = () => {
+    store.set('rb-rated', '1');
+    window.open(PLAY_PAGE, '_blank');
+    $('rateBox').innerHTML = '<div class="rate-q">Thank you! 🙏</div>';
+  };
+}
 function maybeAskReview(key, iWon) {
   if (!NATIVE_APP || reviewCounted === key) return;
   reviewCounted = key;
@@ -1219,18 +1243,22 @@ function resultScreen() {
     const w = (S.score || 0) > 0 ? 0 : 1, iWon = me0() && w === 0, margin = Math.abs(S.score || 0);
     const team = overTeam(); // captured once, when the game ends
     const trophy = TROPHY;
+    const overKey = S.code + ':' + S.handNo + ':' + S.score;
+    if (me0()) maybeAskReview(overKey, iWon); // counts the game first; Google's window opens 2s later
+    const rate = rateBoxOn(overKey, iWon);
     openModal('over', `<div class="over-hero ${iWon ? 'win' : me0() ? 'lose' : ''}"><div class="trophy">${trophy}</div>
       <div class="eyebrow">Game over · ${R.byLimit ? 'hand limit reached' : S.handNo + ' hands'}</div>
       <h2 class="over-title ${S.spectator ? '' : w === 0 ? 'good' : 'bad'}">${iWon ? 'Your team wins!' : `${teamName(w)} ${sv(w, 'wins', 'win')}`}</h2>
       <p class="over-sub">${margin ? `Won by ${margin} point${margin === 1 ? '' : 's'}` : ''}</p></div>${grid}
       ${iWon ? '<button class="share-win" id="shareWin">🏆 Share your win</button>' : ''}
+      ${rate ? rateBoxHTML() : ''}
       ${levelUpHTML()}
       ${nudgeHTML(R, true)}
       ${HL.key === S.code && HL.list.length ? `<div class="hl-box"><div class="hl-head">Your highlights</div>${HL.list.map((h, i) => `<div class="hl-row"><span>${h.info.title === 'Clean sweep!' ? '🧹 Clean sweep' : '⚪ Whitewash'} <small>Hand ${h.hand} · ${h.info.title === 'Clean sweep!' ? 'Bid' : 'They bid'} ${esc(h.contract)}</small></span><button class="hl-share" id="hl${i}">Share</button></div>`).join('')}</div>` : ''}
       ${S.isHost ? '<button class="primary" id="againBtn">Play again</button>' : '<p class="hint">Waiting for the host to start a new game.</p>'}
       ${ANDROID_WEB ? `<a class="get-app" href="${playUrl('game_over')}" target="_blank" rel="noopener"><span class="ga-ico">▶</span><span><b>Play in the free app</b><small>Get Patta Party on Google Play</small></span></a>` : ''}
       <button class="linkbtn" id="leaveOver">Leave table</button>`);
-    if (me0()) maybeAskReview(S.code + ':' + S.handNo + ':' + S.score, iWon);
+    bindRateBox();
     if ($('shareWin')) $('shareWin').onclick = async () => {
       const b = $('shareWin'); if (b.disabled) return; b.disabled = true; b.textContent = 'Getting your picture ready…';
       try {
