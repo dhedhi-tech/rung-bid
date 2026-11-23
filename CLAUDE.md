@@ -86,6 +86,7 @@ Welcome screen, tutorial, practice with bots, table links (WhatsApp), Open table
 - This session's proxy blocks the GitHub Actions API; check results via the Releases API.
 - App usage tracking: client sends `auth.app` = NATIVE_APP; server `socket.data.app` -> `S.appSeen(pid, uid)` into Supabase `app_days` (from `supabase-app.sql`). Admin shows "using the app now", "played in the app" today, an App column per day, and an App tag on Recent sign-ups for accounts that signed in inside the app.
 - App Links (invites open the app): manifest intent-filter autoVerify for https://www.pattaparty.com only (apex redirects, so it can't verify); server serves /.well-known/assetlinks.json with the Play app signing key (2F:FE:EE:...) and upload key SHA-256 hardcoded (+ optional `APP_SHA256` env). In the app, `appGameLink` loads the opened link inside the webview.
+- Nov 23 2026: manifest marks `android.hardware.screen.portrait` and `android.hardware.microphone` as required=false (Play blocked review: portrait lock limited device availability). App 1.0.19 (built from branch app-optional-features) submitted to Play review by the manager.
 - Android back button (`appBack` at the end of app.js, App plugin `backButton`): closes sticker tray / help / tutorial / rules / chat / closable sheets; otherwise press twice: leave the table, or exit the app on the home screen. Added Oct 28 after tester feedback.
 
 ## Admin stats: people
