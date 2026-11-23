@@ -649,6 +649,11 @@ app.delete('/admin/stickers/:id', async (req, res) => {
   catch (e) { console.error('sticker remove', e.message); res.status(500).json({ error: 'Could not remove the sticker' }); }
 });
 
+app.get('/admin/player', async (req, res) => {
+  if (!adminGate(req, res)) return;
+  try { const list = await S.findPlayer(req.query.q); res.json({ list: list.map(r => ({ ...r, level: A.levelOf(r.xp || 0) })) }); }
+  catch (e) { console.error('admin player', e.message); res.json({ list: [], error: 'Could not search players' }); }
+});
 app.get('/admin/reports', async (req, res) => {
   if (!adminGate(req, res)) return;
   try { res.json({ list: await R.list() }); }

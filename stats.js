@@ -110,6 +110,37 @@ function sourceSeen(pid, o) {
     .catch(e => { if (!srcWarned) { srcWarned = true; console.error('install sources:', e.message, '(run supabase-source.sql in Supabase)'); } });
 }
 
+// Admin: find players by name (guests and accounts) with their full stats
+async function findPlayer(q) {
+  q = String(q || '').replace(/[*,()%\\]/g, ' ').trim().slice(0, 30);
+  if (!q || !enabled) return [];
+  const cols = 'id,name,xp,coins,games,wins,hands,hand_wins,bids_made,bids_total,sweeps,last_daily,created_at';
+  const like = encodeURIComponent('*' + q + '*');
+  const [g, a] = await Promise.all([
+    sb(`/rest/v1/guest_profiles?select=${cols}&name=ilike.${like}&order=created_at.desc&limit=15`).catch(() => ({ data: [] })),
+    sb(`/rest/v1/profiles?select=${cols}&name=ilike.${like}&order=created_at.desc&limit=15`).catch(() => ({ data: [] })),
+  ]);
+  const rows = [...(a.data || []).map(r => ({ ...r, guest: false })), ...(g.data || []).map(r => ({ ...r, guest: true }))];
+  const exact = s => String(s || '').trim().toLowerCase() === q.toLowerCase();
+  rows.sort((x, y) => exact(y.name) - exact(x.name));
+  const list = rows.slice(0, 10);
+  if (!list.length) return [];
+  // Days played and app use: guests by phone id, accounts by account id
+  const gids = list.filter(r => r.guest).map(r => encodeURIComponent(r.id)), uids = list.filter(r => !r.guest).map(r => encodeURIComponent(r.id));
+  const ors = [gids.length && `pid.in.(${gids.join(',')})`, uids.length && `uid.in.(${uids.join(',')})`].filter(Boolean).join(',');
+  const [pd, ad] = await Promise.all([
+    sb(`/rest/v1/player_days?select=day,pid,uid&or=(${ors})&limit=5000`).catch(() => ({ data: [] })),
+    sb(`/rest/v1/app_days?select=pid,uid&or=(${ors})&limit=5000`).catch(() => ({ data: [] })),
+  ]);
+  for (const r of list) {
+    const mine = x => r.guest ? x.pid === r.id : x.uid === r.id;
+    const days = [...new Set((pd.data || []).filter(mine).map(x => x.day))].sort();
+    r.first_day = days[0] || null; r.last_day = days[days.length - 1] || null; r.days = days.length;
+    r.app = (ad.data || []).some(mine);
+  }
+  return list;
+}
+
 // ---- report for the admin page ----
 async function report() {
   if (!enabled) return memReport();
@@ -206,4 +237,4 @@ function countSources(rows) {
   return Object.entries(c).sort((a, b) => b[1] - a[1]).map(([label, n]) => ({ label, n }));
 }
 
-module.exports = { markTest, isTest, enabled, sourceSeen, playerSeen, appSeen, logGame, firstGame, firstSeen, firstGet, report, dayOf, sb };
+module.exports = { markTest, isTest, enabled, sourceSeen, playerSeen, appSeen, logGame, firstGame, firstSeen, firstGet, report, findPlayer, dayOf, sb };

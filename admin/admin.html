@@ -38,7 +38,15 @@ button{width:100%;padding:12px;border:0;border-radius:10px;background:var(--acc)
 .rep-chat{background:rgba(255,255,255,.05);border-radius:8px;padding:6px 8px;font-size:13px;max-height:140px;overflow:auto}
 .apptag{display:inline-block;font-size:11px;font-weight:800;background:#2e7d5b;color:#fff;border-radius:6px;padding:1px 6px;margin-left:4px;vertical-align:middle}
 td.away3{color:#f4a93a;font-weight:700}td.away7{color:#ff6b6b;font-weight:800}td.today{color:#5fd39a;font-weight:700}
-</style></head><body><main id="app"></main><main id="repAdmin" hidden></main><main id="stkAdmin" hidden></main>
+.find{display:flex;gap:8px;margin:0 0 4px}.find input{margin:0;padding:10px 12px;font-size:15px}.find button{width:auto;padding:10px 16px}
+[data-find]{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+#pcard{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:40px 12px;z-index:50;overflow:auto}
+#pcard[hidden]{display:none}
+.pc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;width:100%;max-width:440px;display:grid;gap:12px}
+.pc-one{border-top:1px solid var(--line);padding-top:12px;display:grid;gap:8px}.pc-one:first-of-type{border-top:0;padding-top:0}
+.pc-name{font-size:18px;font-weight:800}.pc .grid{grid-template-columns:repeat(3,1fr);gap:6px}.pc .tile{padding:8px 10px}.pc .tile b{font-size:19px}.pc .tile span{font-size:12px}
+.pc .x{width:auto;padding:6px 12px;font-size:13px;background:var(--line);color:var(--text)}
+</style></head><body><main id="findMain" hidden style="padding-bottom:0"><form class="find" id="findF" style="margin:0;max-width:none;background:none;border:0;padding:0"><input id="findQ" placeholder="Find a player by name (e.g. Guest 608)" autocomplete="off"><button>Find</button></form></main><main id="app"></main><div id="pcard" hidden></div><main id="repAdmin" hidden></main><main id="stkAdmin" hidden></main>
 <script>
 const app = document.getElementById('app');
 let key = ''; try { key = sessionStorage.getItem('adminKey') || ''; } catch (e) {}
@@ -64,7 +72,7 @@ function firstGamesHTML(F) {
   const mins = f => f.play_secs == null ? '–' : f.play_secs < 60 ? f.play_secs + ' sec' : Math.round(f.play_secs / 60) + ' min';
   // Signed up: account name. Still a guest but changed their name: the new name. The starting guest name stays small underneath
   const now = f => f.acct || (f.now_name && f.now_name !== f.name ? f.now_name : '');
-  const who = f => (now(f) ? esc(now(f)) : esc(f.name || 'Guest')) + (f.app ? ' <small>App</small>' : '') + (f.uid ? ' <small>Signed in</small>' : '') + (now(f) ? `<br><small>was ${esc(f.name || 'Guest')}</small>` : '');
+  const who = f => `<span data-find="${esc(now(f) || f.name || '')}">${now(f) ? esc(now(f)) : esc(f.name || 'Guest')}</span>` + (f.app ? ' <small>App</small>' : '') + (f.uid ? ' <small>Signed in</small>' : '') + (now(f) ? `<br><small>was ${esc(f.name || 'Guest')}</small>` : '');
   return `<h2>First games (new players)</h2><div class="tw"><table><tr><th>Player</th><th>Played</th><th>How far</th><th>Started</th><th>Tutorial</th><th>Tries</th></tr>${F.map(f =>
     `<tr><td>${who(f)}</td><td>${mins(f)}</td><td>${far(f)}${!f.finished && f.left_early ? ' <small>(left)</small>' : ''}</td><td>${ago(f.started_at)}</td><td>${f.tutorial ? 'On' : 'Off'}</td><td>${f.tries || 1}</td></tr>${firstMore(f)}`).join('')}</table></div>`;
 }
@@ -104,6 +112,29 @@ function login(msg) {
     <input id="p" type="password" autocomplete="current-password" placeholder="Password" required><div class="err">${esc(msg || '')}</div><button>Open</button></form>`;
   document.getElementById('f').onsubmit = e => { e.preventDefault(); key = document.getElementById('p').value; load(); };
 }
+
+// Player card: tap a name anywhere, or search by name (guests and accounts)
+const pcard = document.getElementById('pcard');
+const pct2 = (a, b) => b ? Math.round(100 * a / b) + '%' : '–';
+async function findPlayer(q) {
+  q = String(q || '').trim(); if (!q) return;
+  pcard.hidden = false; pcard.innerHTML = '<div class="pc"><div class="sub">Looking for ' + esc(q) + '…</div></div>';
+  let j; try { const r = await fetch('/admin/player?q=' + encodeURIComponent(q), { headers: { 'x-admin-key': key } }); j = await r.json(); } catch (e) { j = { list: [], error: 'Could not reach the server' }; }
+  const L = j.list || [];
+  const one = p => `<div class="pc-one"><div><span class="pc-name">${esc(p.name || '?')}</span> ${p.guest ? '<small>Guest (not signed in)</small>' : '<small>✔ Google account</small>'}${p.app ? ' <span class="apptag">App</span>' : ''}</div>
+    <div class="grid">
+      <div class="tile"><b>${num(p.level)}</b><span>level</span></div><div class="tile"><b>${num(p.xp)}</b><span>XP</span></div><div class="tile"><b>${num(p.coins)}</b><span>coins</span></div>
+      <div class="tile"><b>${num(p.games)}</b><span>games</span></div><div class="tile"><b>${num(p.wins)}</b><span>wins (${pct2(num(p.wins), num(p.games))})</span></div><div class="tile"><b>${num(p.sweeps)}</b><span>sweeps</span></div>
+      <div class="tile"><b>${num(p.hands)}</b><span>hands</span></div><div class="tile"><b>${num(p.hand_wins)}</b><span>hands won (${pct2(num(p.hand_wins), num(p.hands))})</span></div><div class="tile"><b>${num(p.bids_made)}/${num(p.bids_total)}</b><span>bids made</span></div>
+    </div>
+    <div class="sub">Joined ${p.created_at ? esc(new Date(p.created_at).toLocaleString('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })) : '?'} · Played ${num(p.days)} day${num(p.days) === 1 ? '' : 's'}${p.last_day ? ', last ' + dd(String(p.last_day).slice(0, 10)) : ''}</div></div>`;
+  pcard.innerHTML = `<div class="pc"><div class="top"><div class="sub">${L.length ? L.length + ' found for “' + esc(q) + '”' : ''}</div><button class="x" id="pcX">Close</button></div>
+    ${j.error ? '<div class="note">' + esc(j.error) + '</div>' : ''}${L.length ? L.map(one).join('') : '<div>No player named “' + esc(q) + '”.</div>'}</div>`;
+  document.getElementById('pcX').onclick = () => { pcard.hidden = true; };
+}
+pcard.onclick = e => { if (e.target === pcard) pcard.hidden = true; };
+document.addEventListener('click', e => { const t = e.target.closest('[data-find]'); if (t && t.dataset.find) findPlayer(t.dataset.find); });
+document.getElementById('findF').onsubmit = e => { e.preventDefault(); findPlayer(document.getElementById('findQ').value); };
 let timer = null;
 async function load() {
   let r, j;
@@ -111,7 +142,7 @@ async function load() {
   catch (e) { return show(null, 'Could not reach the server. Retrying…'); }
   if (!r.ok) { try { sessionStorage.removeItem('adminKey'); } catch (e) {} clearInterval(timer); timer = null; return login(j.error); }
   try { sessionStorage.setItem('adminKey', key); } catch (e) {}
-  show(j);
+  show(j); document.getElementById('findMain').hidden = false;
   if (!timer) timer = setInterval(load, 30000);
 }
 let last = null;
@@ -195,7 +226,7 @@ function show(j, warn) {
   </table></div>
   <h2>Top players (${num(j.accounts)} accounts)</h2>
   <div class="tw"><table><tr><th>Name</th><th>XP</th><th>Games</th><th>Wins</th><th>Coins</th><th>Joined</th></tr>
-    ${(j.top || []).map(p => `<tr><td>${esc(p.name)}</td><td>${num(p.xp)}</td><td>${num(p.games)}</td><td>${num(p.wins)}</td><td>${num(p.coins)}</td><td>${p.created_at ? dd(String(p.created_at).slice(0, 10)) : ''}</td></tr>`).join('') || '<tr><td colspan="6">No signed-in players yet</td></tr>'}
+    ${(j.top || []).map(p => `<tr><td><span data-find="${esc(p.name)}">${esc(p.name)}</span></td><td>${num(p.xp)}</td><td>${num(p.games)}</td><td>${num(p.wins)}</td><td>${num(p.coins)}</td><td>${p.created_at ? dd(String(p.created_at).slice(0, 10)) : ''}</td></tr>`).join('') || '<tr><td colspan="6">No signed-in players yet</td></tr>'}
   </table></div>
   <h2>Return rate</h2>
   ${j.people === null ? '<div class="note">Players list could not load. Run supabase-stats.sql in Supabase again.</div>' : ''}
@@ -206,13 +237,13 @@ function show(j, warn) {
   <h2>Players (last 30 days)</h2>
   <div class="sub">Longest absent first. People who typed a name or signed in.</div>
   <div class="tw"><table><tr><th>Name</th><th>First played</th><th>Last played</th><th>Days</th></tr>
-    ${(j.people || []).map(p => { const ago = daysAgo(p.last_day); return `<tr><td>${esc(p.name || '?')}${p.app ? ' <span class="apptag">App</span>' : ''}${p.signed ? ' <small>✔ Google</small>' : ''}</td><td>${dd(String(p.first_day).slice(0, 10))}</td><td class="${ago >= 7 ? 'away7' : ago >= 3 ? 'away3' : ago === 0 ? 'today' : ''}">${ago === 0 ? 'today' : ago === 1 ? 'yesterday' : ago + ' days ago'}</td><td>${num(p.days)}</td></tr>`; }).join('') || '<tr><td colspan="4">No named players yet</td></tr>'}
+    ${(j.people || []).map(p => { const ago = daysAgo(p.last_day); return `<tr><td><span data-find="${esc(p.name || '')}">${esc(p.name || '?')}</span>${p.app ? ' <span class="apptag">App</span>' : ''}${p.signed ? ' <small>✔ Google</small>' : ''}</td><td>${dd(String(p.first_day).slice(0, 10))}</td><td class="${ago >= 7 ? 'away7' : ago >= 3 ? 'away3' : ago === 0 ? 'today' : ''}">${ago === 0 ? 'today' : ago === 1 ? 'yesterday' : ago + ' days ago'}</td><td>${num(p.days)}</td></tr>`; }).join('') || '<tr><td colspan="4">No named players yet</td></tr>'}
   </table></div>
   <h2>Recent sign-ups</h2>${j.app === null ? '<div class="note">App usage could not load. Did you run supabase-app.sql in Supabase?</div>' : '<div class="sub">The App tag shows players who have signed in inside the Android app (last 30 days).</div>'}
   <div class="tw"><table><tr><th>Name</th><th>Signed up</th><th>Games</th><th>XP</th></tr>
-    ${(j.recent || []).map(p => `<tr><td>${esc(p.name)}${appUids.has(p.id) ? ' <span class="apptag">App</span>' : ''}</td><td>${p.created_at ? esc(new Date(p.created_at).toLocaleString('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })) : ''}</td><td>${num(p.games)}</td><td>${num(p.xp)}</td></tr>`).join('') || '<tr><td colspan="4">No sign-ups yet</td></tr>'}
+    ${(j.recent || []).map(p => `<tr><td><span data-find="${esc(p.name)}">${esc(p.name)}</span>${appUids.has(p.id) ? ' <span class="apptag">App</span>' : ''}</td><td>${p.created_at ? esc(new Date(p.created_at).toLocaleString('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })) : ''}</td><td>${num(p.games)}</td><td>${num(p.xp)}</td></tr>`).join('') || '<tr><td colspan="4">No sign-ups yet</td></tr>'}
   </table></div>`;
-  document.getElementById('out').onclick = () => { try { sessionStorage.removeItem('adminKey'); } catch (e) {} key = ''; clearInterval(timer); timer = null; document.getElementById('stkAdmin').hidden = true; document.getElementById('repAdmin').hidden = true; stkShown = false; login(); };
+  document.getElementById('out').onclick = () => { try { sessionStorage.removeItem('adminKey'); } catch (e) {} key = ''; clearInterval(timer); timer = null; document.getElementById('stkAdmin').hidden = true; document.getElementById('repAdmin').hidden = true; document.getElementById('findMain').hidden = true; stkShown = false; login(); };
   if (!stkShown) { stkShown = true; stickersAdmin(); }
   reportsAdmin();
 }
