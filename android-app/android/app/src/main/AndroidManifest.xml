@@ -46,6 +46,10 @@
         </provider>
     </application>
 
+    <!-- Portrait lock and mic are nice-to-have, not required: lets tablets, PCs and phones without a mic install the app -->
+    <uses-feature android:name="android.hardware.screen.portrait" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
