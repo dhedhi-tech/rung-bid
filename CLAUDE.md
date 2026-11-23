@@ -185,3 +185,4 @@ SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, ADMIN_PASS, TURN_URL, TUR
    - Before production (Ansa said wait): Delete my account button (Google requires). Back button DONE (tester asked). Vibration only if testers ask. Real logo, AdMob (then Ads + Advertising ID answers change to Yes), Play Store video (YouTube link).
    - Play Console answers given: app access No restriction, ads No, target audience 18+, content rating interactions Yes, data safety (name, email, user IDs, photos, voice + chat ephemeral, app interactions, device IDs), advertising ID No.
 5. Later: real push notifications (friends, invites), sticker packs for coins, landscape/tablet layout.
+6. Later (manager, Nov 23 2026: build when the game has real players all day): save running games on SIGTERM (Render gives ~30s) and restore them on start, so a deploy never ends a game; players see a short reconnect and continue the same hand. ~1 day incl. testing.
