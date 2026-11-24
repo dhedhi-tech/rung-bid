@@ -174,9 +174,9 @@ function renderAway() {
 }
 function renderHeader() {
   renderAway();
-  const watching = S.phase !== 'lobby' && S.lobbyNames && S.lobbyNames.length ? `<button class="watchn" id="watchBtn"> · 👀 ${S.lobbyNames.length}<span class="wl"> watching</span></button>` : '';
+  const watching = S.phase !== 'lobby' && S.lobbyNames && S.lobbyNames.length ? `<button class="watchn" id="watchBtn">👀 ${S.lobbyNames.length}<span class="wl"> watching</span></button>` : '';
   const hn = !S.handNo ? '' : S.decider ? 'Decider hand' : S.limit ? `Hand ${S.handNo} of ${S.limit}` : `Hand ${S.handNo}`;
-  $('handNo').innerHTML = esc(S.handNo ? `${hn} · ${S.n} players` : `Table ${S.code} · ${S.n} players`) + watching;
+  $('handNo').innerHTML = `<span class="hn-t">${esc(S.handNo ? `${hn} · ${S.n} players` : `Table ${S.code} · ${S.n} players`)}</span>` + watching; // 👀 sits outside the cut-off text so small phones still show it
   $('handNo').title = watching ? 'Watching: ' + S.lobbyNames.join(', ') : '';
   if ($('watchBtn')) $('watchBtn').onclick = watchersSheet;
   if (modalKind === 'watchers') { if (watching) watchersSheet(); else closeModal(); }
