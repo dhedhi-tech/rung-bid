@@ -73,7 +73,7 @@ function firstGamesHTML(F) {
   // Signed up: account name. Still a guest but changed their name: the new name. The starting guest name stays small underneath
   const now = f => f.acct || (f.now_name && f.now_name !== f.name ? f.now_name : '');
   const who = f => `<span data-find="${esc(now(f) || f.name || '')}">${now(f) ? esc(now(f)) : esc(f.name || 'Guest')}</span>` + (f.app ? ' <small>App</small>' : '') + (f.uid ? ' <small>Signed in</small>' : '') + (now(f) ? `<br><small>was ${esc(f.name || 'Guest')}</small>` : '');
-  return `<h2>First games (new players)</h2><div class="tw"><table><tr><th>Player</th><th>Played</th><th>How far</th><th>Started</th><th>Tutorial</th><th>Tries</th></tr>${F.map(f =>
+  return `<h2>First games (new players)</h2><div class="tw"><table><tr><th>Player</th><th>Played</th><th>How far</th><th>Started</th><th>Tutorial</th><th>Tries</th></tr>${[...F].sort((a, b) => new Date(b.last_at || b.started_at || 0) - new Date(a.last_at || a.started_at || 0)).map(f =>
     `<tr><td>${who(f)}</td><td>${mins(f)}</td><td>${far(f)}${!f.finished && f.left_early ? ' <small>(left)</small>' : ''}</td><td>${ago(f.started_at)}</td><td>${f.tutorial ? 'On' : 'Off'}</td><td>${f.tries || 1}</td></tr>${firstMore(f)}`).join('')}</table></div>`;
 }
 // Where new players came from (install_sources, last 30 days)
