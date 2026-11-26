@@ -182,6 +182,11 @@ function levelUp(t, info) {
 // Counts live in equipped.ch (all hands) and equipped.jh (Joker hands); old players start from all their hands so far.
 const HANDS_UP = 5;
 const guestHands = new Map(); // guests without a saved profile yet: pid -> { ch, jh }
+// Hands played so far (for the new-player turn timer); unknown players count as new
+function handsOf(pid) {
+  const pr = profOf(pid), g = guestHands.get(pid);
+  return Math.max(pr ? Math.max(pr.hands || 0, (pr.equipped && pr.equipped.ch) || 0) : 0, g ? g.ch : 0);
+}
 function countHand(t, pid) {
   const pr = profOf(pid);
   let c;
@@ -222,6 +227,7 @@ function firstStep(pid, rank, hands, patch) {
 }
 function wireProgress(t) {
   t.isBeginner = isBeginner;
+  t.handsOf = handsOf; // turn timer and away rule ease off as hands go up (game.js turnRule)
   const realGame = () => t.seats.some(s => !s.bot && s.pid && !S.isTest(s.pid)); // tables with only Google test phones aren't logged
   t.onGameStart = () => { if (realGame()) S.logGame({ kind: 'start', ...tableInfo(t) }); };
   t.levelOf = p => { const pr = profOf(p); return pr ? A.levelOf(pr.xp) : null; };

@@ -17,7 +17,13 @@ const TARGET = 52;
 const SPEED = Number(process.env.RB_SPEED) || 1; // test hook: 0.1 runs ten times faster
 const PACE = { bot: 800 * SPEED, trick: 1300 * SPEED, trump: 1800 * SPEED, deal: 700 * SPEED };
 const TURN_MS = { bid: 20000, trump: 20000, play: 8000 };
-const BEGINNER_MS = { bid: 30000, trump: 30000, play: 15000 }; // guests and players with under 5 games; never auto-away for missed turns
+// New players (Nov 26 2026, manager): extra turn time and no auto-away for missed turns, cut down step by step as they play more hands.
+// [hands played up to, card ms, bid/trump ms, missed turns before away]. From 30 hands on: normal (TURN_MS, away after 2).
+const EASE_STEPS = [[10, 15000, 30000, Infinity], [20, 12000, 25000, 3], [30, 10000, 22000, 3]];
+function turnRule(hands) {
+  const st = EASE_STEPS.find(s => hands < s[0]);
+  return st ? { ms: { play: st[1], bid: st[2], trump: st[2] }, miss: st[3] } : { ms: TURN_MS, miss: 2 };
+}
 const HIDE_AWAY_MS = 10000, AWAY_SWAP_MS = +process.env.RB_AWAY_SWAP_MS || 180000; // away after 10s out of the app; seat to the waiting list after 3 min away
 const HAND_END_MS = 9000 * SPEED;
 
@@ -499,8 +505,8 @@ class Table {
       return this.sleep(PACE.bot).then(() => fallback());
     }
     const guided = this.guidedOn();
-    const newbie = !!(this.isBeginner && this.isBeginner(this.seats[seat].pid));
-    const ms = newbie ? BEGINNER_MS[kind] : TURN_MS[kind]; // beginners get more time
+    const rule = turnRule(this.handsOf ? this.handsOf(this.seats[seat].pid) : 99); // new players get more time (server sets handsOf)
+    const ms = rule.ms[kind];
     G.deadline = guided ? 0 : Date.now() + ms; // guided practice: no turn timer
     if (guided) { try { askView = { ...askView, hint: this.coachHint(seat, kind) }; } catch (e) { console.error('coach', e); } }
     return new Promise((resolve, reject) => {
@@ -509,7 +515,7 @@ class Table {
       const pl = this.players.get(this.seats[seat].pid);
       const timer = guided ? null : setTimeout(() => {
         finish(fallback());
-        if (pl && (pl.missed = (pl.missed || 0) + 1) >= 2 && !newbie) this.setAway(this.seats[seat].pid, true, 'missed');
+        if (pl && (pl.missed = (pl.missed || 0) + 1) >= rule.miss) this.setAway(this.seats[seat].pid, true, 'missed');
       }, ms);
       this.pending = {
         seat, kind, askView,
