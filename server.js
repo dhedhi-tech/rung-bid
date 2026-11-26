@@ -155,7 +155,7 @@ function takeGuestGain(pid, profile) {
   return A.award(profile, p.xp, p.coins, p.stats);
 }
 // Beginners: guests, or signed in with fewer than 5 finished games. Classic only (Joker locked), longer turn timer, no auto-away
-// Skill stage (A.skillOf): 0 beginner, 1 Classic done, 2 Joker done. You move up by playing HANDS_UP hands, or winning a game, with the tutorial off.
+// Skill stage (A.skillOf): 0 beginner, 1 Classic done, 2 Joker done. You move up by playing HANDS_UP hands, or by winning a game with the tutorial off.
 // Guests: the phone keeps it (rb-skill) and tells us on connect and when it changes.
 const guestSkill = new Map();
 // Guests (not signed in) have a profile too, kept on their phone's player id (A.loadGuest, guest_profiles)
@@ -178,17 +178,16 @@ function levelUp(t, info) {
   }
 }
 // Nov 26 2026 (manager): players with 40+ hands were stuck as beginners because they never won a full game.
-// Now HANDS_UP hands played with the tutorial off also levels you up: any hands -> stage 1, Joker hands -> stage 2.
-// Counts live in equipped.ch (all hands) and equipped.jh (Joker hands); old players start from their hands so far minus the first (tutorial) game.
+// Now HANDS_UP hands played also level you up (tutorial on or off; manager, same day): any hands -> stage 1, Joker hands -> stage 2.
+// Counts live in equipped.ch (all hands) and equipped.jh (Joker hands); old players start from all their hands so far.
 const HANDS_UP = 5;
 const guestHands = new Map(); // guests without a saved profile yet: pid -> { ch, jh }
 function countHand(t, pid) {
-  if (t.guided) return; // tutorial on for this hand
   const pr = profOf(pid);
   let c;
   if (pr) {
     const e = pr.equipped || {};
-    c = { ch: e.ch != null ? e.ch + 1 : Math.max(1, (pr.hands || 0) + 1 - 6), jh: (e.jh || 0) + (t.joker ? 1 : 0) };
+    c = { ch: Math.max((e.ch || 0) + 1, (pr.hands || 0) + 1), jh: (e.jh || 0) + (t.joker ? 1 : 0) };
     pr.equipped = { ...e, ch: c.ch, jh: c.jh }; // saved by the award that follows
   } else {
     c = guestHands.get(pid) || { ch: 0, jh: 0 };
