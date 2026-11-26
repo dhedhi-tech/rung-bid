@@ -241,7 +241,7 @@ function award(p, xp, coins, stats = {}) {
 function skillOf(p) {
   if (!p) return 0;
   const k = p.equipped && p.equipped.skill;
-  return k != null ? k : ((p.games || 0) >= 5 ? 2 : 0);
+  return k != null ? k : ((p.games || 0) >= 5 ? 2 : (p.hands || 0) >= 11 ? 1 : 0); // 11 = first (tutorial) game of 6 hands + 5 more (Nov 26 2026)
 }
 function setSkill(p, k) { if (k <= skillOf(p)) return false; p.equipped = { ...(p.equipped || {}), skill: k }; if (!p._unsaved) save(p); return true; } // a new guest is saved only once they play
 function view(p) {

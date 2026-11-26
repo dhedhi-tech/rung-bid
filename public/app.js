@@ -425,7 +425,7 @@ function welcomeScreen(err) {
       </div>
       <div class="wmenu first">
         <button class="primary big-start" id="wStart">▶ Start playing<small>کھیلنا شروع کریں</small></button>
-        <p class="first-note">${store.get('rb-first') === 'done' ? 'Win one game with the tutorial off to unlock all games.' : 'A friendly coach shows you what to tap.'}</p>
+        <p class="first-note">${store.get('rb-first') === 'done' ? `Play ${handsToGo('ch')} with the tutorial off to unlock all games.` : 'A friendly coach shows you what to tap.'}</p>
         <button class="secondary" id="wFriends">👥 Play with friends</button>
         <button class="linkbtn" id="wKnow">I have played before</button>
         <div class="err" id="wErr">${err ? esc(err) : ''}</div>
@@ -516,16 +516,18 @@ function takeName() {
   setName(v); return true;
 }
 // Beginners (guest, or under 5 games): Joker locked, setup shows only name + Start, the rest under "More options"
-// Skill stage: 0 beginner (Classic with bots), 1 Classic done, 2 Joker done. Up by winning a game with the tutorial off (server sends 'skill').
+// Skill stage: 0 beginner (Classic with bots), 1 Classic done, 2 Joker done. Up by 5 hands or a won game with the tutorial off (server sends 'skill').
 const mySkill = () => Math.max(PROFILE && PROFILE.skill != null ? PROFILE.skill : 0, GPROF && GPROF.skill != null ? GPROF.skill : 0, +(store.get('rb-skill') || 0));
 const isBeginner = () => mySkill() < 1;
+// Hands still needed to move up (server counts them in equipped.ch / equipped.jh; 5 hands with the tutorial off)
+function handsToGo(k) { const e = (ME() && ME().equipped) || {}, n = Math.max(1, 5 - (e[k] || 0)); return n === 5 ? '5 hands' : `${n} more hand${n > 1 ? 's' : ''}`; }
 const COACH_FIELD = '<div class="field"><span>🎓 Coach tips</span><div class="seg text" id="segC"><button data-c="1">On</button><button data-c="0">Off</button></div></div>';
 // Coach default: on for the first game; afterwards what the player last chose (rb-coach)
 const coachPref = () => store.get('rb-coach') ? store.get('rb-coach') === '1' : !store.get('rb-coached');
 function createSheet(practice) {
   const newbie = isBeginner();
   if (newbie) { homeJ = false; if (!createSheet.seen) homeL = 6; createSheet.seen = true; } // beginners start with Quick (6 hands)
-  const lockTxt = 'Win a game with the tutorial off to unlock it';
+  const lockTxt = `Play ${handsToGo('ch')} with the tutorial off to unlock it`;
   const jTrain = mySkill() === 1; // Joker not learned yet: choosing it starts Joker training with bots
   openModal('create', `<div class="eyebrow">${practice ? 'Practice with bots' : 'New table'}</div>
     <h2>${practice ? 'Set up a practice game' : 'Create a table'}</h2>
@@ -536,7 +538,7 @@ function createSheet(practice) {
     <button class="linkbtn" id="moreOpts">More options ▾</button><div id="optsBox" hidden>` : ''}
     <div class="field"><span>Players</span><div class="seg" id="segN">
       <button data-n="4">4<small>1 deck</small></button><button data-n="6">6<small>78 cards</small></button><button data-n="8">8<small>2 decks</small></button></div></div>
-    <div class="field"><span>Mode</span><div class="seg text" id="segJ"><button data-j="0">Classic</button><button data-j="1" class="${newbie ? 'locked' : ''}">${newbie ? '🔒 ' : ''}Joker mode</button></div>${newbie ? `<small class="lock-note">🔒 Joker: ${lockTxt}</small>` : jTrain ? `<small class="lock-note" id="jNote" ${homeJ ? '' : 'hidden'}>🃏 New to Joker mode? You'll play Joker training games with bots first. Win one with the tutorial off and Joker is open for all your tables.</small>` : ''}</div>
+    <div class="field"><span>Mode</span><div class="seg text" id="segJ"><button data-j="0">Classic</button><button data-j="1" class="${newbie ? 'locked' : ''}">${newbie ? '🔒 ' : ''}Joker mode</button></div>${newbie ? `<small class="lock-note">🔒 Joker: ${lockTxt}</small>` : jTrain ? `<small class="lock-note" id="jNote" ${homeJ ? '' : 'hidden'}>🃏 New to Joker mode? You'll play Joker training with bots first. Play ${handsToGo('jh')} with the tutorial off and Joker is open for all your tables.</small>` : ''}</div>
     <div class="field"><span>Game length</span><div class="seg" id="segL">
       <button data-l="6">Quick<small>6 hands</small></button><button data-l="10">Normal<small>10 hands</small></button><button data-l="0">Full<small>no limit</small></button></div></div>
     ${practice && !newbie ? COACH_FIELD : ''}
@@ -685,8 +687,9 @@ let GG = { xp: 0, coins: 0, last: null };
 let LEVELUP = null; // shown on the game over sheet after winning a game with the tutorial off
 function levelUpHTML() {
   if (!LEVELUP || !S || LEVELUP.code !== S.code) return '';
-  return LEVELUP.skill >= 2 ? '<div class="lvlup"><b>🃏 Joker mode unlocked!</b><span>You won with the tutorial off. Choose Joker mode for any table now.</span></div>'
-    : '<div class="lvlup"><b>🎉 You won on your own!</b><span>All games are open now: play with friends, 6 and 8 players, and open tables.</span></div>';
+  if (LEVELUP.hand == null) LEVELUP.hand = S.handNo; if (LEVELUP.hand !== S.handNo) return ''; // shown on the sheet of the hand it happened
+  return LEVELUP.skill >= 2 ? '<div class="lvlup"><b>🃏 Joker mode unlocked!</b><span>Choose Joker mode for any table now.</span></div>'
+    : '<div class="lvlup"><b>🎉 Level up!</b><span>All games are open now: play with friends, 6 and 8 players, and open tables.</span></div>';
 }          // XP/coins a guest would have saved (server keeps them for 3 hours)
 let NUDGE = { code: '', lastHand: 0, hand: 0, over: false, later: false };
 function nudgeGame(R) {
@@ -1274,7 +1277,7 @@ function resultScreen() {
     return;
   }
   resultAt = Date.now() + (R.endsAt || 0);
-  openModal('result', `<div class="eyebrow">Hand ${R.handNo} result</div><h2 class="${good}">${colourNames(R.title)}</h2>${grid}
+  openModal('result', `<div class="eyebrow">Hand ${R.handNo} result</div><h2 class="${good}">${colourNames(R.title)}</h2>${grid}${levelUpHTML()}
     ${R.deciderNext ? '<p><b>Scores are level after the last hand.</b> One decider hand to finish the game.</p>' : ''}
     <p>Next dealer: ${colourNames(R.next || '')}. Next hand in <b class="countdown" data-countdown>${Math.ceil((R.endsAt || 0) / 1000)}</b>s.</p>
     ${featShare(R) ? `<button class="share-win" id="shareFeat">${featShare(R).label}</button>` : ''}

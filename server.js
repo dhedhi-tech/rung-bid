@@ -155,7 +155,7 @@ function takeGuestGain(pid, profile) {
   return A.award(profile, p.xp, p.coins, p.stats);
 }
 // Beginners: guests, or signed in with fewer than 5 finished games. Classic only (Joker locked), longer turn timer, no auto-away
-// Skill stage (A.skillOf): 0 beginner, 1 Classic done, 2 Joker done. You move up by winning a game with the tutorial off.
+// Skill stage (A.skillOf): 0 beginner, 1 Classic done, 2 Joker done. You move up by playing HANDS_UP hands, or winning a game, with the tutorial off.
 // Guests: the phone keeps it (rb-skill) and tells us on connect and when it changes.
 const guestSkill = new Map();
 // Guests (not signed in) have a profile too, kept on their phone's player id (A.loadGuest, guest_profiles)
@@ -163,14 +163,42 @@ const pidGuest = new Map();
 const profOf = p => { const a = pidAuth.get(p); return a ? a.profile : pidGuest.get(p) || null; };
 const skillOf = p => { const a = pidAuth.get(p); return a ? A.skillOf(a.profile) : Math.max(guestSkill.get(p) || 0, pidGuest.has(p) ? A.skillOf(pidGuest.get(p)) : 0); };
 const isBeginner = p => skillOf(p) < 1;
+// Move a player up to stage `want` (never down) and tell their phone
+function promote(t, pid, want) {
+  const a = pidAuth.get(pid);
+  if (want <= skillOf(pid)) return;
+  if (a) A.setSkill(a.profile, want); else { guestSkill.set(pid, want); if (pidGuest.has(pid)) A.setSkill(pidGuest.get(pid), want); }
+  for (const { socket, pid: cp } of t.clients.values()) if (cp === pid) socket.emit('skill', { skill: want, up: true });
+}
+// Winning a game with the tutorial off still levels you up at once
 function levelUp(t, info) {
   for (const s of info.seats) {
     if (!s.pid || info.gameWinner !== s.seat % 2 || t.coachUsed) continue;
-    const want = t.joker ? 2 : 1, a = pidAuth.get(s.pid), cur = skillOf(s.pid);
-    if (want <= cur) continue;
-    if (a) A.setSkill(a.profile, want); else { guestSkill.set(s.pid, want); if (pidGuest.has(s.pid)) A.setSkill(pidGuest.get(s.pid), want); }
-    for (const { socket, pid: cp } of t.clients.values()) if (cp === s.pid) socket.emit('skill', { skill: want, up: true });
+    promote(t, s.pid, t.joker ? 2 : 1);
   }
+}
+// Nov 26 2026 (manager): players with 40+ hands were stuck as beginners because they never won a full game.
+// Now HANDS_UP hands played with the tutorial off also levels you up: any hands -> stage 1, Joker hands -> stage 2.
+// Counts live in equipped.ch (all hands) and equipped.jh (Joker hands); old players start from their hands so far minus the first (tutorial) game.
+const HANDS_UP = 5;
+const guestHands = new Map(); // guests without a saved profile yet: pid -> { ch, jh }
+function countHand(t, pid) {
+  if (t.guided) return; // tutorial on for this hand
+  const pr = profOf(pid);
+  let c;
+  if (pr) {
+    const e = pr.equipped || {};
+    c = { ch: e.ch != null ? e.ch + 1 : Math.max(1, (pr.hands || 0) + 1 - 6), jh: (e.jh || 0) + (t.joker ? 1 : 0) };
+    pr.equipped = { ...e, ch: c.ch, jh: c.jh }; // saved by the award that follows
+  } else {
+    c = guestHands.get(pid) || { ch: 0, jh: 0 };
+    c.ch++; if (t.joker) c.jh++;
+    guestHands.set(pid, c);
+    if (guestHands.size > 20000) guestHands.delete(guestHands.keys().next().value);
+  }
+  const cur = skillOf(pid);
+  if (cur < 1 && c.ch >= HANDS_UP) promote(t, pid, 1);
+  else if (cur === 1 && c.jh >= HANDS_UP) promote(t, pid, 2);
 }
 // First games: only write when a try gets further than any earlier try (started 0, bid 1, trump 2, card 3, hands 4, finished 5)
 // What a new player was looking at: last coach tip + the game step (and whether it was their turn)
@@ -214,6 +242,7 @@ function wireProgress(t) {
       if (!s.pid) continue;
       // (skipped only while the first game itself is running; "Play again" on the same table counts again)
       if (!(t.first && t.first.pid === s.pid && !t.first.done && !info.over)) S.firstSeen(s.pid, info.over ? `finished a ${tName(t)} game, ${info.gameWinner === s.seat % 2 ? 'won' : 'lost'}` : `played hand ${t.G.handNo} (${tName(t)})`);
+      try { countHand(t, s.pid); } catch (e) { console.error('skill hands', e); }
       const a = pidAuth.get(s.pid);
       if (!a) {
         const gp = pidGuest.get(s.pid);
