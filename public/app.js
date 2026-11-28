@@ -449,7 +449,7 @@ function welcomeScreen(err) {
       <button class="primary" id="wPlay">Play with friends</button>
       <button class="secondary" id="wPractice">Practice with bots</button>
       <div class="wrow"><button class="secondary" id="wJoin">Join with a code</button><button class="secondary" id="wTut">${firstTime ? 'Tutorial' : 'How to play'}</button></div>
-      <button class="secondary" id="wLb">🏆 Leaderboard</button>
+      <div class="wrow"><button class="secondary" id="wLb">🏆 Leaderboard</button><button class="secondary" id="wGames">🎬 My last games</button></div>
       <div id="wRooms" class="wrooms"></div>
       ${ANDROID_WEB ? `<a class="get-app" href="${playUrl('home')}" target="_blank" rel="noopener"><span class="ga-ico">▶</span><span><b>Get the Patta Party app</b><small>Free on Google Play · invite links open in the app</small></span></a>` : ''}
       <div class="err" id="wErr">${err ? esc(err) : ''}</div>
@@ -461,6 +461,7 @@ function welcomeScreen(err) {
   $('wJoin').onclick = joinSheet;
   $('wTut').onclick = () => openTutorial('home');
   $('wLb').onclick = () => lbSheet('xp');
+  $('wGames').onclick = myGamesSheet;
   renderChip();
   loadRooms();
 }
@@ -776,12 +777,47 @@ function replaysHTML(R) {
     <p class="rp-note">Tap a hand to watch it. Record your screen while it plays to make a video. Kept for 7 days.</p></div>`;
 }
 function bindReplays() {
-  document.querySelectorAll('.rp-btn').forEach(b => b.onclick = () => {
-    const mine = !S.spectator && S.seats && S.seats[0] ? '&me=' + S.seats[0].real : ''; // replay from my seat: only my cards shown
-    const url = location.origin + '/replay?id=' + encodeURIComponent(b.dataset.rp) + mine;
-    const Br = NATIVE_APP && capPlugin('Browser'); // in the app: open in the phone's browser, so the table stays open
-    if (Br) Br.open({ url }).catch(() => window.open(url, '_blank')); else window.open(url, '_blank');
-  });
+  document.querySelectorAll('.rp-btn').forEach(b => b.onclick = () => openReplay(b.dataset.rp, !S.spectator && S.seats && S.seats[0] ? S.seats[0].real : null));
+}
+// The replay opens on top of the app (a frame with a ✕), so the table or home screen is still there when you close it
+function openReplay(id, seat) {
+  closeReplay();
+  const d = document.createElement('div'); d.id = 'rpView';
+  d.innerHTML = `<iframe src="/replay?id=${encodeURIComponent(id)}${seat != null ? '&me=' + seat : ''}&embed=1" allow="autoplay; fullscreen" title="Hand replay"></iframe><button id="rpClose" aria-label="Close">✕</button>`;
+  document.body.appendChild(d);
+  $('rpClose').onclick = closeReplay;
+}
+function closeReplay() { const d = $('rpView'); if (d) d.remove(); }
+addEventListener('message', e => { // replay.html: recording mode hides the ✕ too
+  if (e.origin !== location.origin || !e.data || e.data.rp !== 'clean') return;
+  if ($('rpClose')) $('rpClose').hidden = !!e.data.on;
+});
+// My last games: the last 5 games I played, each hand with a replay (kept 7 days)
+async function myGamesSheet() {
+  openModal('games', `<div class="eyebrow">Replays</div><h2>🎬 My last games</h2><div id="mgList" class="mg-list"><div class="sub-muted">Loading…</div></div>
+    <p class="hint">Tap a hand to watch it. Replays are kept for 7 days.</p><button class="primary" id="mgClose">Close</button>`);
+  $('mgClose').onclick = closeModal;
+  const r = await send('myGames'); if (modalKind !== 'games' || !$('mgList')) return;
+  if (!r || !r.ok) { $('mgList').innerHTML = '<div class="sub-muted">Could not load your games. Try again in a minute.</div>'; return; }
+  if (!r.list.length) { $('mgList').innerHTML = '<div class="sub-muted">No games yet. Play a game and its hands will show here.</div>'; return; }
+  const when = t => { const d = new Date(t), now = new Date(), y = new Date(now - 864e5);
+    const day = d.toDateString() === now.toDateString() ? 'Today' : d.toDateString() === y.toDateString() ? 'Yesterday' : d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+    return day + ', ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
+  $('mgList').innerHTML = r.list.map(g => {
+    const mt = g.me % 2, mine = g.score * (mt ? -1 : 1); // + = my team ahead
+    const res = g.over ? (mine > 0 ? `<b class="good">You won by ${mine}</b>` : `<b class="bad">You lost by ${-mine}</b>`)
+      : `<b>Not finished</b> · ${mine > 0 ? `ahead by ${mine}` : mine < 0 ? `behind by ${-mine}` : 'level'}`;
+    const names = t => (g.seats || []).filter((_, i) => i % 2 === t).map(p => esc(p.name)).join(', ');
+    const hands = g.hands.map(h => {
+      const won = h.winner === mt, tag = h.kind === 'sweep' ? '🧹 ' : h.kind === 'whitewash' ? '⚪ ' : '';
+      return `<button class="rp-btn mg-h ${won ? 'won' : 'lost'}" data-rp="${esc(h.id)}" data-me="${g.me}">▶ Hand ${h.h}<small>${tag}Bid ${h.v}${SYM[h.trump] || ''} · ${esc(h.bidder)}</small><small class="${won ? 'w' : 'l'}">${won ? '✓ Won' : '✗ Lost'} ${h.pts}</small></button>`;
+    }).join('');
+    return `<div class="mg-game"><div class="mg-top"><span>${when(g.at)}</span><span>${g.n} players${g.joker ? ' · Joker' : ''}</span></div>
+      <div class="mg-res">${res} · ${g.hands.length} hand${g.hands.length === 1 ? '' : 's'}</div>
+      <div class="mg-teams"><span class="ta">Your team:</span> ${names(mt)}<br><span class="tb">Opponents:</span> ${names(1 - mt)}</div>
+      <div class="rp-list">${hands}</div></div>`;
+  }).join('');
+  $('mgList').querySelectorAll('.mg-h').forEach(b => b.onclick = () => openReplay(b.dataset.rp, +b.dataset.me));
 }
 function bindRateBox() {
   if (!$('rateBtn')) return;
@@ -1902,6 +1938,7 @@ else homeScreen();
 let backAt = 0;
 function appBack() {
   const vis = id => $(id) && !$(id).hidden;
+  if ($('rpView')) { closeReplay(); return; }
   if (vis('stkTray')) { $('stkTray').hidden = true; return; }
   if (vis('inapp')) { $('inapp').hidden = true; return; }
   if (vis('tut') && $('tutClose')) { $('tutClose').click(); return; }

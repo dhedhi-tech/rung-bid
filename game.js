@@ -545,7 +545,7 @@ class Table {
   }
   newGame() {
     this.coachUsed = !!this.guided; // a win only levels you up if the tutorial was off the whole game
-    this.hintsUsed = 0; this.replays = [];
+    this.hintsUsed = 0; this.replays = []; this.gameId = Math.random().toString(36).slice(2, 12) + Date.now().toString(36); this.gameAt = Date.now(); // My last games
     this.G = {
       n: this.n, joker: this.joker, avg: calibrate(this.n, this.joker), fullDeck: buildDeck(this.n, this.joker), played: [], players: Array.from({ length: this.n }, () => ({ hand: [], tricks: 0 })),
       dealer: Math.floor(Math.random() * this.n), score: 0, won: [0, 0], handNo: 1,

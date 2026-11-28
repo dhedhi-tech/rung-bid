@@ -240,7 +240,17 @@ function wireProgress(t) {
   t.levelOf = p => { const pr = profOf(p); return pr ? A.levelOf(pr.xp) : null; };
   t.avOf = p => { const pr = profOf(p); return pr ? A.avOf(pr) : null; };
   t.idOf = p => { const a = pidAuth.get(p); return a ? a.profile.id : null; };
-  t.onReplay = rec => (realGame() ? RP.save(rec, t.code) : null); // hand replay (replays.js)
+  t.onReplay = rec => { // hand replay (replays.js) + the game's entry in each player's "My last games"
+    if (!realGame()) return null;
+    const id = RP.save(rec, t.code), r = rec.res;
+    try {
+      RP.noteGame(t.gameId, { code: t.code, n: t.n, joker: t.joker, limit: t.limit, at: t.gameAt || Date.now(), score: r.score, over: r.over,
+        hand: { h: rec.handNo, id, v: r.v, trump: r.trump, bidder: rec.seats[r.bidSeat] ? rec.seats[r.bidSeat].name : '', bs: r.bidSeat, kind: r.kind, winner: r.winner, pts: r.pts },
+        people: t.seats.map((s, i) => (!s.bot && s.pid ? { pid: s.pid, uid: t.idOf(s.pid) || null, name: s.name, seat: i } : null)).filter(Boolean),
+        seats: rec.seats.map(s => ({ name: s.name, bot: s.bot })) });
+    } catch (e) { console.error('noteGame', e.message); }
+    return id;
+  };
   t.onHandEnd = info => {
     if (info.over && realGame()) S.logGame({ kind: 'finish', ...tableInfo(t), hands: t.G.handNo });
     if (info.over) try { levelUp(t, info); } catch (e) { console.error('skill', e); }
@@ -493,6 +503,12 @@ io.on('connection', socket => {
     if (!A.enabled && !A.DEV) return reply(cb, null, { list: [], mine: null, off: true });
     try { const a = pidAuth.get(pid); reply(cb, null, await A.leaderboard(String(sort), a ? a.profile : null)); }
     catch (e) { console.error('leaderboard', e.message); reply(cb, 'Leaderboard is not available right now'); }
+  });
+  // My last games (hand replays to watch later)
+  socket.on('myGames', async (_, cb) => {
+    const now = Date.now(); if (socket.data.lastMg && now - socket.data.lastMg < 800) return reply(cb, 'Slow down a little'); socket.data.lastMg = now;
+    try { const a = pidAuth.get(pid); reply(cb, null, { list: await RP.myGames(pid, a ? a.profile.id : null) }); }
+    catch (e) { console.error('myGames', e.message); reply(cb, 'Could not load your games'); }
   });
   // ---- friends ----
   const meId = () => { const a = pidAuth.get(pid); return a ? a.profile.id : null; };

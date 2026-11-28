@@ -101,6 +101,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:8px;pad
 #ctl input{width:100%;accent-color:var(--ta)}
 #ctl .hint{font-size:11.5px;color:var(--muted);text-align:center}
 body.clean #ctl{display:none}
+body.embed:not(.clean) header{padding-right:58px}
 .overlay{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:rgba(8,16,18,.95);padding:20px;animation:fade .3s}
 .overlay h1{margin:0;font-size:34px;font-weight:900;color:var(--gold);line-height:1.1}
 .overlay h2{margin:4px 0 0;font-size:18px;font-weight:700}
@@ -134,6 +135,7 @@ body.clean #ctl{display:none}
       <button id="bSpeed">1x</button>
     </div>
     <div class="row">
+      <button id="bSound" style="max-width:110px">🔊 On</button>
       <button id="bNames" style="max-width:150px">👤 Names: on</button>
       <button id="bClean" style="max-width:170px">🎬 Recording mode</button>
     </div>
@@ -142,6 +144,72 @@ body.clean #ctl{display:none}
 </div>
 <script>
 const $ = id => document.getElementById(id);
+// ---- game sounds (copied from app.js) ----
+let AC = null, muted = false;
+function ac() { if (muted) return null; try { if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); return AC; } catch (e) { return null; } }
+function tone(f, t0, dur, { type = 'sine', vol = .18, slide = 0 } = {}) {
+  const c = ac(); if (!c) return; const t = c.currentTime + t0;
+  const o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.setValueAtTime(f, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(f * slide, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + .02);
+}
+function noise(t0, dur, { vol = .25, freq = 2500, q = .8, type = 'bandpass' } = {}) {
+  const c = ac(); if (!c) return; const t = c.currentTime + t0;
+  const len = Math.ceil(c.sampleRate * dur), buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+  const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(); src.buffer = buf; f.type = type; f.frequency.value = freq; f.Q.value = q; g.gain.value = vol;
+  src.connect(f).connect(g).connect(c.destination); src.start(t);
+}
+const SFX = {
+  deal() { for (let i = 0; i < 4; i++) noise(i * .07, .05, { vol: .12, freq: 3500 }); },
+  card() { noise(0, .07, { vol: .3, freq: 1800, q: 1.2 }); tone(180, 0, .06, { type: 'triangle', vol: .08 }); },
+  bid(v) { const base = 330 * Math.pow(2, (v - 6) / 12 * 2); tone(base, 0, .14, { type: 'triangle', vol: .16 }); tone(base * 1.5, .09, .22, { type: 'triangle', vol: .16 }); },
+  support() { tone(523, 0, .12, { type: 'triangle' }); tone(659, .08, .12, { type: 'triangle' }); tone(784, .16, .25, { type: 'triangle' }); },
+  pass() { tone(220, 0, .12, { type: 'sine', vol: .08, slide: .8 }); },
+  trump() { [392, 494, 587].forEach((f, i) => tone(f, i * .06, .6, { type: 'triangle', vol: .11 })); tone(784, .2, .5, { type: 'sine', vol: .08 }); },
+  cut() { noise(0, .28, { vol: .35, freq: 900, q: .6, type: 'highpass' }); tone(140, .18, .25, { type: 'square', vol: .12, slide: .5 }); tone(880, .2, .18, { type: 'sawtooth', vol: .05, slide: .6 }); },
+  trickUs() { tone(784, 0, .12, { vol: .14 }); tone(1047, .09, .22, { vol: .14 }); },
+  trickThem() { tone(392, 0, .12, { vol: .11 }); tone(330, .09, .2, { vol: .11 }); },
+  turn() { tone(988, 0, .08, { vol: .07 }); },
+  joker() {
+    // Missile: a falling whistle and rising whoosh, then a loud blast with a long rumble
+    const c = ac(); if (!c) return;
+    const t = c.currentTime, out = c.createDynamicsCompressor(), boost = c.createGain();
+    out.threshold.value = -18; out.ratio.value = 6; out.attack.value = .002; out.release.value = .3; boost.gain.value = .9;
+    out.connect(boost).connect(c.destination);
+    const osc = (type, f0, f1, t0, dur, vol) => {
+      const o = c.createOscillator(), g = c.createGain(); o.type = type;
+      o.frequency.setValueAtTime(f0, t + t0); o.frequency.exponentialRampToValueAtTime(f1, t + t0 + dur);
+      g.gain.setValueAtTime(.0001, t + t0); g.gain.exponentialRampToValueAtTime(vol, t + t0 + Math.min(.08, dur / 3)); g.gain.exponentialRampToValueAtTime(.0001, t + t0 + dur);
+      o.connect(g).connect(out); o.start(t + t0); o.stop(t + t0 + dur + .05);
+    };
+    const nz = (t0, dur, vol, type, f0, f1, attack = .01) => {
+      const len = Math.ceil(c.sampleRate * dur), buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(); src.buffer = buf; f.type = type; f.Q.value = .7;
+      f.frequency.setValueAtTime(f0, t + t0); f.frequency.exponentialRampToValueAtTime(f1, t + t0 + dur);
+      g.gain.setValueAtTime(.0001, t + t0); g.gain.exponentialRampToValueAtTime(vol, t + t0 + attack); g.gain.exponentialRampToValueAtTime(.0001, t + t0 + dur);
+      src.connect(f).connect(g).connect(out); src.start(t + t0);
+    };
+    const hit = .75;
+    osc('sine', 2200, 520, 0, hit, .22);                 // incoming whistle
+    osc('triangle', 2210, 525, 0, hit, .08);             // slight wobble in the whistle
+    nz(0, hit, .35, 'bandpass', 600, 3000, hit * .9);    // rising whoosh
+    nz(hit, .12, 1.2, 'bandpass', 2400, 1200, .003);     // slap
+    nz(hit, .06, .7, 'highpass', 5000, 3000, .002);      // crack
+    osc('sine', 150, 32, hit, .9, .9);                   // boom
+    osc('triangle', 70, 28, hit + .02, 1.6, .6);         // sub rumble
+    nz(hit + .02, 2.0, 1, 'lowpass', 1400, 120, .02);    // blast rumble that fades out
+    nz(hit + .3, 1.4, .25, 'bandpass', 900, 300, .05);   // debris
+  },
+  win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * .11, .35, { type: 'triangle', vol: .16 })); },
+  lose() { [392, 349, 311, 262].forEach((f, i) => tone(f, i * .14, .35, { type: 'triangle', vol: .12 })); },
+  pop() { tone(660, 0, .08, { vol: .08 }); },
+  fanfare() { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, i * .12, i === 6 ? .7 : .22, { type: 'triangle', vol: .16 })); [262, 392, 523].forEach(f => tone(f, .84, .9, { type: 'sine', vol: .07 })); },
+};
+function sfx(name, ...a) { try { SFX[name](...a); } catch (e) {} }
+const EMBED = new URLSearchParams(location.search).has('embed');
 const SYM = { S: '♠', H: '♥', D: '♦', C: '♣' }, SNAME = { S: 'Spades', H: 'Hearts', D: 'Diamonds', C: 'Clubs' };
 const RL = r => ({ 11: 'J', 12: 'Q', 13: 'K', 14: 'A' }[r] || String(r));
 const RED = s => s === 'H' || s === 'D';
@@ -164,7 +232,7 @@ function build() {
   const n = R.n, cards = new Map();
   let st = { hands: Array.from({ length: n }, () => []), acts: {}, bid: null, trump: null, trick: [], won: [0, 0], seatTricks: Array(n).fill(0), round: 0,
     active: -1, cap: '', big: false, done: false, show: null, score: R.score, overlay: 'intro', pop: null };
-  const snap = (ms, patch) => { st = { ...st, ...patch }; steps.push({ ms, st: JSON.parse(JSON.stringify(st)) }); };
+  const snap = (ms, patch) => { const { snd, ...rest } = patch; st = { ...st, ...rest }; steps.push({ ms, snd: snd || null, st: JSON.parse(JSON.stringify(st)) }); };
   snap(2600, {});
   st.overlay = null;
   const plan = [5, 4, 4];
@@ -173,16 +241,16 @@ function build() {
     if (e.t === 'd') {
       const hands = st.hands.map((h, s) => h.concat(e.c[s].map(([id, su, r]) => { const c = { id, s: su, r }; cards.set(id, c); return c; })));
       const round = st.round + 1;
-      snap(1300, { hands, round, acts: {}, active: -1, trick: [], cap: `Round ${round}: ${plan[round - 1] || ''} cards each`, big: false });
+      snap(1300, { snd: ['deal'], hands, round, acts: {}, active: -1, trick: [], cap: `Round ${round}: ${plan[round - 1] || ''} cards each`, big: false });
     } else if (e.t === 'b') {
       const acts = { ...st.acts }; let cap, bid = st.bid;
       if (e.w) { acts[e.s] = '👀'; cap = `${nameHTML(e.s)} watches this round`; }
       else if (e.v) { const own = bid && bid.s === e.s; acts[e.s] = e.v; bid = { v: e.v, s: e.s }; cap = e.f ? `All passed. ${nameHTML(e.s)} must bid 6` : own ? `${nameHTML(e.s)} raises own bid to ${e.v}` : `${nameHTML(e.s)} bids ${e.v}`; }
       else { acts[e.s] = 'Pass'; cap = `${nameHTML(e.s)} passes`; }
-      snap(e.v ? 1300 : 800, { acts, bid, active: e.s, cap, big: false });
+      snap(e.v ? 1300 : 800, { snd: e.w ? ['pop'] : e.v ? ['bid', e.v] : ['pass'], acts, bid, active: e.s, cap, big: false });
     } else if (e.t === 't') {
       const cap = e.k === 'call' ? `${nameHTML(e.s)} calls ${SYM[e.x]} ${SNAME[e.x]} trump` : e.k === 'change' ? `${nameHTML(e.s)} changes trump to ${SYM[e.x]} ${SNAME[e.x]}` : e.k === 'keep' ? `Trump stays ${SYM[e.x]} ${SNAME[e.x]}` : `No raise. Trump stays ${SYM[e.x]}`;
-      snap(e.k === 'stay' ? 1100 : 1600, { trump: e.x, active: e.k === 'stay' ? -1 : e.s, cap, big: e.k === 'call' || e.k === 'change' });
+      snap(e.k === 'stay' ? 1100 : 1600, { snd: e.k === 'call' || e.k === 'change' ? ['trump'] : null, trump: e.x, active: e.k === 'stay' ? -1 : e.s, cap, big: e.k === 'call' || e.k === 'change' });
     } else if (e.t === 'p') {
       const c = cards.get(e.c), trick = st.done ? [] : st.trick.slice(), lead = trick.length ? trick[0].c.s : null;
       const cut = !!(lead && c.s === st.trump && lead !== st.trump && c.s !== 'J'), over = cut && trick.some(t => t.c.s === st.trump);
@@ -190,23 +258,23 @@ function build() {
       const hands = st.hands.slice(); hands[e.s] = hands[e.s].filter(x => x.id !== e.c);
       const cap = c.s === 'J' ? `${nameHTML(e.s)} throws the Joker!` : !lead ? `${nameHTML(e.s)} leads ${cardTxt(c)}` : cut ? `${nameHTML(e.s)} ${over ? 'over-cuts' : 'cuts'} with ${cardTxt(c)}!` : `${nameHTML(e.s)} plays ${cardTxt(c)}`;
       const second = c.s === 'J' && trick.filter(t => t.c.s === 'J').length === 2;
-      snap(cut || c.s === 'J' ? 1500 : 850, { hands, trick, done: false, show: null, acts: trick.length === 1 ? {} : st.acts, active: e.s, cap, big: cut || c.s === 'J',
+      snap(c.s === 'J' ? 2000 : cut ? 1500 : 850, { snd: [c.s === 'J' ? 'joker' : cut ? 'cut' : 'card'], hands, trick, done: false, show: null, acts: trick.length === 1 ? {} : st.acts, active: e.s, cap, big: cut || c.s === 'J',
         fx: cut ? { s: e.s, x: c.s, over } : c.s === 'J' ? { s: e.s, j: 1, second } : null });
       st.fx = null;
     } else if (e.t === 'w') {
       const won = st.won.slice(); won[e.team]++; const seatTricks = st.seatTricks.slice(); seatTricks[e.cr]++;
       const cap = e.sec ? `Jokers cancel. ${nameHTML(e.cr)} wins the trick` : e.fl ? `Joker flips it! ${teamHTML(e.team)} take the trick` : `${nameHTML(e.cr)} wins the trick`;
-      snap(1500, { won, seatTricks, done: true, show: e.sh, active: -1, cap, big: !!(e.fl || e.sec) });
+      snap(1500, { snd: [ME < 0 || TM(e.team) === 0 ? 'trickUs' : 'trickThem'], won, seatTricks, done: true, show: e.sh, active: -1, cap, big: !!(e.fl || e.sec) });
     } else if (e.t === 'e' || e.t === 'k') { // emoji reaction / sticker sent during the hand
       if (!st.hands[e.s]) continue;
-      snap(e.t === 'k' ? 1700 : 1100, { pop: { s: e.s, e: e.e || null, k: e.id || null } });
+      snap(e.t === 'k' ? 1700 : 1100, { snd: ['pop'], pop: { s: e.s, e: e.e || null, k: e.id || null } });
       st.pop = null; continue;
     } else if (e.t === 'x') {
       const won = st.won.slice(); won[e.team] += e.left;
-      snap(2200, { won, active: e.s, cap: `${nameHTML(e.s)} is stuck with ${e.left === 1 ? 'a joker' : e.left + ' jokers'}. ${teamHTML(e.team)} take ${e.left}`, big: true });
+      snap(2200, { snd: ['lose'], won, active: e.s, cap: `${nameHTML(e.s)} is stuck with ${e.left === 1 ? 'a joker' : e.left + ' jokers'}. ${teamHTML(e.team)} take ${e.left}`, big: true });
     }
   }
-  if (R.res) snap(5000, { overlay: 'end', active: -1, cap: '', trick: [], score: R.res.score });
+  if (R.res) snap(5000, { snd: [ME < 0 || TM(R.res.winner) === 0 ? 'win' : 'lose'], overlay: 'end', active: -1, cap: '', trick: [], score: R.res.score });
 }
 
 // ---------- drawing ----------
@@ -292,12 +360,13 @@ function draw() {
 }
 
 // ---------- playback ----------
-function go(i) { at = Math.max(0, Math.min(steps.length - 1, i)); draw(); }
+function go(i, sound) { at = Math.max(0, Math.min(steps.length - 1, i)); draw(); const s = steps[at].snd; if (sound && s && soundOn) sfx(...s); }
+let soundOn = true;
 function tick() {
   clearTimeout(timer);
   if (!playing) return;
   if (at >= steps.length - 1) { playing = false; draw(); return; }
-  timer = setTimeout(() => { go(at + 1); tick(); }, steps[at].ms / speed);
+  timer = setTimeout(() => { go(at + 1, true); tick(); }, steps[at].ms / speed);
 }
 function play(on) { playing = on; if (on && at >= steps.length - 1) at = 0; draw(); tick(); }
 function sizeVars() {
@@ -314,20 +383,21 @@ async function load() {
     if (!r.ok) throw new Error('missing');
     R = await r.json();
   } catch (e) { $('msg').textContent = 'This replay is not available. Replays are kept for 7 days.'; return; }
-  $('msg').remove(); $('app').hidden = false;
+  $('msg').remove(); $('app').hidden = false; if (EMBED) document.body.classList.add('embed');
   if (ME >= 0) TEAM = ['Your team', 'Opponents'];
   try { const j = await (await fetch('/stickers/list')).json(); (j.list || []).forEach(x => STK[x.id] = x.src); } catch (e) {}
   $('sub').textContent = `Hand ${R.handNo} replay · ${R.n} players${R.joker ? ' · Joker' : ''}`;
   build(); $('bar').max = steps.length - 1; sizeVars(); go(0);
-  $('bPlay').onclick = () => play(!playing);
+  $('bPlay').onclick = () => { ac(); play(!playing); };
   $('bBack').onclick = () => { play(false); go(at - 1); };
-  $('bNext').onclick = () => { play(false); go(at + 1); };
-  $('bRestart').onclick = () => { go(0); play(true); };
+  $('bNext').onclick = () => { ac(); play(false); go(at + 1, true); };
+  $('bRestart').onclick = () => { ac(); go(0); play(true); };
   $('bSpeed').onclick = () => { speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]; $('bSpeed').textContent = speed + 'x'; tick(); };
+  $('bSound').onclick = () => { soundOn = !soundOn; $('bSound').textContent = soundOn ? '🔊 On' : '🔇 Off'; if (soundOn) { ac(); sfx('pop'); } };
   $('bNames').onclick = () => { names = !names; $('bNames').textContent = '👤 Names: ' + (names ? 'on' : 'off'); steps = []; build(); draw(); };
-  $('bClean').onclick = () => { document.body.classList.add('clean'); setTimeout(draw, 50); if (!playing) setTimeout(() => { go(0); play(true); }, 1200); };
+  $('bClean').onclick = () => { ac(); document.body.classList.add('clean'); if (EMBED) parent.postMessage({ rp: 'clean', on: true }, location.origin); setTimeout(draw, 50); if (!playing) setTimeout(() => { go(0); play(true); }, 1200); };
   $('bar').oninput = () => { play(false); go(+$('bar').value); };
-  $('stage').onclick = () => { if (document.body.classList.contains('clean')) { document.body.classList.remove('clean'); play(false); setTimeout(draw, 50); } };
+  $('stage').onclick = () => { if (document.body.classList.contains('clean')) { document.body.classList.remove('clean'); if (EMBED) parent.postMessage({ rp: 'clean', on: false }, location.origin); play(false); setTimeout(draw, 50); } };
   addEventListener('resize', () => { sizeVars(); draw(); });
 }
 load();
