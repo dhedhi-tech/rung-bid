@@ -771,13 +771,14 @@ const rateBoxHTML = () => `<div class="rate-box" id="rateBox"><div class="rate-q
 function replaysHTML(R) {
   const list = R.replays || []; if (!list.length) return '';
   const tag = k => (k === 'sweep' ? '🧹 ' : k === 'whitewash' ? '⚪ ' : '');
-  return `<div class="hl-box rp-box"><div class="hl-head">🎬 Hand replays · all cards open</div>
+  return `<div class="hl-box rp-box"><div class="hl-head">🎬 Hand replays</div>
     <div class="rp-list">${list.map(x => `<button class="rp-btn" data-rp="${esc(x.id)}">Hand ${x.h}<small>${tag(x.kind)}${esc(x.contract)}</small></button>`).join('')}</div>
     <p class="rp-note">Tap a hand to watch it. Record your screen while it plays to make a video. Kept for 7 days.</p></div>`;
 }
 function bindReplays() {
   document.querySelectorAll('.rp-btn').forEach(b => b.onclick = () => {
-    const url = location.origin + '/replay?id=' + encodeURIComponent(b.dataset.rp);
+    const mine = !S.spectator && S.seats && S.seats[0] ? '&me=' + S.seats[0].real : ''; // replay from my seat: only my cards shown
+    const url = location.origin + '/replay?id=' + encodeURIComponent(b.dataset.rp) + mine;
     const Br = NATIVE_APP && capPlugin('Browser'); // in the app: open in the phone's browser, so the table stays open
     if (Br) Br.open({ url }).catch(() => window.open(url, '_blank')); else window.open(url, '_blank');
   });

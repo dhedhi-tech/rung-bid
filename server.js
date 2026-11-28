@@ -588,7 +588,7 @@ io.on('connection', socket => {
     if (!table || !STK.has(String(id))) return reply(cb);
     const now = Date.now(); if (socket.data.lastReact && now - socket.data.lastReact < 1500) return reply(cb, 'Slow down a little');
     socket.data.lastReact = now;
-    const p = table.players.get(pid); if (p && p.seat != null) table.fx('sticker', { seat: p.seat, id: String(id) });
+    const p = table.players.get(pid); if (p && p.seat != null) { table.fx('sticker', { seat: p.seat, id: String(id) }); table.rec({ t: 'k', s: p.seat, id: String(id) }); }
     reply(cb);
   });
   socket.on('react', (emo, cb) => {
@@ -596,7 +596,7 @@ io.on('connection', socket => {
     if (!table || !allowed.includes(emo)) return reply(cb);
     const now = Date.now(); if (socket.data.lastReact && now - socket.data.lastReact < 1200) return reply(cb);
     socket.data.lastReact = now;
-    const p = table.players.get(pid); if (p && p.seat != null) table.fx('react', { seat: p.seat, emo });
+    const p = table.players.get(pid); if (p && p.seat != null) { table.fx('react', { seat: p.seat, emo }); table.rec({ t: 'e', s: p.seat, e: emo }); }
     reply(cb);
   });
   // ---- voice chat: the server only passes connection messages between players' phones ----

@@ -401,7 +401,7 @@ class Table {
       .replace(/\{t(\d)\}/g, (_, t) => team(+t));
   }
   // Hand replay (Nov 28 2026): every move of the hand is saved, so it can be played back later (replay.html)
-  rec(e) { const G = this.G; if (G && G.rec) G.rec.ev.push(e); }
+  rec(e) { const G = this.G; if (G && G.rec && !G.rec.res) G.rec.ev.push(e); } // stops once the hand is saved
   log(str) { const G = this.G; G.log.push(str); if (G.log.length > 4) G.log.shift(); }
   setMain(str) { this.G.main = str; }
 
