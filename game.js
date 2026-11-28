@@ -400,6 +400,8 @@ class Table {
       .replace(/\{tl(\d)\}/g, (_, t) => team(+t).toLowerCase())
       .replace(/\{t(\d)\}/g, (_, t) => team(+t));
   }
+  // Hand replay (Nov 28 2026): every move of the hand is saved, so it can be played back later (replay.html)
+  rec(e) { const G = this.G; if (G && G.rec) G.rec.ev.push(e); }
   log(str) { const G = this.G; G.log.push(str); if (G.log.length > 4) G.log.shift(); }
   setMain(str) { this.G.main = str; }
 
@@ -457,7 +459,7 @@ class Table {
     return {
       title: this.fmt(R.title, me), winner: rotTeam(R.winner), pts: R.pts, contract: R.contract, bidder: this.fmt(`{n${R.bidSeat}}`, me),
       tricks: [R.tricks[base % 2], R.tricks[1 - base % 2]], next: R.next != null ? this.fmt(`{n${R.next}}`, me) : null,
-      kind: R.kind, over: R.over, byLimit: !!R.byLimit, deciderNext: !!R.deciderNext, endsAt: R.endsAt ? Math.max(0, R.endsAt - Date.now()) : 0, handNo: R.handNo,
+      kind: R.kind, replay: R.replay || null, replays: R.over ? (this.replays || []).map(x => ({ ...x, winner: rotTeam(x.winner) })) : null, over: R.over, byLimit: !!R.byLimit, deciderNext: !!R.deciderNext, endsAt: R.endsAt ? Math.max(0, R.endsAt - Date.now()) : 0, handNo: R.handNo,
     };
   }
   broadcast() {
@@ -543,7 +545,7 @@ class Table {
   }
   newGame() {
     this.coachUsed = !!this.guided; // a win only levels you up if the tutorial was off the whole game
-    this.hintsUsed = 0;
+    this.hintsUsed = 0; this.replays = [];
     this.G = {
       n: this.n, joker: this.joker, avg: calibrate(this.n, this.joker), fullDeck: buildDeck(this.n, this.joker), played: [], players: Array.from({ length: this.n }, () => ({ hand: [], tricks: 0 })),
       dealer: Math.floor(Math.random() * this.n), score: 0, won: [0, 0], handNo: 1,
@@ -836,7 +838,9 @@ class Table {
   // ---------- flow ----------
   async deal(k) {
     const G = this.G, start = (G.dealer + 1) % G.n;
-    for (let i = 0; i < k; i++) for (let j = 0; j < G.n; j++) G.players[(start + j) % G.n].hand.push(G.deck.pop());
+    const got = Array.from({ length: G.n }, () => []);
+    for (let i = 0; i < k; i++) for (let j = 0; j < G.n; j++) { const c = G.deck.pop(); G.players[(start + j) % G.n].hand.push(c); got[(start + j) % G.n].push([c.id, c.s, c.r]); }
+    this.rec({ t: 'd', c: got });
     this.broadcast(); this.fx('deal');
     await this.sleep(PACE.deal + (G.rigged ? k * 300 * SPEED : 0)); // first hand: the app deals your cards one by one
   }
@@ -845,7 +849,7 @@ class Table {
     const raised = new Set(), out = new Set(); // who bid in this round, and who then dropped out
     const watcher = G.rigged && r < 3 ? G.newbie : -1; // first coached hand: the new player watches rounds 1 and 2, then bids in round 3
     const turn = async seat => {
-      if (seat === watcher) { G.hist.push({ r, seat, v: null, watch: true }); G.acts[seat] = 'Watch'; this.broadcast(); return seat; }
+      if (seat === watcher) { G.hist.push({ r, seat, v: null, watch: true }); this.rec({ t: 'b', r, s: seat, v: null, w: 1 }); G.acts[seat] = 'Watch'; this.broadcast(); return seat; }
       G.main = `Waiting for {n${seat}} to bid`;
       const cur = G.bid ? G.bid.value : 5;
       // The current holder may raise their own bid too (for example to change trump)
@@ -853,7 +857,7 @@ class Table {
       const v = await this.ask(seat, 'bid', { kind: 'bid', round: r, options }, () => this.firstBotBid(seat, r),
         val => val === 0 || val === null || options.includes(val));
       const val = v || null;
-      G.hist.push({ r, seat, v: val });
+      G.hist.push({ r, seat, v: val }); this.rec({ t: 'b', r, s: seat, v: val });
       if (val) {
         const support = G.supportSeat === seat && !this.isHuman(seat);
         const own = !!(G.bid && G.bid.seat === seat);
@@ -883,7 +887,7 @@ class Table {
     }
     G.active = -1;
     if (!G.bid) {
-      G.bid = { value: 6, seat: start }; G.acts[start] = 6; G.hist.push({ r, seat: start, v: 6, forced: true });
+      G.bid = { value: 6, seat: start }; G.acts[start] = 6; G.hist.push({ r, seat: start, v: 6, forced: true }); this.rec({ t: 'b', r, s: start, v: 6, f: 1 });
       this.log(`All passed. {v${start}:are:is} forced to bid 6`); this.broadcast();
       await this.sleep(PACE.bot);
     }
@@ -895,6 +899,7 @@ class Table {
     const s = await this.ask(seat, 'trump', { kind: 'trump', bid: G.bid.value, current: G.trump }, () => this.botTrump(seat), v => SUITS.includes(v));
     const prev = G.trump; G.trump = s;
     const kind = !prev ? 'call' : prev !== s ? 'change' : 'keep';
+    this.rec({ t: 't', s: seat, x: s, k: kind });
     this.log(kind === 'call' ? `{v${seat}:call:calls} ${SNAME[s]} trump` : kind === 'change' ? `{v${seat}:change:changes} trump to ${SNAME[s]}` : `Trump stays ${SNAME[s]}`);
     G.active = -1; this.broadcast();
     this.fx('trump', { s, sub: kind === 'call' ? `Called by {n${seat}}` : kind === 'change' ? `Changed by {n${seat}}` : `Kept by {n${seat}}`, seat });
@@ -904,6 +909,7 @@ class Table {
     const G = this.G, h = G.players[seat].hand; h.splice(h.findIndex(c => c.id === card.id), 1);
     if (!G.trick.length) G.leadSuit = card.s;
     G.trick.push({ seat, card }); G.played.push(card);
+    this.rec({ t: 'p', s: seat, c: card.id });
     if (G.trick.length > 1 && card.s !== G.leadSuit) G.voids[seat].add(G.leadSuit);
     if (isJ(card)) {
       const second = this.jokerCount() === 2;
@@ -925,6 +931,7 @@ class Table {
         G.tricksWon[ot] += left;
         this.log(`{v${leader}:are:is} stuck with ${left === 1 ? 'a joker' : left + ' jokers'}`);
         G.main = `{n${leader}} can't lead a joker. {t${ot}} take ${left} trick${left > 1 ? 's' : ''}`;
+        this.rec({ t: 'x', s: leader, left, team: ot });
         this.broadcast(); this.fx('stuck', { seat: leader, left, team: ot });
         await this.sleep(2200 * SPEED);
         break;
@@ -942,6 +949,7 @@ class Table {
       const L = G.trick[0].seat;
       if (!res.flipped && !res.second && L !== res.lead && L % 2 === res.lead % 2) G.returnTo[res.lead] = { suit: G.trick[0].card.s, partner: L };
       G.tricksWon[res.team]++; G.players[res.credit].tricks++;
+      this.rec({ t: 'w', team: res.team, cr: res.credit, ld: res.lead, fl: res.flipped ? 1 : 0, sec: res.second ? 1 : 0, sh: res.show.card.id });
       if (res.second) { this.log(`Jokers cancel. {v${res.credit}:win:wins} the trick`); G.main = `Jokers cancel. {v${res.credit}:win:wins} the trick, {v${res.lead}:lead:leads} next`; }
       else if (res.flipped) { this.log(`Joker flips the trick to {tl${res.team}}`); G.main = `Joker reverses it. {t${res.team}} take the trick, {v${res.lead}:lead:leads} next`; }
       else G.main = `{v${res.lead}:win:wins} the trick`;
@@ -977,6 +985,11 @@ class Table {
     G.result = { title, winner, pts, kind, contract: `${v} ${SYM[G.trump]}`, bidSeat: G.bid.seat, tricks: tw.slice(), next: over ? null : G.dealer, over,
       byLimit: over && Math.abs(G.score) < TARGET, deciderNext: !over && limitHit, endsAt: over ? 0 : Date.now() + HAND_END_MS, handNo: G.handNo };
     if (over) G.over = { winner: G.score > 0 ? 0 : 1 };
+    if (G.rec) {
+      G.rec.res = { title, winner, pts, kind, v, trump: G.trump, bidSeat: G.bid.seat, tricks: tw.slice(), score: G.score, over };
+      G.result.replay = this.onReplay ? this.onReplay(G.rec) : null;
+      if (G.result.replay) (this.replays = this.replays || []).push({ h: G.handNo, id: G.result.replay, kind, contract: G.result.contract, bidder: this.seats[G.bid.seat].name, winner });
+    }
     if (over) this.phase = 'over';
     // Progress hook (XP and coins for signed-in players)
     if (this.onHandEnd) {
@@ -1014,6 +1027,8 @@ class Table {
     G.players.forEach(p => { p.hand = []; p.tricks = 0; });
     G.deck = shuffle(buildDeck(G.n, G.joker));
     G.rigged = false; G.newbie = -1;
+    G.rec = { v: 1, at: Date.now(), n: G.n, joker: G.joker, handNo: G.handNo, limit: this.limit, dealer: G.dealer, score: G.score,
+      seats: this.seats.map(st => ({ name: st.name, bot: !!st.bot, av: !st.bot && st.pid && this.avOf ? this.avOf(st.pid) : st.bot ? this.botAv(st.name) : null })), ev: [] };
     if (this.guidedOn() && G.handNo === 1 && !this.coachGames) this.rigDeck(); // winning first hand, first game only
     this.log(`{v${G.dealer}:deal:deals}`);
     const plan = [5, 4, 4];
@@ -1023,7 +1038,7 @@ class Table {
       G.phase = 'bid'; G.acts = {};
       const raised = await this.biddingRound(r);
       if (raised || !G.trump) await this.callTrump();
-      else { this.log(`No raise. Trump stays ${SNAME[G.trump]}`); this.broadcast(); this.fx('trump', { s: G.trump, sub: 'No raise. Trump stays' }); await this.sleep(PACE.trump); }
+      else { this.rec({ t: 't', s: G.bid.seat, x: G.trump, k: 'stay' }); this.log(`No raise. Trump stays ${SNAME[G.trump]}`); this.broadcast(); this.fx('trump', { s: G.trump, sub: 'No raise. Trump stays' }); await this.sleep(PACE.trump); }
       G.roundTrump[r] = { s: G.trump, seat: G.bid.seat, v: G.bid.value };
     }
     G.phase = 'play'; G.acts = {};

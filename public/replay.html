@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0c1618">
+<meta name="robots" content="noindex">
+<title>Hand replay · Patta Party</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=DM+Serif+Display&display=swap">
+<style>
+/* Hand replay (Nov 28 2026): plays back a saved hand with every player's cards open, for screen recording (YouTube). */
+:root{--bg:#0c1618;--panel:#14242a;--line:#2b444b;--fg:#eef3f0;--muted:#94aba8;--paper:#fbf7ef;--red:#c3302b;--black:#191b22;
+  --ta:#f4a93a;--tb:#6cc4d8;--gold:#f4c542;--good:#82d48e;--felt:#1f7a4d;--felt-dark:#0d4a2e;--font:"Archivo",system-ui,sans-serif;--card:"DM Serif Display",Georgia,serif;
+  --mw:17px;--tw:44px;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px var(--font);overflow:hidden;-webkit-tap-highlight-color:transparent}
+#app{position:fixed;inset:0;display:flex;flex-direction:column;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px 6px}
+.logo{font-weight:900;font-size:20px;letter-spacing:.01em;white-space:nowrap}
+.logo small{display:block;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0}
+.score{display:flex;gap:6px;font-weight:800;font-size:13px}
+.score span{padding:5px 9px;border-radius:999px;background:var(--panel);border:1px solid var(--line);white-space:nowrap}
+.score .a{color:var(--ta)} .score .b{color:var(--tb)}
+#stage{position:relative;flex:1;min-height:0;margin:4px 8px}
+.felt{position:absolute;inset:6% 9%;border-radius:50%;background:radial-gradient(ellipse at 50% 45%,var(--felt) 0%,var(--felt-dark) 100%);
+  box-shadow:0 0 0 7px #4f2c1b,0 0 0 9px #8b5636,0 18px 40px rgba(0,0,0,.5);overflow:hidden}
+.felt::before{content:"";position:absolute;inset:0;opacity:.09;background:repeating-linear-gradient(45deg,#f6d27a 0 6px,transparent 6px 14px),repeating-linear-gradient(-45deg,#f6d27a 0 6px,transparent 6px 14px)}
+.center{display:flex;justify-content:center;align-items:center;gap:8px;min-height:30px;padding:0 10px}
+.contract{display:inline-flex;align-items:center;gap:6px;background:rgba(0,0,0,.35);border-radius:999px;padding:5px 11px;font-weight:800;font-size:13px;white-space:nowrap}
+.contract .tr{font-family:var(--card);font-size:20px;line-height:1}
+.tricks{font-weight:800;font-size:13px;white-space:nowrap;background:rgba(0,0,0,.35);border-radius:999px;padding:5px 11px}
+.tricks .a{color:var(--ta)} .tricks .b{color:var(--tb)}
+.seat{position:absolute;transform:translate(-50%,-50%);z-index:3;display:flex;flex-direction:column;align-items:center;gap:3px;max-width:150px}
+.who{display:flex;align-items:center;gap:6px;background:var(--panel);border:2px solid var(--line);border-radius:999px;padding:3px 10px 3px 3px;box-shadow:0 6px 14px rgba(0,0,0,.4);transition:box-shadow .2s,border-color .2s}
+.seat.ta .who{border-color:color-mix(in srgb,var(--ta) 55%,var(--line))} .seat.tb .who{border-color:color-mix(in srgb,var(--tb) 55%,var(--line))}
+.seat.on .who{box-shadow:0 0 0 3px var(--gold),0 0 18px var(--gold)}
+.av{width:28px;height:28px;border-radius:50%;flex:none;display:grid;place-items:center;font-weight:900;font-size:14px;color:#1b1208;overflow:hidden}
+.ta .av{background:var(--ta)} .tb .av{background:var(--tb)}
+.av img{width:100%;height:100%;object-fit:cover}
+.nm{font-weight:800;font-size:12.5px;white-space:nowrap;max-width:78px;overflow:hidden;text-overflow:ellipsis}
+.tk{font-size:11px;font-weight:800;color:var(--muted);white-space:nowrap}
+.act{position:absolute;top:-16px;right:-12px;background:var(--paper);color:var(--black);font-weight:900;font-size:12px;border-radius:999px;padding:2px 8px;box-shadow:0 3px 8px rgba(0,0,0,.4);white-space:nowrap;animation:pop .25s}
+.act.pass{background:#55666a;color:#fff}
+.mini{display:flex;padding-left:calc(var(--mw)*.38)}
+.mc{width:var(--mw);height:calc(var(--mw)*1.38);margin-left:calc(var(--mw)*-.38);background:var(--paper);border-radius:3px;color:var(--black);font:800 calc(var(--mw)*.6)/1 var(--font);letter-spacing:-.04em;
+  box-shadow:0 0 0 1px #c9bfae,1px 2px 3px rgba(0,0,0,.35);display:flex;flex-direction:column;align-items:flex-start;padding:2px 0 0 2px;gap:1px}
+.mc.red{color:var(--red)} .mc.j{background:#e9dbf7;color:#7b2fbf}
+.mc b{font-weight:800} .mc b.t{letter-spacing:-.14em;font-size:.86em} .mc i{font-style:normal;font-family:system-ui;font-size:calc(var(--mw)*.6)}
+.tc{position:absolute;width:var(--tw);height:calc(var(--tw)*1.4);transform:translate(-50%,-50%);background:var(--paper);border-radius:calc(var(--tw)*.1);color:var(--black);
+  box-shadow:0 0 0 1px #c9bfae,0 6px 14px rgba(0,0,0,.45);font-family:var(--card);z-index:2;animation:drop .3s cubic-bezier(.2,.8,.3,1)}
+.tc.red{color:var(--red)} .tc.j{background:radial-gradient(circle,#fff 30%,#e9dbf7);color:#7b2fbf}
+.tc .r{position:absolute;left:5px;top:4px;font-size:calc(var(--tw)*.36);line-height:1}
+.tc .p{position:absolute;left:50%;top:56%;transform:translate(-50%,-50%);font-size:calc(var(--tw)*.6);font-family:system-ui}
+.tc.win{box-shadow:0 0 0 3px var(--gold),0 0 22px var(--gold);z-index:4}
+.tc.cut::after{content:"CUT";position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);background:var(--red);color:#fff;font:900 9px var(--font);padding:1px 5px;border-radius:5px;letter-spacing:.06em}
+.tc.jk::after{content:"JOKER";position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);background:#7b2fbf;color:#fff;font:900 9px var(--font);padding:1px 5px;border-radius:5px}
+#cap{min-height:52px;margin:6px 12px 4px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;font-size:19px;line-height:1.2}
+#cap.big{font-size:23px;color:var(--gold)}
+#cap .a{color:var(--ta)} #cap .b{color:var(--tb)}
+.brand{text-align:center;font-weight:800;font-size:12px;color:var(--ta);padding:0 0 6px}
+#ctl{display:flex;flex-direction:column;gap:6px;padding:6px 10px 10px;background:var(--panel);border-top:1px solid var(--line)}
+#ctl .row{display:flex;gap:6px;justify-content:center;align-items:center}
+#ctl button{flex:1;max-width:70px;height:40px;border-radius:10px;border:1px solid var(--line);background:#1b3037;color:var(--fg);font:800 14px var(--font)}
+#ctl button.main{background:var(--ta);color:#1b1208;border:0;max-width:90px;font-size:18px}
+#ctl input{width:100%;accent-color:var(--ta)}
+#ctl .hint{font-size:11.5px;color:var(--muted);text-align:center}
+body.clean #ctl{display:none}
+.overlay{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:rgba(8,16,18,.95);padding:20px;animation:fade .3s}
+.overlay h1{margin:0;font-size:34px;font-weight:900;color:var(--gold);line-height:1.1}
+.overlay h2{margin:4px 0 0;font-size:18px;font-weight:700}
+.overlay p{margin:10px 0 0;color:var(--muted);font-weight:600}
+.overlay .pts{margin-top:12px;font-size:20px;font-weight:900}
+.overlay .a{color:var(--ta)} .overlay .b{color:var(--tb)}
+.overlay .cta{margin-top:22px;font-weight:800;color:var(--ta)}
+#msg{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;font-size:16px;font-weight:700}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes drop{from{transform:translate(-50%,-50%) scale(.7);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@media (min-width:700px) and (min-height:560px){:root{--mw:22px;--tw:58px}.nm{max-width:110px;font-size:14px}.av{width:34px;height:34px}.seat{max-width:200px}#cap{font-size:24px}}
+</style>
+</head>
+<body>
+<div id="msg">Loading the replay…</div>
+<div id="app" hidden>
+  <header><div class="logo">Patta · Party<small id="sub"></small></div><div class="score" id="score"></div></header>
+  <div class="center" id="center"></div>
+  <div id="stage"><div class="felt"></div><div id="seats"></div><div id="trick"></div></div>
+  <div id="cap"></div>
+  <div class="brand">Play Rung with friends · Free on Google Play</div>
+  <div id="ctl">
+    <input type="range" id="bar" min="0" value="0">
+    <div class="row">
+      <button id="bRestart" title="Start again">⏮</button>
+      <button id="bBack" title="Step back">◀</button>
+      <button id="bPlay" class="main">▶</button>
+      <button id="bNext" title="Next move">▶|</button>
+      <button id="bSpeed">1x</button>
+    </div>
+    <div class="row">
+      <button id="bNames" style="max-width:150px">👤 Names: on</button>
+      <button id="bClean" style="max-width:170px">🎬 Recording mode</button>
+    </div>
+    <div class="hint" id="hint">Recording mode hides these buttons. Tap the screen to bring them back.</div>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const SYM = { S: '♠', H: '♥', D: '♦', C: '♣' }, SNAME = { S: 'Spades', H: 'Hearts', D: 'Diamonds', C: 'Clubs' };
+const RL = r => ({ 11: 'J', 12: 'Q', 13: 'K', 14: 'A' }[r] || String(r));
+const RED = s => s === 'H' || s === 'D';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const TEAM = ['Orange team', 'Blue team'], TC = ['a', 'b'];
+const teamHTML = t => `<span class="${TC[t]}">${TEAM[t]}</span>`;
+const cardTxt = c => c.s === 'J' ? 'the Joker' : RL(c.r) + SYM[c.s];
+let R = null, steps = [], at = 0, playing = false, timer = null, speed = 1, names = true;
+const SPEEDS = [0.5, 1, 1.5, 2];
+
+function nameOf(s) { const st = R.seats[s]; return !names && !st.bot ? 'Player ' + (s + 1) : st.name; }
+const nameHTML = s => `<span class="${TC[s % 2]}">${esc(nameOf(s))}</span>`;
+
+// ---------- build every step of the hand once, so play / step back / the slider are instant ----------
+function build() {
+  const n = R.n, cards = new Map();
+  let st = { hands: Array.from({ length: n }, () => []), acts: {}, bid: null, trump: null, trick: [], won: [0, 0], seatTricks: Array(n).fill(0), round: 0,
+    active: -1, cap: '', big: false, done: false, show: null, score: R.score, overlay: 'intro' };
+  const snap = (ms, patch) => { st = { ...st, ...patch }; steps.push({ ms, st: JSON.parse(JSON.stringify(st)) }); };
+  snap(2600, {});
+  st.overlay = null;
+  const plan = [5, 4, 4];
+  let lastBidVal = 0;
+  for (const e of R.ev) {
+    if (e.t === 'd') {
+      const hands = st.hands.map((h, s) => h.concat(e.c[s].map(([id, su, r]) => { const c = { id, s: su, r }; cards.set(id, c); return c; })));
+      const round = st.round + 1;
+      snap(1300, { hands, round, acts: {}, active: -1, trick: [], cap: `Round ${round}: ${plan[round - 1] || ''} cards each`, big: false });
+    } else if (e.t === 'b') {
+      const acts = { ...st.acts }; let cap, bid = st.bid;
+      if (e.w) { acts[e.s] = '👀'; cap = `${nameHTML(e.s)} watches this round`; }
+      else if (e.v) { const own = bid && bid.s === e.s; acts[e.s] = e.v; bid = { v: e.v, s: e.s }; cap = e.f ? `All passed. ${nameHTML(e.s)} must bid 6` : own ? `${nameHTML(e.s)} raises own bid to ${e.v}` : `${nameHTML(e.s)} bids ${e.v}`; }
+      else { acts[e.s] = 'Pass'; cap = `${nameHTML(e.s)} passes`; }
+      snap(e.v ? 1300 : 800, { acts, bid, active: e.s, cap, big: false });
+    } else if (e.t === 't') {
+      const cap = e.k === 'call' ? `${nameHTML(e.s)} calls ${SYM[e.x]} ${SNAME[e.x]} trump` : e.k === 'change' ? `${nameHTML(e.s)} changes trump to ${SYM[e.x]} ${SNAME[e.x]}` : e.k === 'keep' ? `Trump stays ${SYM[e.x]} ${SNAME[e.x]}` : `No raise. Trump stays ${SYM[e.x]}`;
+      snap(e.k === 'stay' ? 1100 : 1600, { trump: e.x, active: e.k === 'stay' ? -1 : e.s, cap, big: e.k === 'call' || e.k === 'change' });
+    } else if (e.t === 'p') {
+      const c = cards.get(e.c), trick = st.done ? [] : st.trick.slice(), lead = trick.length ? trick[0].c.s : null;
+      const cut = !!(lead && c.s === st.trump && lead !== st.trump && c.s !== 'J'), over = cut && trick.some(t => t.c.s === st.trump);
+      trick.push({ s: e.s, c, cut, jk: c.s === 'J' });
+      const hands = st.hands.slice(); hands[e.s] = hands[e.s].filter(x => x.id !== e.c);
+      const cap = c.s === 'J' ? `${nameHTML(e.s)} throws the Joker!` : !lead ? `${nameHTML(e.s)} leads ${cardTxt(c)}` : cut ? `${nameHTML(e.s)} ${over ? 'over-cuts' : 'cuts'} with ${cardTxt(c)}!` : `${nameHTML(e.s)} plays ${cardTxt(c)}`;
+      snap(cut || c.s === 'J' ? 1250 : 850, { hands, trick, done: false, show: null, acts: trick.length === 1 ? {} : st.acts, active: e.s, cap, big: cut || c.s === 'J' });
+    } else if (e.t === 'w') {
+      const won = st.won.slice(); won[e.team]++; const seatTricks = st.seatTricks.slice(); seatTricks[e.cr]++;
+      const cap = e.sec ? `Jokers cancel. ${nameHTML(e.cr)} wins the trick` : e.fl ? `Joker flips it! ${teamHTML(e.team)} take the trick` : `${nameHTML(e.cr)} wins the trick`;
+      snap(1500, { won, seatTricks, done: true, show: e.sh, active: -1, cap, big: !!(e.fl || e.sec) });
+    } else if (e.t === 'x') {
+      const won = st.won.slice(); won[e.team] += e.left;
+      snap(2200, { won, active: e.s, cap: `${nameHTML(e.s)} is stuck with ${e.left === 1 ? 'a joker' : e.left + ' jokers'}. ${teamHTML(e.team)} take ${e.left}`, big: true });
+    }
+  }
+  if (R.res) snap(5000, { overlay: 'end', active: -1, cap: '', trick: [], score: R.res.score });
+}
+
+// ---------- drawing ----------
+function seatAngle(s) { return Math.PI / 2 + s * 2 * Math.PI / R.n; }
+function avHTML(s) {
+  const st = R.seats[s], av = st.av || {};
+  if (!names && !st.bot) return `<div class="av">P</div>`;
+  if (av.a !== undefined) return `<div class="av"><img src="/avatars/${+av.a}-${s % 2 ? 'b' : 'a'}.svg" alt=""></div>`;
+  if (av.e) return `<div class="av" style="font-size:18px">${esc(av.e)}</div>`;
+  if (av.u) return `<div class="av"><img src="${esc(av.u)}" alt="" referrerpolicy="no-referrer"></div>`;
+  return `<div class="av">${esc((st.name || '?')[0].toUpperCase())}</div>`;
+}
+function sortHand(h, trump) {
+  const order = trump ? [trump, ...['S', 'H', 'C', 'D'].filter(x => x !== trump)] : ['S', 'H', 'C', 'D'];
+  return h.slice().sort((a, b) => (a.s === 'J' ? -1 : order.indexOf(a.s)) - (b.s === 'J' ? -1 : order.indexOf(b.s)) || b.r - a.r);
+}
+const miniHTML = c => c.s === 'J' ? '<div class="mc j"><b>J</b><i>🃏</i></div>' : `<div class="mc ${RED(c.s) ? 'red' : ''}"><b class="${c.r === 10 ? 't' : ''}">${RL(c.r)}</b><i>${SYM[c.s]}</i></div>`;
+function draw() {
+  const { st } = steps[at], n = R.n, stage = $('stage'), W = stage.clientWidth, H = stage.clientHeight;
+  const portrait = H > W;
+  // seats on the edge of the felt; cards of each trick a bit inside
+  const rx = portrait ? 34 : 40, ry = portrait ? 42 : 40;
+  $('seats').innerHTML = R.seats.map((_, s) => {
+    const a = seatAngle(s), x = 50 + rx * Math.cos(a), y = 50 + ry * Math.sin(a), act = st.acts[s];
+    const below = Math.sin(a) > 0.3; // seats at the bottom show their cards above the name
+    const mini = `<div class="mini">${sortHand(st.hands[s], st.trump).map(miniHTML).join('')}</div>`;
+    return `<div class="seat ${s % 2 ? 'tb' : 'ta'} ${st.active === s ? 'on' : ''}" style="left:${x}%;top:${y}%">
+      ${below ? mini : ''}
+      <div class="who" style="position:relative">${avHTML(s)}<div><div class="nm">${esc(nameOf(s))}</div><div class="tk">${st.seatTricks[s]} trick${st.seatTricks[s] === 1 ? '' : 's'}</div></div>
+        ${act != null ? `<span class="act ${act === 'Pass' ? 'pass' : ''}">${act}</span>` : ''}</div>
+      ${below ? '' : mini}</div>`;
+  }).join('');
+  const trx = portrait ? 15 : 17, tr_y = portrait ? 17 : 20;
+  $('trick').innerHTML = st.trick.map(({ s, c, cut, jk }) => {
+    const a = seatAngle(s), x = 50 + trx * Math.cos(a), y = 50 + tr_y * Math.sin(a);
+    const face = c.s === 'J' ? '<span class="r">J</span><span class="p">🃏</span>' : `<span class="r">${RL(c.r)}</span><span class="p">${SYM[c.s]}</span>`;
+    return `<div class="tc ${c.s === 'J' ? 'j' : RED(c.s) ? 'red' : ''} ${st.done && st.show === c.id ? 'win' : ''} ${cut ? 'cut' : ''} ${jk ? 'jk' : ''}" style="left:${x}%;top:${y}%">${face}</div>`;
+  }).join('');
+  const need = st.bid ? Math.max(7, st.bid.v) : 0, bt = st.bid ? st.bid.s % 2 : 0;
+  $('center').innerHTML = st.bid ? `<div class="contract">Bid ${st.bid.v}${st.trump ? ` <span class="tr" style="color:${RED(st.trump) ? '#ff6b61' : '#fff'}">${SYM[st.trump]}</span>` : ''} · ${esc(nameOf(st.bid.s))}</div>
+    ${st.round >= 3 && (st.won[0] || st.won[1] || st.trick.length) ? `<div class="tricks">Tricks <span class="${TC[bt]}">${st.won[bt]}/${need}</span> · <span class="${TC[1 - bt]}">${st.won[1 - bt]}</span></div>` : ''}` : '';
+  const sc = st.score, lead = sc > 0 ? 0 : 1;
+  $('score').innerHTML = `<span class="a">● ${sc > 0 ? '+' + sc : 0}</span><span class="b">● ${sc < 0 ? '+' + -sc : 0}</span>`;
+  $('cap').innerHTML = `<div>${st.cap}</div>`; $('cap').className = st.big ? 'big' : '';
+  const old = stage.querySelector('.overlay'); if (old) old.remove();
+  if (st.overlay === 'intro') stage.insertAdjacentHTML('beforeend', `<div class="overlay"><p style="margin:0">Hand replay</p><h1>Hand ${R.handNo}</h1>
+    <h2>${R.n} players${R.joker ? ' · Joker mode' : ''}</h2><p>${teamHTML(0)} vs ${teamHTML(1)} · all cards open</p></div>`);
+  if (st.overlay === 'end') {
+    const r = R.res, title = String(r.title).replace(/\{t(\d)\}/g, (_, t) => TEAM[+t]);
+    stage.insertAdjacentHTML('beforeend', `<div class="overlay"><h1>${esc(title)}</h1>
+      <h2>Bid ${r.v} ${SYM[r.trump] || ''} · ${esc(nameOf(r.bidSeat))}</h2>
+      <p>Tricks: ${teamHTML(0)} ${r.tricks[0]} · ${teamHTML(1)} ${r.tricks[1]}</p>
+      <div class="pts">${teamHTML(r.winner)} +${r.pts}</div>
+      ${r.over ? `<p>Game over · ${teamHTML(r.score > 0 ? 0 : 1)} win the game</p>` : ''}
+      <div class="cta">Play Rung with friends · Patta Party<br>Free on Google Play</div></div>`);
+  }
+  $('bar').value = at; $('bPlay').textContent = playing ? '⏸' : at >= steps.length - 1 ? '↻' : '▶';
+}
+
+// ---------- playback ----------
+function go(i) { at = Math.max(0, Math.min(steps.length - 1, i)); draw(); }
+function tick() {
+  clearTimeout(timer);
+  if (!playing) return;
+  if (at >= steps.length - 1) { playing = false; draw(); return; }
+  timer = setTimeout(() => { go(at + 1); tick(); }, steps[at].ms / speed);
+}
+function play(on) { playing = on; if (on && at >= steps.length - 1) at = 0; draw(); tick(); }
+function sizeVars() {
+  const W = innerWidth, H = innerHeight, n = R ? R.n : 4;
+  const big = W >= 700 && H >= 560;
+  const mw = big ? (n === 4 ? 26 : 22) : (n === 4 ? 21 : n === 6 ? 18 : 16);
+  document.documentElement.style.setProperty('--mw', mw + 'px');
+  document.documentElement.style.setProperty('--tw', (big ? (n === 4 ? 64 : 54) : (n === 4 ? 48 : 40)) + 'px');
+}
+
+async function load() {
+  const id = new URLSearchParams(location.search).get('id') || '';
+  try {
+    const r = await fetch('/replay/data/' + encodeURIComponent(id));
+    if (!r.ok) throw new Error('missing');
+    R = await r.json();
+  } catch (e) { $('msg').textContent = 'This replay is not available. Replays are kept for 7 days.'; return; }
+  $('msg').remove(); $('app').hidden = false;
+  $('sub').textContent = `Hand ${R.handNo} replay · ${R.n} players${R.joker ? ' · Joker' : ''}`;
+  build(); $('bar').max = steps.length - 1; sizeVars(); go(0);
+  $('bPlay').onclick = () => play(!playing);
+  $('bBack').onclick = () => { play(false); go(at - 1); };
+  $('bNext').onclick = () => { play(false); go(at + 1); };
+  $('bRestart').onclick = () => { go(0); play(true); };
+  $('bSpeed').onclick = () => { speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]; $('bSpeed').textContent = speed + 'x'; tick(); };
+  $('bNames').onclick = () => { names = !names; $('bNames').textContent = '👤 Names: ' + (names ? 'on' : 'off'); steps = []; build(); draw(); };
+  $('bClean').onclick = () => { document.body.classList.add('clean'); setTimeout(draw, 50); if (!playing) setTimeout(() => { go(0); play(true); }, 1200); };
+  $('bar').oninput = () => { play(false); go(+$('bar').value); };
+  $('stage').onclick = () => { if (document.body.classList.contains('clean')) { document.body.classList.remove('clean'); play(false); setTimeout(draw, 50); } };
+  addEventListener('resize', () => { sizeVars(); draw(); });
+}
+load();
+</script>
+</body>
+</html>

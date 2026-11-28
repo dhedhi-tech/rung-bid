@@ -9,6 +9,7 @@ const S = require('./stats');
 const P = require('./play');
 const R = require('./reports');
 const F = require('./friends');
+const RP = require('./replays');
 // Signed-in players who are online right now: profile id -> Map(socket id -> socket)
 const online = new Map();
 const goOnline = (id, socket) => { if (!online.has(id)) online.set(id, new Map()); online.get(id).set(socket.id, socket); };
@@ -62,6 +63,12 @@ app.get('/pic/:id', async (req, res) => {
   if (!d) return res.status(404).end();
   const m = /^data:(image\/jpeg);base64,(.+)$/.exec(d); if (!m) return res.status(404).end();
   res.set('Cache-Control', req.query.v ? 'public, max-age=604800, immutable' : 'public, max-age=3600'); res.type(m[1]).send(Buffer.from(m[2], 'base64'));
+});
+// Hand replay data (replay.html plays it back)
+app.get('/replay/data/:id', async (req, res) => {
+  const d = await RP.get(String(req.params.id));
+  if (!d) return res.status(404).json({ error: 'not found' });
+  res.set('Cache-Control', 'private, max-age=3600').json(d);
 });
 app.get('/config', (_req, res) => { res.set('Cache-Control', 'no-cache'); res.json(A.config()); });
 // playing = games running with a real player connected and seated. Checked before every deploy (a deploy ends running games).
@@ -233,6 +240,7 @@ function wireProgress(t) {
   t.levelOf = p => { const pr = profOf(p); return pr ? A.levelOf(pr.xp) : null; };
   t.avOf = p => { const pr = profOf(p); return pr ? A.avOf(pr) : null; };
   t.idOf = p => { const a = pidAuth.get(p); return a ? a.profile.id : null; };
+  t.onReplay = rec => (realGame() ? RP.save(rec, t.code) : null); // hand replay (replays.js)
   t.onHandEnd = info => {
     if (info.over && realGame()) S.logGame({ kind: 'finish', ...tableInfo(t), hands: t.G.handNo });
     if (info.over) try { levelUp(t, info); } catch (e) { console.error('skill', e); }

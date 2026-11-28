@@ -767,6 +767,21 @@ function rateBoxOn(key, iWon) {
 }
 const rateBoxHTML = () => `<div class="rate-box" id="rateBox"><div class="rate-q">Enjoying Patta Party?</div><div class="rate-stars">★★★★★</div>
   <button class="rate-btn" id="rateBtn">⭐ Rate us on Google Play</button><small>Takes 10 seconds. It helps more people find the game.</small></div>`;
+// Hand replays (Nov 28 2026): every hand of the game, played back with all cards open (replay.html), to screen-record for YouTube
+function replaysHTML(R) {
+  const list = R.replays || []; if (!list.length) return '';
+  const tag = k => (k === 'sweep' ? '🧹 ' : k === 'whitewash' ? '⚪ ' : '');
+  return `<div class="hl-box rp-box"><div class="hl-head">🎬 Hand replays · all cards open</div>
+    <div class="rp-list">${list.map(x => `<button class="rp-btn" data-rp="${esc(x.id)}">Hand ${x.h}<small>${tag(x.kind)}${esc(x.contract)}</small></button>`).join('')}</div>
+    <p class="rp-note">Tap a hand to watch it. Record your screen while it plays to make a video. Kept for 7 days.</p></div>`;
+}
+function bindReplays() {
+  document.querySelectorAll('.rp-btn').forEach(b => b.onclick = () => {
+    const url = location.origin + '/replay?id=' + encodeURIComponent(b.dataset.rp);
+    const Br = NATIVE_APP && capPlugin('Browser'); // in the app: open in the phone's browser, so the table stays open
+    if (Br) Br.open({ url }).catch(() => window.open(url, '_blank')); else window.open(url, '_blank');
+  });
+}
 function bindRateBox() {
   if (!$('rateBtn')) return;
   $('rateBtn').onclick = () => {
@@ -1261,10 +1276,11 @@ function resultScreen() {
       ${levelUpHTML()}
       ${nudgeHTML(R, true)}
       ${HL.key === S.code && HL.list.length ? `<div class="hl-box"><div class="hl-head">Your highlights</div>${HL.list.map((h, i) => `<div class="hl-row"><span>${h.info.title === 'Clean sweep!' ? '🧹 Clean sweep' : '⚪ Whitewash'} <small>Hand ${h.hand} · ${h.info.title === 'Clean sweep!' ? 'Bid' : 'They bid'} ${esc(h.contract)}</small></span><button class="hl-share" id="hl${i}">Share</button></div>`).join('')}</div>` : ''}
+      ${replaysHTML(R)}
       ${S.isHost ? '<button class="primary" id="againBtn">Play again</button>' : '<p class="hint">Waiting for the host to start a new game.</p>'}
       ${ANDROID_WEB ? `<a class="get-app" href="${playUrl('game_over')}" target="_blank" rel="noopener"><span class="ga-ico">▶</span><span><b>Play in the free app</b><small>Get Patta Party on Google Play</small></span></a>` : ''}
       <button class="linkbtn" id="leaveOver">Leave table</button>`);
-    bindRateBox();
+    bindRateBox(); bindReplays();
     if ($('shareWin')) $('shareWin').onclick = async () => {
       const b = $('shareWin'); if (b.disabled) return; b.disabled = true; b.textContent = 'Getting your picture ready…';
       try {
