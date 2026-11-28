@@ -505,7 +505,8 @@ io.on('connection', socket => {
     catch (e) { console.error('leaderboard', e.message); reply(cb, 'Leaderboard is not available right now'); }
   });
   // My last games (hand replays to watch later)
-  socket.on('myGames', async (_, cb) => {
+  socket.on('myGames', async (a, b) => {
+    const cb = typeof a === 'function' ? a : b; // the app sends no data, so the callback comes first
     const now = Date.now(); if (socket.data.lastMg && now - socket.data.lastMg < 800) return reply(cb, 'Slow down a little'); socket.data.lastMg = now;
     try { const a = pidAuth.get(pid); reply(cb, null, { list: await RP.myGames(pid, a ? a.profile.id : null) }); }
     catch (e) { console.error('myGames', e.message); reply(cb, 'Could not load your games'); }
