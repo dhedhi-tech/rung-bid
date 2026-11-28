@@ -24,6 +24,8 @@ let pid = store.get('rb-pid');
 if (!pid) { pid = 'p' + Math.random().toString(36).slice(2) + Date.now().toString(36); store.set('rb-pid', pid); }
 let myName = store.get('rb-name') || '';
 let tableCode = (new URLSearchParams(location.search).get('t') || '').toUpperCase() || null;
+// Hand replay (Nov 29 2026): /?rp=<id>&me=<seat> plays a saved hand on this same game screen (replay-play.js), no server game
+const RP_ID = (new URLSearchParams(location.search).get('rp') || '').replace(/[^\w-]/g, '').slice(0, 30) || null;
 let homeN = 4, homeJ = false, homeL = 10, homePub = true, homeCoach = true, homeSwap = false;
 const limitName = l => (l === 6 ? 'Quick · 6 hands' : l === 10 ? 'Normal · 10 hands' : 'Full · no hand limit');
 
@@ -768,7 +770,7 @@ function rateBoxOn(key, iWon) {
 }
 const rateBoxHTML = () => `<div class="rate-box" id="rateBox"><div class="rate-q">Enjoying Patta Party?</div><div class="rate-stars">★★★★★</div>
   <button class="rate-btn" id="rateBtn">⭐ Rate us on Google Play</button><small>Takes 10 seconds. It helps more people find the game.</small></div>`;
-// Hand replays (Nov 28 2026): every hand of the game, played back with all cards open (replay.html), to screen-record for YouTube
+// Hand replays (Nov 28 2026): every hand of the game, played back on the game screen itself (/?rp=, replay-play.js), to screen-record for YouTube
 function replaysHTML(R) {
   const list = R.replays || []; if (!list.length) return '';
   const tag = k => (k === 'sweep' ? '🧹 ' : k === 'whitewash' ? '⚪ ' : '');
@@ -783,14 +785,15 @@ function bindReplays() {
 function openReplay(id, seat) {
   closeReplay();
   const d = document.createElement('div'); d.id = 'rpView';
-  d.innerHTML = `<iframe src="/replay?id=${encodeURIComponent(id)}${seat != null ? '&me=' + seat : ''}&embed=1" allow="autoplay; fullscreen" title="Hand replay"></iframe><button id="rpClose" aria-label="Close">✕</button>`;
+  d.innerHTML = `<iframe src="/?rp=${encodeURIComponent(id)}${seat != null ? '&me=' + seat : ''}&embed=1" allow="autoplay; fullscreen" title="Hand replay"></iframe><button id="rpClose" aria-label="Close">✕</button>`;
   document.body.appendChild(d);
   $('rpClose').onclick = closeReplay;
 }
 function closeReplay() { const d = $('rpView'); if (d) d.remove(); }
-addEventListener('message', e => { // replay.html: recording mode hides the ✕ too
-  if (e.origin !== location.origin || !e.data || e.data.rp !== 'clean') return;
-  if ($('rpClose')) $('rpClose').hidden = !!e.data.on;
+addEventListener('message', e => { // replay frame: its own ✕ Close button, and the outer ✕ stays hidden
+  if (e.origin !== location.origin || !e.data) return;
+  if (e.data.rp === 'close') closeReplay();
+  else if (e.data.rp === 'clean' && $('rpClose')) $('rpClose').hidden = !!e.data.on;
 });
 // My last games: the last 5 games I played, each hand with a replay (kept 7 days)
 async function myGamesSheet() {
@@ -1928,7 +1931,8 @@ function boot() {
 boot();
 // Opened the game without a link but were in a game before: go straight back to it
 let resuming = false;
-if (!tableCode && store.get('rb-table') && myName) { tableCode = store.get('rb-table'); resuming = true; history.replaceState(null, '', '/?t=' + tableCode); connecting(); }
+if (RP_ID) loadScript('/replay-play.js');
+else if (!tableCode && store.get('rb-table') && myName) { tableCode = store.get('rb-table'); resuming = true; history.replaceState(null, '', '/?t=' + tableCode); connecting(); }
 else if (tableCode) {
   if (looksSignedIn() || (myName && guestRecently())) connecting();
   else { invitePending = true; nameScreen(); }
@@ -1976,6 +1980,6 @@ if (NATIVE_APP) {
       try { const r = await Promise.race([ir.testLab(), new Promise(res => setTimeout(() => res(null), 1500))]); if (r && r.testLab) { store.set('rb-test', '1'); sock.auth.test = 1; } } catch (e) {}
     }
   }
-  sock.connect();
+  if (!RP_ID) sock.connect();
 })();
-initAuth();
+if (!RP_ID) initAuth();

@@ -328,6 +328,18 @@ button:focus-visible{outline:2px solid var(--team-a);outline-offset:2px}
   .display{font-size:32px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* Hand replay on the game screen (?rp=, replay-play.js): live-game buttons hidden, replay controls in place of the reactions bar */
+#rpBar{display:none}
+body.rp-mode #tblInvite,body.rp-mode #coachBtn,body.rp-mode #reacts,body.rp-mode #rulesBtn,body.rp-mode #awayBtn,body.rp-mode #hintBtn,body.rp-mode .watchn,body.rp-mode #awayBar,body.rp-mode .status{display:none!important}
+body.rp-mode #rpBar{display:flex;flex-direction:column;gap:6px}
+#rpSlide{width:100%;margin:0;accent-color:var(--team-a)}
+.rp-row{display:flex;gap:5px;justify-content:center}
+.rp-row button{background:var(--panel);border:1px solid var(--line);color:var(--fg);border-radius:999px;height:34px;min-width:38px;padding:0 9px;font-size:14px;font-weight:600;flex:0 1 auto}
+.rp-row .rp-main{background:var(--team-a);border-color:var(--team-a);color:#1a1205;min-width:56px;font-size:16px}
+.rp-row button.off{opacity:.5;text-decoration:line-through}
+body.rp-clean #rpBar,body.rp-clean .top .tools{visibility:hidden}
+.rp-pick{outline:3px solid #ffd76a!important;box-shadow:0 0 0 7px rgba(255,215,106,.35)!important;transform:scale(1.08)}
 </style>
 <style>
 /* ---------- Online additions ---------- */
