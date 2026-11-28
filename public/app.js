@@ -613,7 +613,8 @@ const TROPHY = `<svg viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradi
       <rect x="54" y="64" width="12" height="18" fill="#d99a24"/><rect x="38" y="82" width="44" height="12" rx="3" fill="url(#tg)"/><rect x="32" y="94" width="56" height="10" rx="3" fill="#8a5a10"/>
       <path d="M48 28l4 10 10 1-8 6 3 10-9-6-9 6 3-10-8-6 10-1z" fill="#fffbe6" opacity=".9" transform="translate(12 0)"/></svg>`;
 // Share a win: a square picture of the result + text, through the phone's share sheet
-function loadImg(src) { return new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; }); }
+// cors: load photos from other sites (Google) in CORS mode so the picture can still be saved; if the site refuses, we fall back to the letter
+function loadImg(src, cors) { return new Promise(res => { const i = new Image(); if (cors && /^https?:/.test(src)) i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = () => res(null); i.src = src; }); }
 async function winImage(info) {
   const W = 1080, c = document.createElement('canvas'); c.width = c.height = W;
   const x = c.getContext('2d'), F = '"Archivo", system-ui, sans-serif';
@@ -633,8 +634,10 @@ async function winImage(info) {
   for (let i = 0; i < team.length; i++) {
     const p = team[i], cx = W / 2 - row / 2 + i * (sz + gap) + sz / 2, cy = 720;
     x.save(); x.beginPath(); x.arc(cx, cy, sz / 2, 0, Math.PI * 2); x.closePath(); x.fillStyle = '#f4a93a'; x.fill(); x.clip();
-    const im = p.av && p.av.a !== undefined ? await loadImg(`/avatars/${+p.av.a}-a.svg`) : null;
-    if (im) x.drawImage(im, cx - sz / 2, cy - sz / 2, sz, sz);
+    const av = p.av || {}, photo = av.u || (p.av === undefined && p.avatar) || '';
+    const im = av.a !== undefined ? await loadImg(`/avatars/${+av.a}-a.svg`) : photo ? await loadImg(photo, true) : null;
+    if (im) { const w = im.naturalWidth, h = im.naturalHeight, s = Math.min(w, h); if (s && w !== h) x.drawImage(im, (w - s) / 2, (h - s) / 2, s, s, cx - sz / 2, cy - sz / 2, sz, sz); else x.drawImage(im, cx - sz / 2, cy - sz / 2, sz, sz); } // photo: centre-crop to a square
+    else if (av.e) { x.font = `${sz * .62}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`; x.textBaseline = 'middle'; x.fillText(av.e, cx, cy + 4); x.textBaseline = 'alphabetic'; }
     else { x.fillStyle = '#1b1208'; x.font = `900 ${sz * .5}px ${F}`; x.textBaseline = 'middle'; x.fillText((p.name || '?')[0].toUpperCase(), cx, cy + 4); x.textBaseline = 'alphabetic'; }
     x.restore();
     x.fillStyle = '#fff'; x.font = `700 ${team.length > 3 ? 30 : 34}px ${F}`;
