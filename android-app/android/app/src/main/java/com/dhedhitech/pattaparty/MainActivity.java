@@ -7,6 +7,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(InstallRefPlugin.class); // install source (where the player found the app)
+        registerPlugin(ScreenRecPlugin.class); // hand replay -> video to share
         super.onCreate(savedInstanceState);
     }
 }

@@ -37,6 +37,12 @@
             </intent-filter>
         </activity>
 
+        <!-- Hand replay videos: Android only allows screen recording from a foreground service -->
+        <service
+            android:name=".ScreenRecService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -56,6 +62,9 @@
     <!-- Voice chat -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Hand replay videos (record the game screen, then share the video) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <!-- Short buzz on your turn -->
     <uses-permission android:name="android.permission.VIBRATE" />
 </manifest>

@@ -7,7 +7,7 @@
   const q = new URLSearchParams(location.search);
   const ID = RP_ID, EMBED = q.get('embed') === '1';
   const meQ = q.get('me');
-  let R = null, ME = -1, frames = [], at = 0, playing = false, timer = null, speed = 1, names = true, clean = false;
+  let R = null, ME = -1, frames = [], at = 0, playing = false, timer = null, speed = 1, names = true, clean = false, recording = null;
   const SPEEDS = [0.5, 1, 1.5, 2];
 
   /* ---------- page set-up: hide what only makes sense in a live game ---------- */
@@ -19,7 +19,7 @@
   bar.innerHTML = `<input type="range" id="rpSlide" min="0" value="0" aria-label="Replay position">
     <div class="rp-row"><button id="rpRestart" aria-label="Start again">⏮</button><button id="rpBack" aria-label="Step back">◀</button>
     <button id="rpPlay" class="rp-main" aria-label="Play">▶</button><button id="rpNext" aria-label="Next move">▶|</button>
-    <button id="rpSpeed">1x</button><button id="rpNames" aria-label="Show or hide names">👤</button><button id="rpRec" aria-label="Recording mode">🎬 Rec</button></div>`;
+    <button id="rpSpeed">1x</button><button id="rpNames" aria-label="Show or hide names">👤</button><button id="rpRec" aria-label="Recording mode">🎬</button><button id="rpShare" class="rp-share" aria-label="Share">📤<span class="lbl"> Share</span></button></div>`;
   document.querySelector('.app').appendChild(bar);
 
   /* ---------- load ---------- */
@@ -177,10 +177,12 @@
         <div><span>Tricks</span><b>${teamName(0)} ${res.tricks[base() % 2]} · ${teamName(1)} ${res.tricks[1 - base() % 2]}</b></div>
         <div><span>Points</span><b class="${good}">${teamName(wt)} +${res.pts}</b></div>
         <div><span>Score</span><b>${scoreText()}</b></div></div>
-      <button class="primary" id="rpAgain">▶ Watch again</button><button class="linkbtn" id="rpDone">Close</button>`);
+      <button class="primary" id="rpAgain">▶ Watch again</button><button class="secondary rp-wide" id="rpShare2">📤 Share this hand</button><button class="linkbtn" id="rpDone">Close</button>`);
+    $('rpShare2').onclick = shareSheet;
     $('rpAgain').onclick = () => { closeModal(); playing = true; go(0, false); tick(); };
     $('rpDone').onclick = () => $('leaveBtn').click();
     playing = false; $('rpPlay').textContent = '▶';
+    if (recording) setTimeout(finishVideo, 2600); // the result card stays in the video for a moment
   }
   function tick() {
     clearTimeout(timer);
@@ -208,9 +210,74 @@
   $('rpNames').onclick = () => { names = !names; toast(names ? 'Names shown' : 'Real players\' names hidden'); $('rpNames').classList.toggle('off', !names); go(at, false); };
   $('rpRec').onclick = e => { e.stopPropagation(); clean = true; document.body.classList.add('rp-clean'); toast('Recording mode: tap the screen to show the buttons again'); };
   document.addEventListener('click', e => {
-    if (!clean || e.target.closest('#rpBar') || e.target.closest('.sheet')) return;
+    if (recording || !clean || e.target.closest('#rpBar') || e.target.closest('.sheet')) return;
     clean = false; document.body.classList.remove('rp-clean');
   }, true);
+  $('rpShare').onclick = shareSheet;
+
+  /* ---------- share: video file or link (Nov 29 2026, manager) ---------- */
+  const plug = n => capPlugin(n) || (parent !== window && parent.Capacitor && parent.Capacitor.Plugins && parent.Capacitor.Plugins[n]) || null; // the replay may run in a frame
+  const replayLink = () => location.origin + '/?rp=' + encodeURIComponent(ID) + (ME >= 0 ? '&me=' + ME : '');
+  const SHARE_TEXT = `Watch this hand of Patta Party 🃏 Play free: https://www.pattaparty.com/get?ref=share_replay`;
+  function shareSheet() {
+    if (!R) return;
+    play(false);
+    openModal('rpshare', `<div class="eyebrow">Hand ${R.handNo} replay</div><h2>Share this hand</h2>
+      <button class="primary" id="shVid">📹 Share video</button>
+      <p class="hint">Makes a video of this hand, then opens WhatsApp, YouTube and more.</p>
+      <button class="secondary rp-wide" id="shLink">🔗 Copy link</button>
+      <p class="hint">Anyone with the link can watch it, for 7 days.</p>
+      <button class="linkbtn" id="shNo">Cancel</button>`);
+    $('shVid').onclick = makeVideo;
+    $('shLink').onclick = copyLink;
+    $('shNo').onclick = closeModal;
+  }
+  async function copyLink() {
+    const url = replayLink();
+    let ok = false;
+    try { await navigator.clipboard.writeText(url); ok = true; } catch (e) {}
+    if (!ok) try { const t = document.createElement('textarea'); t.value = url; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); ok = document.execCommand('copy'); t.remove(); } catch (e) {}
+    if (ok) { closeModal(); toast('Link copied. Paste it in WhatsApp or anywhere. It works for 7 days.'); }
+    else $('sheet').insertAdjacentHTML('beforeend', `<p class="hint" style="user-select:all;word-break:break-all">${esc(url)}</p>`); // copy by hand
+  }
+  async function makeVideo() {
+    const Rec = plug('ScreenRec');
+    if (!NATIVE_APP || !Rec) {
+      openModal('rpshare', NATIVE_APP
+        ? `<h2>Update the app</h2><p class="hint">Video sharing needs the latest Patta Party app. Update it from Google Play, then try again.</p>
+           <button class="primary" id="shPlay">Open Google Play</button><button class="secondary" id="shLink">🔗 Copy link instead</button><button class="linkbtn" id="shNo">Close</button>`
+        : `<h2>Video sharing is in the app</h2><p class="hint">In the Patta Party app on Android, one tap makes the video. Here, you can tap 🎬 and record with your phone's screen recorder, or share the link.</p>
+           <button class="primary" id="shLink">🔗 Copy link</button><button class="linkbtn" id="shNo">Close</button>`);
+      if ($('shPlay')) $('shPlay').onclick = () => window.open(PLAY_PAGE, '_blank');
+      $('shLink').onclick = copyLink; $('shNo').onclick = closeModal;
+      return;
+    }
+    closeModal(); play(false); ac();
+    recording = { at: Date.now() };
+    clean = true; document.body.classList.add('rp-clean', 'rp-recording');
+    go(0, false);
+    try { await Rec.start({ audio: true }); }
+    catch (e) { endRecording(); toast(/cancel/i.test(String(e && e.message)) ? 'Video cancelled' : 'Could not make the video on this phone. Try Copy link.'); return; }
+    await new Promise(r => setTimeout(r, 800)); // Android's "Start recording?" box closes
+    announce('Hand replay', '▶', `Hand ${R.handNo}`, `${R.n} players${R.joker ? ' · Joker mode' : ''}`, '', 1800);
+    await new Promise(r => setTimeout(r, 1900));
+    if (!recording) return;
+    play(true); // resultCard() calls finishVideo() at the end
+  }
+  async function finishVideo() {
+    if (!recording) return;
+    const Rec = plug('ScreenRec'), Sh = plug('Share');
+    let res = null;
+    try { res = await Rec.stop(); } catch (e) {}
+    endRecording();
+    if (!res || !res.path) { toast('Could not make the video on this phone. Try Copy link.'); return; }
+    try { await Sh.share({ title: 'Patta Party hand replay', text: SHARE_TEXT, files: [res.path], dialogTitle: 'Share video' }); } catch (e) {} // closed the share menu
+  }
+  function endRecording() {
+    recording = null; clean = false;
+    document.body.classList.remove('rp-clean', 'rp-recording');
+  }
+  addEventListener('pagehide', () => { if (recording) { const Rec = plug('ScreenRec'); recording = null; if (Rec) Rec.stop().catch(() => {}); } });
   addEventListener('keydown', e => { if (e.key === ' ') { e.preventDefault(); $('rpPlay').click(); } else if (e.key === 'ArrowRight') $('rpNext').click(); else if (e.key === 'ArrowLeft') $('rpBack').click(); });
   addEventListener('resize', () => { if (S) go(at, false); });
 })();
