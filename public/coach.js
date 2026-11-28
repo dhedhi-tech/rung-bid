@@ -85,6 +85,7 @@
   }
   function skip() {
     if (!C) return;
+    store.set('rb-coach', '0'); // Skip tips = off for later games too, until the player turns it on again
     C.off = true; C.queue = []; C.open = null; el().hidden = true; dim(false); mark();
     send('coach', { off: true });
   }
@@ -206,7 +207,7 @@
   /* ---------- tips for moments in the hand ---------- */
   function onState() {
     if (!S) return;
-    if (!C || C.code !== S.code) { reset(S.code); if (store.get('rb-coach') === '0' && store.get('rb-first') === 'done' && S.guided && me0()) { C.off = true; send('coach', { off: true }); } }
+    if (!C || C.code !== S.code) { reset(S.code); if (store.get('rb-coach') === '0' && S.guided && me0()) { C.off = true; send('coach', { off: true }); } }
     // First game over: from now on the coach is off unless the player turns it on (Tutorial switch)
     if (S.phase === 'over' && !C.over) { C.over = true; if (store.get('rb-coach') == null) store.set('rb-coach', '0'); store.set('rb-first', 'done'); }
     if (S.phase === 'game' && S.handNo === 1 && C.over) { C.over = false; C.shown = new Set(['start', 'team', 'deals', 'decks', 'jokerMode', 'bidRule', 'playRule', 'follow', 'tap', 'end']);
@@ -277,8 +278,8 @@
           : kind === 'sweep' ? T(`The bidding team won every single trick, so they score double: ${to}.`, `بولی والی ٹیم نے سارے ہاتھ جیت لیے، اس لیے دگنے نمبر: ${toU}۔`)
           : kind === 'broken' ? T(`The bid was broken, so the defending team scores double: ${to}.`, `بولی ٹوٹ گئی، اس لیے دوسری ٹیم کو دگنے نمبر: ${toU}۔`)
           : T(`The bidding team didn't win a single trick, so the defenders score 4×: ${to}.`, `بولی والی ٹیم ایک ہاتھ بھی نہ جیت سکی، اس لیے دوسری ٹیم کو 4 گنا: ${toU}۔`);
-        say('end', T(`${res.en} The score bar at the top is a tug of war: the first team to lead by <b>52</b> wins the game.<br><br>I'll keep showing my pick (it glows) for the rest of this game. Tap <b>Skip tips</b> or the <b>Tutorial</b> switch to turn me off.`,
-          `${res.ur} اوپر اسکور کی پٹی رسہ کشی جیسی ہے: جو ٹیم پہلے <b>52</b> سے آگے ہو جائے وہ گیم جیتتی ہے۔<br><br>اس گیم میں آگے بھی میں اپنی رائے دکھاتا رہوں گا (چمکتا ہوا پتا)۔ مجھے بند کرنے کے لیے <b>ٹپس بند کریں</b> یا <b>ٹیوٹوریل</b> بٹن دبائیں۔`), { pos: 'low', end: true });
+        say('end', T(`${res.en} The score bar at the top is a tug of war: the first team to lead by <b>52</b> wins the game.<br><br>I'll keep showing my pick (it glows) for the rest of this game. Tap the <b>🎓 Tutorial</b> switch at the top to turn me off.`,
+          `${res.ur} اوپر اسکور کی پٹی رسہ کشی جیسی ہے: جو ٹیم پہلے <b>52</b> سے آگے ہو جائے وہ گیم جیتتی ہے۔<br><br>اس گیم میں آگے بھی میں اپنی رائے دکھاتا رہوں گا (چمکتا ہوا پتا)۔ مجھے بند کرنے کے لیے اوپر <b>🎓 Tutorial</b> بٹن دبائیں۔`), { pos: 'low', end: true });
         break;
       }
     }

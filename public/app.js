@@ -477,7 +477,7 @@ function startFirstGame() {
   if (first) { store.set('rb-first', 'started'); FIRST_TRY = (+(store.get('rb-first-tries') || 0)) + 1; store.set('rb-first-tries', String(FIRST_TRY)); }
   if (!myName) setName('Guest ' + (100 + Math.floor(Math.random() * 900))); // they can change it later
   // First game: tutorial on. After that it is off unless the player turned it on (they move up by winning without it)
-  homeN = 4; homeJ = false; homeL = 6; homePub = false; homeCoach = first || store.get('rb-coach') === '1';
+  homeN = 4; homeJ = false; homeL = 6; homePub = false; homeCoach = store.get('rb-coach') === '1' || (first && store.get('rb-coach') !== '0'); // the player turned it off: stays off
   hideWelcome(); createTable(true);
 }
 // Open tables: public tables with a free seat, refreshed while the home screen is showing
@@ -1798,7 +1798,7 @@ async function createTable(practice) {
   awaitingCreate = true;
   if (homeJ && mySkill() === 1) { // Joker training: 4 players with bots, private; tutorial on the first time
     practice = true; homeN = 4; homePub = false;
-    homeCoach = !store.get('rb-jtrain') || store.get('rb-coach') === '1'; store.set('rb-jtrain', '1');
+    homeCoach = store.get('rb-coach') === '1' || (!store.get('rb-jtrain') && store.get('rb-coach') !== '0'); store.set('rb-jtrain', '1');
   }
   const r = await send('create', { n: homeN, joker: homeJ, limit: homeL, pub: homePub, swap: !practice && !homePub && homeSwap, guided: !!(practice && homeCoach), region: myRegion(), first: FIRST_TRY || undefined });
   FIRST_TRY = 0;
