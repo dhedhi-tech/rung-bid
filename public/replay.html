@@ -11,7 +11,8 @@
 /* Hand replay (Nov 28 2026): plays back a saved hand with every player's cards open, for screen recording (YouTube). */
 :root{--bg:#0c1618;--panel:#14242a;--line:#2b444b;--fg:#eef3f0;--muted:#94aba8;--paper:#fbf7ef;--red:#c3302b;--black:#191b22;
   --ta:#f4a93a;--tb:#6cc4d8;--gold:#f4c542;--good:#82d48e;--felt:#1f7a4d;--felt-dark:#0d4a2e;--font:"Archivo",system-ui,sans-serif;--card:"DM Serif Display",Georgia,serif;
-  --mw:17px;--tw:44px;color-scheme:dark}
+  --mw:17px;--tw:44px;color-scheme:dark;
+  --paper-edge:#ddd3c1;--suit-red:#c3302b;--suit-black:#191b22;--team-a:#f4a93a;--team-b:#6cc4d8;--joker:#7b2fbf;--joker-tint:#e9dbf7;--back-a:#8a2329;--back-dot:#e8c27b;--font-card:"DM Serif Display",Georgia,"Times New Roman",serif;--cw:60px}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px var(--font);overflow:hidden;-webkit-tap-highlight-color:transparent}
 #app{position:fixed;inset:0;display:flex;flex-direction:column;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
@@ -46,22 +47,49 @@ header{display:flex;align-items:center;justify-content:space-between;gap:8px;pad
   box-shadow:0 0 0 1px #c9bfae,1px 2px 3px rgba(0,0,0,.35);display:flex;flex-direction:column;align-items:flex-start;padding:2px 0 0 2px;gap:1px}
 .mc.red{color:var(--red)} .mc.j{background:#e9dbf7;color:#7b2fbf}
 .mc b{font-weight:800} .mc b.t{letter-spacing:-.14em;font-size:.86em} .mc i{font-style:normal;font-family:system-ui;font-size:calc(var(--mw)*.6)}
-.tc{position:absolute;width:var(--tw);height:calc(var(--tw)*1.4);transform:translate(-50%,-50%);background:var(--paper);border-radius:calc(var(--tw)*.1);color:var(--black);
-  box-shadow:0 0 0 1px #c9bfae,0 6px 14px rgba(0,0,0,.45);font-family:var(--card);z-index:2;animation:drop .3s cubic-bezier(.2,.8,.3,1)}
-.tc.red{color:var(--red)} .tc.j{background:radial-gradient(circle,#fff 30%,#e9dbf7);color:#7b2fbf}
-.tc .r{position:absolute;left:5px;top:4px;font-size:calc(var(--tw)*.36);line-height:1}
-.tc .p{position:absolute;left:50%;top:56%;transform:translate(-50%,-50%);font-size:calc(var(--tw)*.6);font-family:system-ui}
-.tc.win{box-shadow:0 0 0 3px var(--gold),0 0 22px var(--gold);z-index:4}
-.tc.cut::after{content:"CUT";position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);background:var(--red);color:#fff;font:900 9px var(--font);padding:1px 5px;border-radius:5px;letter-spacing:.06em}
-.tc.jk::after{content:"JOKER";position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);background:#7b2fbf;color:#fff;font:900 9px var(--font);padding:1px 5px;border-radius:5px}
-#myhand{display:flex;justify-content:center;min-height:0}#myhand:empty{display:none}
+#myhand{position:relative;margin:2px 8px 0;flex:none}#myhand.off{display:none}
+.tcard{--cw:var(--tw);transform:translate(-50%,-50%);transition:left .32s cubic-bezier(.2,.8,.3,1),top .32s cubic-bezier(.2,.8,.3,1),opacity .35s,transform .35s,box-shadow .2s}
+.tcard.win{box-shadow:inset 0 0 0 1px var(--paper-edge),0 0 0 3px var(--team-a),0 8px 22px rgba(0,0,0,.5)}
+.tcard.win.tb{box-shadow:inset 0 0 0 1px var(--paper-edge),0 0 0 3px var(--team-b),0 8px 22px rgba(0,0,0,.5)}
+.tcard.win{box-shadow:inset 0 0 0 1px var(--paper-edge),0 0 0 3px var(--gold),0 0 20px var(--gold)!important}
+#myhand .card{transform-origin:50% 100%;bottom:10px}
 .mini.mine{--mw:38px;padding-left:calc(var(--mw)*.45)} .mini.mine .mc{margin-left:calc(var(--mw)*-.45);border-radius:5px}
-.backs{display:flex;align-items:center;padding-left:8px}
-.backs i{width:13px;height:18px;margin-left:-8px;border-radius:2px;background:repeating-linear-gradient(45deg,#8a2329 0 3px,#a8323a 3px 6px);box-shadow:0 0 0 1px #e8c27b,1px 1px 3px rgba(0,0,0,.4)}
-.backs b{margin-left:5px;font-size:11px;font-weight:800;color:var(--muted)}
+.backs{display:flex;align-items:center;gap:3px;padding-left:2px}
+.backs .mini-back{width:12px;height:17px;margin-left:-8px}.backs .mini-back:first-child{margin-left:0}
+.backs b{margin-left:4px;font-size:11px;font-weight:800;color:var(--muted)}
 .pop{position:absolute;left:50%;top:-14px;transform:translateX(-50%);font-size:40px;z-index:6;animation:popup 1.1s ease-out both;pointer-events:none}
 .pop.stk{top:-60px}.pop.stk img{width:96px;height:96px;filter:drop-shadow(0 6px 12px rgba(0,0,0,.5))}
 @keyframes popup{0%{transform:translate(-50%,10px) scale(.4);opacity:0}25%{transform:translate(-50%,0) scale(1.15);opacity:1}100%{transform:translate(-50%,-6px) scale(1);opacity:1}}
+/* --- cards: same look as the game (copied from index.html) --- */
+.card{position:absolute;width:var(--cw);height:calc(var(--cw)*1.4);background:var(--paper);border-radius:calc(var(--cw)*.1);color:var(--suit-black);font-family:var(--font-card);
+  box-shadow:inset 0 0 0 1px var(--paper-edge),0 4px 10px rgba(0,0,0,.35);user-select:none;-webkit-user-select:none}
+.card.red{color:var(--suit-red)}
+.c-idx{position:absolute;left:7%;top:4%;display:flex;flex-direction:column;align-items:center;line-height:.95;font-size:calc(var(--cw)*.3)}
+.c-idx small{font-size:calc(var(--cw)*.3)}
+.c-pip{position:absolute;right:8%;bottom:4%;font-size:calc(var(--cw)*.62);line-height:1}
+
+
+.cut-fx{position:absolute;width:0;height:0;z-index:30;pointer-events:none}
+.cut-ring,.cut-slash,.cut-label{will-change:transform,opacity}
+.cut-ring{position:absolute;left:-60px;top:-60px;width:120px;height:120px;border-radius:50%;border:4px solid var(--team-a);opacity:0;animation:cutRing .7s ease-out .25s both}
+.cut-fx.tb .cut-ring{border-color:var(--team-b)}
+.cut-slash{position:absolute;left:-75px;top:-4px;width:150px;height:8px;border-radius:4px;background:linear-gradient(90deg,transparent,var(--paper) 30%,var(--team-a) 50%,var(--paper) 70%,transparent);
+  transform:rotate(-35deg) scaleX(0);animation:cutSlash .45s cubic-bezier(.2,.9,.3,1) .22s both;box-shadow:0 0 18px var(--team-a)}
+.cut-fx.tb .cut-slash{background:linear-gradient(90deg,transparent,var(--paper) 30%,var(--team-b) 50%,var(--paper) 70%,transparent);box-shadow:0 0 18px var(--team-b)}
+.cut-label{position:absolute;left:0;top:-62px;transform:translateX(-50%);white-space:nowrap;background:var(--paper);color:var(--suit-black);border-radius:8px;padding:3px 10px;
+  font-weight:900;font-stretch:120%;font-size:16px;letter-spacing:.06em;box-shadow:0 0 0 3px var(--team-a),0 10px 24px rgba(0,0,0,.5);animation:cutLabel 1.3s ease both .2s}
+.cut-fx.tb .cut-label{box-shadow:0 0 0 3px var(--team-b),0 10px 24px rgba(0,0,0,.5)}
+.cut-label b{font-family:var(--font-card);font-size:20px;font-weight:400}
+.cut-label.red b{color:var(--suit-red)}
+@keyframes cutSlash{0%{transform:rotate(-35deg) scaleX(0);opacity:1}70%{transform:rotate(-35deg) scaleX(1);opacity:1}100%{transform:rotate(-35deg) scaleX(1.1);opacity:0}}
+@keyframes cutRing{0%{opacity:.9;transform:scale(.3)}100%{opacity:0;transform:scale(1.4)}}
+@keyframes cutLabel{0%{opacity:0;transform:translateX(-50%) scale(.5)}15%{opacity:1;transform:translateX(-50%) scale(1.15)}25%{transform:translateX(-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-10px)}}
+
+.card.joker{background:radial-gradient(circle at 50% 55%,var(--paper) 45%,var(--joker-tint) 100%);overflow:hidden}
+.card.joker .j-art{position:absolute;inset:0;width:100%;height:100%;display:block}
+.jfx .cut-ring{border-color:var(--joker)!important}
+.jlabel{background:var(--joker)!important;color:#fff!important;box-shadow:0 0 0 3px var(--paper),0 10px 24px rgba(0,0,0,.5)!important}
+.mini-back{width:9px;height:13px;border-radius:2px;background:radial-gradient(circle,var(--back-dot) 0 22%,transparent 24%) 0 0/5px 5px,var(--back-a);border:1px solid rgba(255,255,255,.25)}
 #cap{min-height:52px;margin:6px 12px 4px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;font-size:19px;line-height:1.2}
 #cap.big{font-size:23px;color:var(--gold)}
 #cap .a{color:var(--ta)} #cap .b{color:var(--tb)}
@@ -161,7 +189,10 @@ function build() {
       trick.push({ s: e.s, c, cut, jk: c.s === 'J' });
       const hands = st.hands.slice(); hands[e.s] = hands[e.s].filter(x => x.id !== e.c);
       const cap = c.s === 'J' ? `${nameHTML(e.s)} throws the Joker!` : !lead ? `${nameHTML(e.s)} leads ${cardTxt(c)}` : cut ? `${nameHTML(e.s)} ${over ? 'over-cuts' : 'cuts'} with ${cardTxt(c)}!` : `${nameHTML(e.s)} plays ${cardTxt(c)}`;
-      snap(cut || c.s === 'J' ? 1250 : 850, { hands, trick, done: false, show: null, acts: trick.length === 1 ? {} : st.acts, active: e.s, cap, big: cut || c.s === 'J' });
+      const second = c.s === 'J' && trick.filter(t => t.c.s === 'J').length === 2;
+      snap(cut || c.s === 'J' ? 1500 : 850, { hands, trick, done: false, show: null, acts: trick.length === 1 ? {} : st.acts, active: e.s, cap, big: cut || c.s === 'J',
+        fx: cut ? { s: e.s, x: c.s, over } : c.s === 'J' ? { s: e.s, j: 1, second } : null });
+      st.fx = null;
     } else if (e.t === 'w') {
       const won = st.won.slice(); won[e.team]++; const seatTricks = st.seatTricks.slice(); seatTricks[e.cr]++;
       const cap = e.sec ? `Jokers cancel. ${nameHTML(e.cr)} wins the trick` : e.fl ? `Joker flips it! ${teamHTML(e.team)} take the trick` : `${nameHTML(e.cr)} wins the trick`;
@@ -192,6 +223,13 @@ function sortHand(h, trump) {
   const order = trump ? [trump, ...['S', 'H', 'C', 'D'].filter(x => x !== trump)] : ['S', 'H', 'C', 'D'];
   return h.slice().sort((a, b) => (a.s === 'J' ? -1 : order.indexOf(a.s)) - (b.s === 'J' ? -1 : order.indexOf(b.s)) || b.r - a.r);
 }
+const JOKER_SVG = '<svg class="j-art" viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"> <defs> <radialGradient id="rBg_@" cx="50%" cy="38%" r="65%"><stop offset="0" stop-color="#ffffff"/><stop offset=".6" stop-color="#f7f3ec"/><stop offset="1" stop-color="#e4ddd1"/></radialGradient> <radialGradient id="rFace_@" cx="50%" cy="62%" r="60%"><stop offset="0" stop-color="#f1e9dc"/><stop offset=".6" stop-color="#c9bfb1"/><stop offset="1" stop-color="#5b524a"/></radialGradient> <radialGradient id="rEye_@" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#000"/><stop offset=".7" stop-color="#1a1210" stop-opacity=".9"/><stop offset="1" stop-color="#3a302a" stop-opacity="0"/></radialGradient> <linearGradient id="rCoat_@" x1="0" x2="1"><stop offset="0" stop-color="#7a0f1c"/><stop offset=".35" stop-color="#1a0b0e"/><stop offset=".7" stop-color="#0b0607"/><stop offset="1" stop-color="#5a0a15"/></linearGradient> <linearGradient id="rLimb_@" x1="0" x2="1"><stop offset="0" stop-color="#8e1222"/><stop offset=".5" stop-color="#120809"/><stop offset="1" stop-color="#3d0710"/></linearGradient> <pattern id="rDia_@" width="6" height="8" patternUnits="userSpaceOnUse"><path d="M3 0 L6 4 L3 8 L0 4 Z" fill="#b3172a" opacity=".22"/></pattern> <filter id="rGrain_@" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="1.6" numOctaves="2" seed="4"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .22 0"/><feComposite in2="SourceGraphic" operator="in"/></filter> <filter id="rGlow_@"><feGaussianBlur stdDeviation=".6"/></filter> </defs> <rect width="100" height="140" fill="url(#rBg_@)"/> <rect x="3" y="3" width="94" height="134" rx="6" fill="none" stroke="#b3172a" stroke-width="1.2"/> <rect x="6" y="6" width="88" height="128" rx="4" fill="none" stroke="#b3172a" stroke-width=".35" opacity=".45"/> <g id="rIdx_@" fill="#c81c30" font-family="Georgia,Times New Roman,serif" font-weight="700" font-size="6.4" text-anchor="middle"> <text x="11" y="15">J</text><text x="11" y="21.5">O</text><text x="11" y="28">K</text><text x="11" y="34.5">E</text><text x="11" y="41">R</text> </g> <use href="#rIdx_@" transform="rotate(180 50 70)"/> <ellipse cx="50" cy="124" rx="20" ry="2.5" fill="#000" opacity=".25"/> <path d="M46 92 L43 121 L45.5 121.5 L49 93 Z" fill="url(#rLimb_@)"/> <path d="M52 93 L55.5 121.5 L58 121 L55 92 Z" fill="url(#rLimb_@)"/> <path d="M45.5 121.5 Q38 124 33 120.5 Q37 121 43 120.5 Z" fill="#0d0708" stroke="#8e1222" stroke-width=".4"/> <path d="M55.5 121.5 Q63 124 68 120.5 Q63 121 57.5 120.5 Z" fill="#0d0708" stroke="#8e1222" stroke-width=".4"/> <path d="M41 56 Q50 52 59 56 L62 80 L64.5 98 L57 95 L54 99 L50 95 L46 99 L43 95 L35.5 98 L38 80 Z" fill="url(#rCoat_@)"/> <path d="M41 56 Q50 52 59 56 L62 80 L64.5 98 L57 95 L54 99 L50 95 L46 99 L43 95 L35.5 98 L38 80 Z" fill="url(#rDia_@)"/> <path d="M50 56 L50 95" stroke="#000" stroke-width=".5" opacity=".6"/> <path d="M41 56 L38 80 L35.5 98" fill="none" stroke="#d0283c" stroke-width=".35" opacity=".8"/> <path d="M41.5 58 Q35 70 34 86" fill="none" stroke="url(#rLimb_@)" stroke-width="3" stroke-linecap="round"/> <path d="M34 86 q-1.2 4 -1.6 7.5 M34.6 86.4 q-.2 4.2 -.4 8 M35.3 86.4 q.6 3.8 .8 7.2 M33.4 85.8 q-2 2.4 -2.8 4.8" stroke="#d9cfc0" stroke-width=".7" fill="none" stroke-linecap="round"/> <path d="M58.5 58 Q67 64 68 52 Q68.5 46 66 42" fill="none" stroke="url(#rLimb_@)" stroke-width="3" stroke-linecap="round"/> <g transform="translate(66 36) rotate(14)"><rect x="-4" y="-6" width="8" height="11.5" rx=".8" fill="#e6dccb"/><rect x="-3.2" y="-5.2" width="6.4" height="9.9" rx=".5" fill="none" stroke="#b3172a" stroke-width=".3"/><path d="M0 -2.2 l2 2.6 l-2 2.6 l-2 -2.6 Z" fill="#b3172a"/></g> <path d="M65.5 42.5 q-1.8 -1.5 -2.4 -4.5 M66.4 42 q-.8 -2.4 -.6 -5.4 M67.2 42.2 q.4 -2.4 1 -4.8 M64.8 43.2 q-2.4 0 -3.4 -1.4" stroke="#d9cfc0" stroke-width=".7" fill="none" stroke-linecap="round"/> <path d="M39 57 L36 50 L42 54 L44 47.5 L47 53 L50 48 L53 53 L56 47.5 L58 54 L64 50 L61 57 Q50 60 39 57 Z" fill="#100809" stroke="#b3172a" stroke-width=".45"/> <path d="M43 40 Q43 52 50 54.5 Q57 52 57 40 Q57 31 50 31 Q43 31 43 40 Z" fill="url(#rFace_@)"/> <path d="M43.5 41 Q45 49 47 51" fill="none" stroke="#5b524a" stroke-width=".5" opacity=".7"/> <path d="M56.5 41 Q55 49 53 51" fill="none" stroke="#5b524a" stroke-width=".5" opacity=".7"/> <ellipse cx="46.6" cy="40.6" rx="2.6" ry="2" fill="url(#rEye_@)"/> <ellipse cx="53.4" cy="40.6" rx="2.6" ry="2" fill="url(#rEye_@)"/> <circle cx="47.2" cy="40.8" r=".7" fill="#ff2a40" filter="url(#rGlow_@)"/><circle cx="47.2" cy="40.8" r=".35" fill="#ffb3bc"/> <circle cx="54" cy="40.8" r=".7" fill="#ff2a40" filter="url(#rGlow_@)"/><circle cx="54" cy="40.8" r=".35" fill="#ffb3bc"/> <path d="M44 38 Q46.5 37.6 48.6 39.2 M56 38 Q53.5 37.6 51.4 39.2" stroke="#2a201c" stroke-width=".55" fill="none"/> <path d="M43.6 44.8 Q50 52.6 56.4 44.8 Q53.5 48.6 50 48.9 Q46.5 48.6 43.6 44.8 Z" fill="#0a0506"/> <path d="M44.6 45.9 Q50 51.3 55.4 45.9 Q53 47.9 50 48.1 Q47 47.9 44.6 45.9 Z" fill="#d8d0c2"/> <path d="M45.6 46.7 v1 M46.6 47.3 v1.1 M47.7 47.8 v1.1 M48.8 48 v1.1 M50 48.1 v1.1 M51.2 48 v1.1 M52.3 47.8 v1.1 M53.4 47.3 v1.1 M54.4 46.7 v1" stroke="#2a1d1a" stroke-width=".28"/> <path d="M45.2 49 Q50 51.4 54.8 49" stroke="#0a0506" stroke-width=".35" fill="none"/> <path d="M43.6 44.8 q-.9 -.4 -1.3 -1.4 M56.4 44.8 q.9 -.4 1.3 -1.4" stroke="#3a2f2a" stroke-width=".45" fill="none"/> <path d="M42.5 36 Q48 29 50 30 Q52 29 57.5 36 Q56 33 50 32.4 Q44 33 42.5 36 Z" fill="#0c0607"/> <path d="M43 35 Q36 30 33 22 Q31 17 27 19 Q31 19 31.5 25 Q33 32 42 37 Z" fill="#7d0e1b" stroke="#c81c30" stroke-width=".3"/> <path d="M47 32 Q46 22 50 14 Q53 9 56 12 Q52 12 52 20 Q52 26 53 32 Z" fill="#0d0708" stroke="#7d0e1b" stroke-width=".4"/> <path d="M57 35 Q64 30 67 22 Q69 17 73 19 Q69 19 68.5 25 Q67 32 58 37 Z" fill="#120809" stroke="#c81c30" stroke-width=".3"/> <circle cx="27" cy="19.3" r="1.3" fill="#6e6458"/><circle cx="56" cy="12" r="1.3" fill="#6e6458"/><circle cx="73" cy="19.3" r="1.3" fill="#6e6458"/> <rect width="100" height="140" filter="url(#rGrain_@)" opacity=".3"/> </svg>';
+let jokerN = 0;
+const jokerArt = () => JOKER_SVG.replace(/_@/g, '_' + (++jokerN));
+function cardHTML(c, extra = '', style = '') {
+  if (c.s === 'J') return `<div class="card joker ${extra}" style="${style}">${jokerArt()}</div>`;
+  return `<div class="card ${RED(c.s) ? 'red' : ''} ${extra}" style="${style}"><span class="c-idx">${RL(c.r)}<small>${SYM[c.s]}</small></span><span class="c-pip">${SYM[c.s]}</span></div>`;
+}
 const miniHTML = c => c.s === 'J' ? '<div class="mc j"><b>J</b><i>🃏</i></div>' : `<div class="mc ${RED(c.s) ? 'red' : ''}"><b class="${c.r === 10 ? 't' : ''}">${RL(c.r)}</b><i>${SYM[c.s]}</i></div>`;
 function draw() {
   const { st } = steps[at], n = R.n, stage = $('stage'), W = stage.clientWidth, H = stage.clientHeight;
@@ -203,7 +241,7 @@ function draw() {
     const below = Math.sin(a) > 0.3; // seats at the bottom show their cards above the name
     const n0 = st.hands[s].length;
     const mini = s === ME ? ''
-      : n0 ? `<div class="backs">${'<i></i>'.repeat(Math.min(n0, 6))}<b>${n0}</b></div>` : '';
+      : n0 ? `<div class="backs">${'<i class="mini-back"></i>'.repeat(Math.min(n0, 5))}<b>${n0}</b></div>` : '';
     const pop = st.pop && st.pop.s === s ? (st.pop.k ? `<div class="pop stk"><img src="${esc(stkSrc(st.pop.k))}" alt=""></div>` : `<div class="pop">${esc(st.pop.e)}</div>`) : '';
     return `<div class="seat ${TM(s % 2) ? 'tb' : 'ta'} ${st.active === s ? 'on' : ''} ${s === ME ? 'me' : ''}" style="left:${x}%;top:${y}%">${pop}
       ${below ? mini : ''}
@@ -211,13 +249,27 @@ function draw() {
         ${act != null ? `<span class="act ${act === 'Pass' ? 'pass' : ''}">${act}</span>` : ''}</div>
       ${below ? '' : mini}</div>`;
   }).join('');
-  $('myhand').innerHTML = ME >= 0 ? `<div class="mini mine">${sortHand(st.hands[ME], st.trump).map(miniHTML).join('')}</div>` : '';
-  const trx = portrait ? 15 : 17, tr_y = portrait ? 17 : 20;
-  $('trick').innerHTML = st.trick.map(({ s, c, cut, jk }) => {
-    const a = seatAngle(s), x = 50 + trx * Math.cos(a), y = 50 + tr_y * Math.sin(a);
-    const face = c.s === 'J' ? '<span class="r">J</span><span class="p">🃏</span>' : `<span class="r">${RL(c.r)}</span><span class="p">${SYM[c.s]}</span>`;
-    return `<div class="tc ${c.s === 'J' ? 'j' : RED(c.s) ? 'red' : ''} ${st.done && st.show === c.id ? 'win' : ''} ${cut ? 'cut' : ''} ${jk ? 'jk' : ''}" style="left:${x}%;top:${y}%">${face}</div>`;
-  }).join('');
+  if (ME >= 0) { // my cards, fanned like in the game (app.js renderHand)
+    const el = $('myhand'), hand = sortHand(st.hands[ME], st.trump), k = hand.length;
+    const cw = Math.round(Math.max(46, Math.min(84, innerWidth * 0.14, innerHeight * 0.1)));
+    el.style.setProperty('--cw', cw + 'px'); el.style.height = Math.round(cw * 1.4 + 22) + 'px';
+    const W = el.clientWidth, mid = (k - 1) / 2, tilt = k > 1 ? Math.min(3, 26 / (k - 1)) : 0, drop = Math.min(12, cw * 0.2);
+    const pad = Math.ceil(cw * 1.4 * Math.sin(mid * tilt * Math.PI / 180)) + 2;
+    const step = k > 1 ? Math.min(cw + 6, (W - 2 * pad - cw) / (k - 1)) : 0, start = (W - (cw + step * (k - 1))) / 2;
+    el.innerHTML = hand.map((c, i) => { const t = mid ? (i - mid) / mid : 0;
+      return cardHTML(c, '', `rotate:${((i - mid) * tilt).toFixed(1)}deg;translate:0 ${(t * t * drop).toFixed(1)}px;left:${start + i * step}px;z-index:${i}`); }).join('');
+  } else { $('myhand').innerHTML = ''; $('myhand').classList.add('off'); }
+  const tw = Math.round(n === 4 ? Math.min(W * 0.15, H * 0.1) : n === 6 ? Math.min(W * 0.115, H * 0.075) : Math.min(W * 0.105, H * 0.07)); // played cards, sized to the table
+  document.documentElement.style.setProperty('--tw', Math.max(36, tw) + 'px');
+  const trx = portrait ? (n === 4 ? 15 : 19) : (n === 4 ? 14 : 19), tr_y = portrait ? (n === 4 ? 14 : 18) : (n === 4 ? 15 : 21);
+  const tpos = s => { const a = seatAngle(s); return { x: 50 + trx * Math.cos(a), y: 50 + tr_y * Math.sin(a) }; };
+  const tcls = s => (TM(s % 2) ? 'tb' : 'ta');
+  $('trick').innerHTML = st.trick.map(({ s, c }, i) => {
+    const p = tpos(s), win = st.done && st.show === c.id;
+    return cardHTML(c, `tcard ${win ? 'win ' + tcls(s) : ''}`, `left:${p.x}%;top:${p.y}%;z-index:${win ? 20 : i + 1}`);
+  }).join('') + (st.fx ? (f => { const p = tpos(f.s);
+    return f.j ? `<div class="cut-fx jfx ${tcls(f.s)}" style="left:${p.x}%;top:${p.y}%"><span class="cut-ring"></span><span class="cut-label jlabel">${f.second ? 'CANCELLED' : 'REVERSE ⇄'}</span></div>`
+      : `<div class="cut-fx ${tcls(f.s)}" style="left:${p.x}%;top:${p.y}%"><span class="cut-ring"></span><span class="cut-slash"></span><span class="cut-label ${RED(f.x) ? 'red' : ''}">${f.over ? 'OVER CUT' : 'CUT'} <b>${SYM[f.x]}</b></span></div>`; })(st.fx) : '');
   const need = st.bid ? Math.max(7, st.bid.v) : 0, bt = st.bid ? st.bid.s % 2 : 0;
   $('center').innerHTML = st.bid ? `<div class="contract">Bid ${st.bid.v}${st.trump ? ` <span class="tr" style="color:${RED(st.trump) ? '#ff6b61' : '#fff'}">${SYM[st.trump]}</span>` : ''} · ${esc(nameOf(st.bid.s))}</div>
     ${st.round >= 3 && (st.won[0] || st.won[1] || st.trick.length) ? `<div class="tricks">Tricks <span class="${TC[TM(bt)]}">${st.won[bt]}/${need}</span> · <span class="${TC[TM(1 - bt)]}">${st.won[1 - bt]}</span></div>` : ''}` : '';
@@ -253,7 +305,6 @@ function sizeVars() {
   const big = W >= 700 && H >= 560;
   const mw = big ? (n === 4 ? 26 : 22) : (n === 4 ? 21 : n === 6 ? 18 : 16);
   document.documentElement.style.setProperty('--mw', mw + 'px');
-  document.documentElement.style.setProperty('--tw', (big ? (n === 4 ? 64 : 54) : (n === 4 ? 48 : 40)) + 'px');
 }
 
 async function load() {
